@@ -1,443 +1,349 @@
-import React, { useEffect, useState } from 'react';
+/**
+ * 🏠 IPTV Mobile App - Écran d'Accueil
+ * Écran principal avec chaînes récentes, favoris et accès rapide
+ */
+
+import React, { useState, useEffect } from 'react';
 import {
   View,
-  Text,
-  StyleSheet,
   ScrollView,
-  TouchableOpacity,
-  Alert,
-  RefreshControl,
-  useColorScheme,
+  StyleSheet,
+  Dimensions,
 } from 'react-native';
-import { AppManager } from '../modules/app/AppManager';
-import { Channel, Playlist } from '../types';
+import {
+  Surface,
+  Text,
+  Card,
+  Button,
+  Chip,
+  useTheme,
+  ActivityIndicator,
+} from 'react-native-paper';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { FlashList } from '@shopify/flash-list';
+import Icon from 'react-native-vector-icons/MaterialIcons';
 
-const HomeScreen: React.FC = () => {
-  const [appManager] = useState(() => AppManager.getInstance());
-  const [stats, setStats] = useState<any>(null);
+// Types
+import type { HomeScreenNavigationProp } from '../types';
+import type { Channel, Playlist, RecentChannel } from '../types';
+
+// Components (à créer)
+import ChannelCard from '../components/ChannelCard';
+import QuickActions from '../components/QuickActions';
+
+interface Props {
+  navigation: HomeScreenNavigationProp;
+}
+
+const { width } = Dimensions.get('window');
+
+const HomeScreen: React.FC<Props> = ({ navigation }) => {
+  const theme = useTheme();
+  const [loading, setLoading] = useState(true);
   const [recentChannels, setRecentChannels] = useState<Channel[]>([]);
   const [favoriteChannels, setFavoriteChannels] = useState<Channel[]>([]);
-  const [refreshing, setRefreshing] = useState(false);
-  const isDarkMode = useColorScheme() === 'dark';
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [stats, setStats] = useState({
+    totalChannels: 0,
+    totalPlaylists: 0,
+    favoriteCount: 0,
+  });
 
+  // Simulation de chargement des données
   useEffect(() => {
+    const loadHomeData = async () => {
+      try {
+        setLoading(true);
+        
+        // Simulation de chargement
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Données de démonstration
+        const mockRecentChannels: Channel[] = [
+          {
+            id: '1',
+            name: 'TF1 HD',
+            url: 'https://example.com/tf1',
+            logo: 'https://via.placeholder.com/80x80?text=TF1',
+            category: 'Généraliste',
+            quality: 'HD',
+          },
+          {
+            id: '2',
+            name: 'France 2 HD',
+            url: 'https://example.com/france2',
+            logo: 'https://via.placeholder.com/80x80?text=F2',
+            category: 'Généraliste',
+            quality: 'HD',
+          },
+          {
+            id: '3',
+            name: 'Canal+ Sport',
+            url: 'https://example.com/canalplus',
+            logo: 'https://via.placeholder.com/80x80?text=C+',
+            category: 'Sport',
+            quality: 'FHD',
+          },
+        ];
+        
+        const mockPlaylists: Playlist[] = [
+          {
+            id: '1',
+            name: 'Playlist Française',
+            channels: mockRecentChannels,
+            isLocal: false,
+            dateAdded: new Date().toISOString(),
+            lastUpdated: new Date().toISOString(),
+            totalChannels: 150,
+            type: 'M3U',
+          },
+        ];
+        
+        setRecentChannels(mockRecentChannels);
+        setFavoriteChannels(mockRecentChannels.slice(0, 2));
+        setPlaylists(mockPlaylists);
+        setStats({
+          totalChannels: 150,
+          totalPlaylists: 1,
+          favoriteCount: 2,
+        });
+        
+      } catch (error) {
+        console.error('Erreur chargement données accueil:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
     loadHomeData();
   }, []);
 
-  const loadHomeData = async () => {
-    try {
-      // Get app statistics
-      const appStats = appManager.getStats();
-      setStats(appStats);
-
-      // Get recent channels
-      const recent = await appManager.getStorageService().getRecentChannels();
-      const recentChannelData = recent.slice(0, 5).map(r => 
-        appManager.getPlaylistManager().getChannelById(r.channelId)
-      ).filter(Boolean) as Channel[];
-      setRecentChannels(recentChannelData);
-
-      // Get favorite channels
-      const favorites = await appManager.getFavoriteChannels();
-      setFavoriteChannels(favorites.slice(0, 5));
-
-    } catch (error) {
-      console.error('❌ Erreur chargement données accueil:', error);
-    }
+  const handleChannelPress = (channel: Channel) => {
+    navigation.navigate('Player', { channel });
   };
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await loadHomeData();
-    setRefreshing(false);
+  const handlePlaylistPress = (playlist: Playlist) => {
+    navigation.navigate('PlaylistDetail', { playlist });
   };
 
-  const playChannel = async (channel: Channel) => {
-    try {
-      await appManager.playChannel(channel);
-      Alert.alert('▶️ Lecture', `Lecture de ${channel.name}`);
-    } catch (error) {
-      Alert.alert('❌ Erreur', 'Impossible de lire cette chaîne');
-    }
-  };
-
-  const toggleFavorite = async (channelId: string) => {
-    try {
-      await appManager.toggleFavorite(channelId);
-      await loadHomeData(); // Refresh data
-    } catch (error) {
-      Alert.alert('❌ Erreur', 'Impossible de modifier les favoris');
-    }
-  };
-
-  const renderChannelCard = (channel: Channel, showFavorite = true) => (
-    <TouchableOpacity
-      key={channel.id}
-      style={[styles.channelCard, isDarkMode && styles.channelCardDark]}
-      onPress={() => playChannel(channel)}
-    >
-      <View style={styles.channelHeader}>
-        <Text 
-          style={[styles.channelName, isDarkMode && styles.channelNameDark]}
-          numberOfLines={1}
-        >
-          {channel.name}
-        </Text>
-        {showFavorite && (
-          <TouchableOpacity onPress={() => toggleFavorite(channel.id)}>
-            <Text style={styles.favoriteIcon}>
-              {appManager.isFavorite(channel.id) ? '❤️' : '🤍'}
-            </Text>
-          </TouchableOpacity>
-        )}
-      </View>
-      {channel.category && (
-        <Text style={[styles.channelCategory, isDarkMode && styles.channelCategoryDark]}>
-          {channel.category}
-        </Text>
-      )}
-    </TouchableOpacity>
+  const renderChannelItem = ({ item }: { item: Channel }) => (
+    <ChannelCard
+      channel={item}
+      onPress={handleChannelPress}
+      style={styles.channelCard}
+    />
   );
 
-  return (
-    <ScrollView 
-      style={[styles.container, isDarkMode && styles.containerDark]}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }
-    >
-      {/* Welcome Section */}
-      <View style={[styles.welcomeSection, isDarkMode && styles.welcomeSectionDark]}>
-        <Text style={[styles.welcomeTitle, isDarkMode && styles.welcomeTitleDark]}>
-          Bienvenue dans IPTV Mobile! 👋
-        </Text>
-        <Text style={[styles.welcomeSubtitle, isDarkMode && styles.welcomeSubtitleDark]}>
-          Application modulaire haute performance
-        </Text>
-      </View>
-
-      {/* Statistics */}
-      {stats && (
-        <View style={[styles.statsSection, isDarkMode && styles.statsSectionDark]}>
-          <Text style={[styles.sectionTitle, isDarkMode && styles.sectionTitleDark]}>
-            📊 Statistiques
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text style={[styles.loadingText, { color: theme.colors.onBackground }]}>
+            Chargement...
           </Text>
-          <View style={styles.statsGrid}>
-            <View style={[styles.statCard, isDarkMode && styles.statCardDark]}>
-              <Text style={[styles.statNumber, isDarkMode && styles.statNumberDark]}>
-                {stats.playlist.totalPlaylists}
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        
+        {/* En-tête avec statistiques */}
+        <Surface style={[styles.headerCard, { backgroundColor: theme.colors.surface }]} elevation={2}>
+          <Text variant="headlineSmall" style={[styles.welcomeText, { color: theme.colors.onSurface }]}>
+            Bienvenue dans IPTV Mobile
+          </Text>
+          <View style={styles.statsContainer}>
+            <View style={styles.statItem}>
+              <Text variant="titleLarge" style={{ color: theme.colors.primary }}>
+                {stats.totalChannels}
               </Text>
-              <Text style={[styles.statLabel, isDarkMode && styles.statLabelDark]}>
-                Playlists
-              </Text>
-            </View>
-            <View style={[styles.statCard, isDarkMode && styles.statCardDark]}>
-              <Text style={[styles.statNumber, isDarkMode && styles.statNumberDark]}>
-                {stats.playlist.totalChannels}
-              </Text>
-              <Text style={[styles.statLabel, isDarkMode && styles.statLabelDark]}>
+              <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
                 Chaînes
               </Text>
             </View>
-            <View style={[styles.statCard, isDarkMode && styles.statCardDark]}>
-              <Text style={[styles.statNumber, isDarkMode && styles.statNumberDark]}>
-                {stats.app.favoritesCount}
+            <View style={styles.statItem}>
+              <Text variant="titleLarge" style={{ color: theme.colors.secondary }}>
+                {stats.totalPlaylists}
               </Text>
-              <Text style={[styles.statLabel, isDarkMode && styles.statLabelDark]}>
+              <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
+                Playlists
+              </Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text variant="titleLarge" style={{ color: theme.colors.tertiary }}>
+                {stats.favoriteCount}
+              </Text>
+              <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
                 Favoris
               </Text>
             </View>
-            <View style={[styles.statCard, isDarkMode && styles.statCardDark]}>
-              <Text style={[styles.statNumber, isDarkMode && styles.statNumberDark]}>
-                {stats.playlist.totalCategories}
+          </View>
+        </Surface>
+
+        {/* Actions rapides */}
+        <QuickActions navigation={navigation} />
+
+        {/* Chaînes récentes */}
+        {recentChannels.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text variant="titleLarge" style={{ color: theme.colors.onBackground }}>
+                Récemment regardées
               </Text>
-              <Text style={[styles.statLabel, isDarkMode && styles.statLabelDark]}>
-                Catégories
-              </Text>
+              <Chip icon="history" compact>
+                {recentChannels.length}
+              </Chip>
             </View>
-          </View>
-        </View>
-      )}
-
-      {/* Recent Channels */}
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, isDarkMode && styles.sectionTitleDark]}>
-          🕒 Récemment regardées
-        </Text>
-        {recentChannels.length > 0 ? (
-          <View style={styles.channelsList}>
-            {recentChannels.map(channel => renderChannelCard(channel))}
-          </View>
-        ) : (
-          <View style={[styles.emptyCard, isDarkMode && styles.emptyCardDark]}>
-            <Text style={[styles.emptyText, isDarkMode && styles.emptyTextDark]}>
-              Aucune chaîne récente
-            </Text>
-            <Text style={[styles.emptySubtext, isDarkMode && styles.emptySubtextDark]}>
-              Commencez à regarder des chaînes pour les voir ici
-            </Text>
+            <FlashList
+              data={recentChannels}
+              renderItem={renderChannelItem}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              estimatedItemSize={160}
+              ItemSeparatorComponent={() => <View style={{ width: 12 }} />}
+              contentContainerStyle={styles.horizontalList}
+            />
           </View>
         )}
-      </View>
 
-      {/* Favorite Channels */}
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, isDarkMode && styles.sectionTitleDark]}>
-          ❤️ Mes favoris
-        </Text>
-        {favoriteChannels.length > 0 ? (
-          <View style={styles.channelsList}>
-            {favoriteChannels.map(channel => renderChannelCard(channel, false))}
-          </View>
-        ) : (
-          <View style={[styles.emptyCard, isDarkMode && styles.emptyCardDark]}>
-            <Text style={[styles.emptyText, isDarkMode && styles.emptyTextDark]}>
-              Aucun favori
-            </Text>
-            <Text style={[styles.emptySubtext, isDarkMode && styles.emptySubtextDark]}>
-              Ajoutez des chaînes à vos favoris pour les voir ici
-            </Text>
+        {/* Chaînes favorites */}
+        {favoriteChannels.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text variant="titleLarge" style={{ color: theme.colors.onBackground }}>
+                Favoris
+              </Text>
+              <Chip icon="favorite" compact>
+                {favoriteChannels.length}
+              </Chip>
+            </View>
+            <FlashList
+              data={favoriteChannels}
+              renderItem={renderChannelItem}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              estimatedItemSize={160}
+              ItemSeparatorComponent={() => <View style={{ width: 12 }} />}
+              contentContainerStyle={styles.horizontalList}
+            />
           </View>
         )}
-      </View>
 
-      {/* Quick Actions */}
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, isDarkMode && styles.sectionTitleDark]}>
-          ⚡ Actions rapides
-        </Text>
-        <View style={styles.actionsGrid}>
-          <TouchableOpacity 
-            style={[styles.actionCard, isDarkMode && styles.actionCardDark]}
-            onPress={() => Alert.alert('🔍 Recherche', 'Fonctionnalité bientôt disponible')}
-          >
-            <Text style={styles.actionIcon}>🔍</Text>
-            <Text style={[styles.actionText, isDarkMode && styles.actionTextDark]}>
-              Rechercher
-            </Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[styles.actionCard, isDarkMode && styles.actionCardDark]}
-            onPress={() => Alert.alert('📋 Playlists', 'Consultez l\'onglet Playlists')}
-          >
-            <Text style={styles.actionIcon}>📋</Text>
-            <Text style={[styles.actionText, isDarkMode && styles.actionTextDark]}>
-              Playlists
-            </Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[styles.actionCard, isDarkMode && styles.actionCardDark]}
-            onPress={() => Alert.alert('⚙️ Paramètres', 'Consultez l\'onglet Paramètres')}
-          >
-            <Text style={styles.actionIcon}>⚙️</Text>
-            <Text style={[styles.actionText, isDarkMode && styles.actionTextDark]}>
-              Paramètres
-            </Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[styles.actionCard, isDarkMode && styles.actionCardDark]}
-            onPress={() => Alert.alert('📊 Stats', JSON.stringify(stats, null, 2))}
-          >
-            <Text style={styles.actionIcon}>📊</Text>
-            <Text style={[styles.actionText, isDarkMode && styles.actionTextDark]}>
-              Statistiques
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </ScrollView>
+        {/* Playlists */}
+        {playlists.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text variant="titleLarge" style={{ color: theme.colors.onBackground }}>
+                Mes Playlists
+              </Text>
+              <Button
+                mode="text"
+                compact
+                onPress={() => navigation.navigate('PlaylistsTab' as any)}
+              >
+                Voir tout
+              </Button>
+            </View>
+            {playlists.map((playlist) => (
+              <Card
+                key={playlist.id}
+                style={styles.playlistCard}
+                onPress={() => handlePlaylistPress(playlist)}
+              >
+                <Card.Content>
+                  <View style={styles.playlistHeader}>
+                    <View style={styles.playlistInfo}>
+                      <Text variant="titleMedium" style={{ color: theme.colors.onSurface }}>
+                        {playlist.name}
+                      </Text>
+                      <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
+                        {playlist.totalChannels} chaînes • {playlist.type}
+                      </Text>
+                    </View>
+                    <Icon
+                      name="playlist-play"
+                      size={32}
+                      color={theme.colors.primary}
+                    />
+                  </View>
+                </Card.Content>
+              </Card>
+            ))}
+          </View>
+        )}
+
+        {/* Espacement en bas */}
+        <View style={{ height: 20 }} />
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
   },
-  containerDark: {
-    backgroundColor: '#1a1a1a',
+  scrollView: {
+    flex: 1,
   },
-  welcomeSection: {
-    padding: 20,
-    backgroundColor: '#fff',
-    marginBottom: 10,
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  welcomeSectionDark: {
-    backgroundColor: '#2a2a2a',
-  },
-  welcomeTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 5,
-  },
-  welcomeTitleDark: {
-    color: '#fff',
-  },
-  welcomeSubtitle: {
+  loadingText: {
+    marginTop: 16,
     fontSize: 16,
-    color: '#666',
   },
-  welcomeSubtitleDark: {
-    color: '#999',
+  headerCard: {
+    margin: 16,
+    padding: 20,
+    borderRadius: 12,
+  },
+  welcomeText: {
+    textAlign: 'center',
+    marginBottom: 16,
+    fontWeight: 'bold',
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+  },
+  statItem: {
+    alignItems: 'center',
   },
   section: {
-    marginBottom: 20,
+    marginVertical: 8,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 10,
-    paddingHorizontal: 20,
-  },
-  sectionTitleDark: {
-    color: '#fff',
-  },
-  statsSection: {
-    backgroundColor: '#fff',
-    padding: 20,
-    marginBottom: 10,
-  },
-  statsSectionDark: {
-    backgroundColor: '#2a2a2a',
-  },
-  statsGrid: {
+  sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-  },
-  statCard: {
-    backgroundColor: '#f9f9f9',
-    padding: 15,
-    borderRadius: 10,
     alignItems: 'center',
-    flex: 1,
-    marginHorizontal: 2,
+    paddingHorizontal: 16,
+    marginBottom: 12,
   },
-  statCardDark: {
-    backgroundColor: '#333',
-  },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#007AFF',
-  },
-  statNumberDark: {
-    color: '#0A84FF',
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 5,
-  },
-  statLabelDark: {
-    color: '#999',
-  },
-  channelsList: {
-    paddingHorizontal: 20,
+  horizontalList: {
+    paddingHorizontal: 16,
   },
   channelCard: {
-    backgroundColor: '#fff',
-    padding: 15,
-    marginBottom: 8,
-    borderRadius: 10,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
+    width: 140,
   },
-  channelCardDark: {
-    backgroundColor: '#2a2a2a',
+  playlistCard: {
+    marginHorizontal: 16,
+    marginVertical: 4,
   },
-  channelHeader: {
+  playlistHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  channelName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
+  playlistInfo: {
     flex: 1,
-  },
-  channelNameDark: {
-    color: '#fff',
-  },
-  channelCategory: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 4,
-  },
-  channelCategoryDark: {
-    color: '#999',
-  },
-  favoriteIcon: {
-    fontSize: 20,
-    marginLeft: 10,
-  },
-  emptyCard: {
-    backgroundColor: '#fff',
-    padding: 20,
-    marginHorizontal: 20,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  emptyCardDark: {
-    backgroundColor: '#2a2a2a',
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 5,
-  },
-  emptyTextDark: {
-    color: '#999',
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#999',
-    textAlign: 'center',
-  },
-  emptySubtextDark: {
-    color: '#666',
-  },
-  actionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: 20,
-  },
-  actionCard: {
-    backgroundColor: '#fff',
-    padding: 20,
-    borderRadius: 10,
-    alignItems: 'center',
-    width: '48%',
-    marginBottom: 10,
-    marginRight: '2%',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-  },
-  actionCardDark: {
-    backgroundColor: '#2a2a2a',
-  },
-  actionIcon: {
-    fontSize: 32,
-    marginBottom: 8,
-  },
-  actionText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-  },
-  actionTextDark: {
-    color: '#fff',
   },
 });
 

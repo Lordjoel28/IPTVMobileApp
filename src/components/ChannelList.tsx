@@ -82,7 +82,6 @@ const ChannelList: React.FC<ChannelListProps> = ({
             <Image
               source={{ uri: item.logo }}
               style={styles.channelLogo}
-              defaultSource={require('../../assets/default-channel.png')}
             />
           ) : (
             <View style={[styles.channelLogo, styles.channelLogoPlaceholder]}>
