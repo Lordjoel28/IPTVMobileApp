@@ -11,24 +11,26 @@ import {
 } from 'react-native';
 import Video from 'react-native-video';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
+import { M3UParserBasic, Channel } from './src/services/M3UParserBasic';
+import { UltraOptimizedM3UParser } from './src/modules/parsers/UltraOptimizedM3UParser';
 
-// ÉTAPE 5: Navigation + Thèmes fonctionnels
-// (Services modulaires créés mais pas encore intégrés - approche incrémentale)
+// ÉTAPE 6A: Intégration incrémentale du parser M3U modulaire
+// Une seule fonctionnalité : M3UParserBasic dans l'onglet Playlists
 
-// Playlist M3U de test volumineuse (simule le parser ultra-optimisé)
+// Playlist M3U de test avec URLs fonctionnelles
 const testM3U = `#EXTM3U
-#EXTINF:-1 tvg-id="france24" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/8/8a/France24.png" group-title="News",France 24
-https://static.france24.com/live/F24_FR_LO_HLS/live_web.m3u8
-#EXTINF:-1 tvg-id="test1" tvg-logo="" group-title="Test",Test Stream 1  
-https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4
-#EXTINF:-1 tvg-id="test2" tvg-logo="" group-title="Test",Test Stream 2
-https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4
-#EXTINF:-1 tvg-id="bfmtv" tvg-logo="" group-title="News",BFM TV
-https://example.com/bfmtv.m3u8
-#EXTINF:-1 tvg-id="tf1" tvg-logo="" group-title="Généraliste",TF1 HD
-https://example.com/tf1.m3u8
-#EXTINF:-1 tvg-id="france2" tvg-logo="" group-title="Généraliste",France 2 HD
-https://example.com/france2.m3u8`;
+#EXTINF:-1 tvg-id="france24" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/8/8a/France24.png" group-title="News",France 24 FR
+https://ythls.armelin.one/channel/UCCCPCZNChQdGa9EkATeye4g.m3u8
+#EXTINF:-1 tvg-id="euronews" tvg-logo="" group-title="News",Euronews EN
+https://ythls.armelin.one/channel/UCSrZ3UN4aSm1_sdbKorr59Q.m3u8
+#EXTINF:-1 tvg-id="bigbuck" tvg-logo="" group-title="Test",Big Buck Bunny (MP4)
+https://sample-videos.com/zip/10/mp4/SampleVideo_1280x720_1mb.mp4
+#EXTINF:-1 tvg-id="test1" tvg-logo="" group-title="Test",Test Stream MP4 
+https://file-examples.com/storage/fe86f7fa2848d36b630d887/2017/10/file_example_MP4_1920_18MG.mp4
+#EXTINF:-1 tvg-id="bfmtv" tvg-logo="" group-title="News",BFM TV Live
+https://live.euronews.com/api/live/channel/13/live.m3u8
+#EXTINF:-1 tvg-id="arte" tvg-logo="" group-title="Culture",Arte Live
+https://artesimulcast.akamaized.net/hls/live/2030993/artelive_fr/master.m3u8`;
 
 // Parser M3U simple qui fonctionnait
 const parseM3U = (m3uContent) => {
@@ -106,6 +108,33 @@ function App(): React.JSX.Element {
     performance: '⏳ En attente...',
     migration: '⏳ En attente...'
   });
+
+  // NOUVEAU: Instance du parser modulaire pour onglet Playlists
+  const [m3uParser] = useState(() => new M3UParserBasic());
+  const [parserStats, setParserStats] = useState(null);
+
+  // MODULE 1: UltraOptimizedM3UParser - TEST
+  const [ultraParser] = useState(() => {
+    try {
+      console.log('🔧 Création instance UltraOptimizedM3UParser...');
+      console.log('🔧 Classe disponible:', typeof UltraOptimizedM3UParser);
+      
+      const parser = new UltraOptimizedM3UParser({
+        chunkSize: 1000,
+        enableStringInterning: true,
+        strictValidation: false
+      });
+      
+      console.log('✅ Instance créée:', typeof parser);
+      console.log('✅ Méthodes disponibles:', Object.getOwnPropertyNames(Object.getPrototypeOf(parser)));
+      
+      return parser;
+    } catch (error) {
+      console.error('❌ Erreur création parser:', error);
+      return null;
+    }
+  });
+  const [ultraStats, setUltraStats] = useState(null);
 
   // Charger les chaînes avec le parser M3U au démarrage
   useEffect(() => {
@@ -269,10 +298,12 @@ function App(): React.JSX.Element {
         controls={true}
         resizeMode="contain"
         onError={(error) => {
-          console.log('Video error:', error);
+          console.log('❌ Erreur vidéo détaillée:', error);
+          const errorMsg = error?.error?.errorStackTrace || error?.error?.errorException || 'Erreur inconnue';
+          console.log('❌ Type erreur:', errorMsg);
           setTestResults(prev => ({
             ...prev,
-            videoPlayer: '❌ Erreur vidéo'
+            videoPlayer: `❌ Erreur: ${selectedChannel?.name || 'Aucune chaîne'} - Vérifier réseau`
           }));
         }}
         onLoad={() => {
@@ -288,23 +319,131 @@ function App(): React.JSX.Element {
     </View>
   );
 
-  const renderPlaylistsTab = () => (
-    <View style={styles.tabContent}>
-      <Text style={styles.tabTitle}>📋 Playlists M3U</Text>
-      <Text style={styles.subtitle}>Parser M3U Ultra-Optimisé - {channels.length} chaînes</Text>
+  const renderPlaylistsTab = () => {
+    // Test du parser modulaire basique
+    const testModularParser = () => {
+      console.log('🚀 Test du parser modulaire basique...');
+      const startTime = Date.now();
       
-      {/* Liste des chaînes cliquable */}
-      <View style={styles.channelList}>
-        <Text style={styles.listTitle}>📋 Chaînes disponibles ({channels.length}):</Text>
-        <FlatList 
-          data={channels}
-          renderItem={renderChannelItem}
-          keyExtractor={(item) => item.id}
-          showsVerticalScrollIndicator={false}
-        />
+      try {
+        const parsedChannels = m3uParser.parseM3U(testM3U);
+        const parseTime = Date.now() - startTime;
+        const stats = m3uParser.getStats();
+        
+        setParserStats({
+          parseTime,
+          ...stats,
+          groups: m3uParser.getGroups()
+        });
+        
+        console.log(`✅ Parser modulaire: ${parsedChannels.length} chaînes en ${parseTime}ms`);
+        Alert.alert(
+          '🎉 Parser Modulaire',
+          `✅ Parser modulaire testé avec succès!\n\n📊 ${parsedChannels.length} chaînes parsées\n⚡ ${parseTime}ms\n📁 ${stats.totalGroups} groupes\n🖼️ ${stats.channelsWithLogo} logos`
+        );
+      } catch (error) {
+        console.error('❌ Erreur parser modulaire:', error);
+        Alert.alert('❌ Erreur', 'Erreur lors du test du parser modulaire');
+      }
+    };
+
+    // MODULE 1 TEST: UltraOptimizedM3UParser
+    const testUltraParser = async () => {
+      console.log('🚀 MODULE 1 TEST: UltraOptimizedM3UParser...');
+      const startTime = Date.now();
+      
+      try {
+        // Vérification sécurité
+        if (!ultraParser) {
+          throw new Error('UltraOptimizedM3UParser non initialisé');
+        }
+        
+        console.log('✅ Parser instance OK:', typeof ultraParser);
+        console.log('✅ parseM3U method:', typeof ultraParser.parseM3U);
+        
+        // Test de la méthode parseM3U
+        if (typeof ultraParser.parseM3U !== 'function') {
+          throw new Error('parseM3U n\'est pas une fonction');
+        }
+        
+        const parsedChannels = await ultraParser.parseM3U(testM3U);
+        const parseTime = Date.now() - startTime;
+        const stats = ultraParser.getStats();
+        const groups = ultraParser.getGroups();
+        
+        setUltraStats({
+          parseTime,
+          ...stats,
+          groups
+        });
+        
+        console.log(`✅ MODULE 1: ${parsedChannels.length} chaînes en ${parseTime}ms`);
+        console.log(`📊 Performance Score: ${stats.performanceScore} chaînes/sec`);
+        console.log(`💾 Mémoire utilisée: ${stats.memoryUsed} bytes`);
+        
+        Alert.alert(
+          '🚀 MODULE 1 - UltraOptimizedParser',
+          `✅ Module testé avec succès!\n\n📊 ${parsedChannels.length} chaînes parsées\n⚡ ${parseTime}ms\n🚀 ${stats.performanceScore} chaînes/sec\n📁 ${groups.length} groupes\n💾 ${Math.round(stats.memoryUsed/1024)}KB mémoire`
+        );
+      } catch (error) {
+        console.error('❌ MODULE 1 Erreur complète:', error);
+        console.error('❌ Stack trace:', error.stack);
+        Alert.alert('❌ MODULE 1 Erreur', `Erreur: ${error.message}\n\nVoir console pour détails`);
+      }
+    };
+
+    return (
+      <View style={styles.tabContent}>
+        <Text style={styles.tabTitle}>📋 Playlists M3U</Text>
+        <Text style={styles.subtitle}>MODULE 1 TEST: UltraOptimizedM3UParser</Text>
+        
+        {/* MODULE 1: Test UltraOptimizedParser */}
+        <TouchableOpacity style={styles.bigButton} onPress={testUltraParser}>
+          <Text style={styles.bigButtonText}>🚀 MODULE 1 - ULTRA PARSER</Text>
+        </TouchableOpacity>
+        
+        {/* Statistiques MODULE 1 */}
+        {ultraStats && (
+          <View style={styles.statsPanel}>
+            <Text style={styles.statsTitle}>🚀 MODULE 1 - UltraOptimizedParser</Text>
+            <Text style={styles.statItem}>⚡ Temps: {ultraStats.parseTime}ms</Text>
+            <Text style={styles.statItem}>📺 Chaînes: {ultraStats.totalChannels}</Text>
+            <Text style={styles.statItem}>🚀 Performance: {ultraStats.performanceScore} ch/sec</Text>
+            <Text style={styles.statItem}>📁 Groupes: {ultraStats.groups.length}</Text>
+            <Text style={styles.statItem}>💾 Mémoire: {Math.round(ultraStats.memoryUsed/1024)}KB</Text>
+            <Text style={styles.statItem}>🏷️ Groupes: {ultraStats.groups.slice(0, 3).join(', ')}...</Text>
+          </View>
+        )}
+        
+        {/* ANCIEN: Test du parser modulaire basique */}
+        <TouchableOpacity style={styles.testButton} onPress={testModularParser}>
+          <Text style={styles.testButtonText}>🧪 Tester Parser Basique</Text>
+        </TouchableOpacity>
+        
+        {/* Statistiques du parser basique */}
+        {parserStats && (
+          <View style={[styles.statsPanel, {borderColor: '#FF9800'}]}>
+            <Text style={[styles.statsTitle, {color: '#FF9800'}]}>📊 Parser Basique (Comparaison)</Text>
+            <Text style={styles.statItem}>⚡ Temps de parsing: {parserStats.parseTime}ms</Text>
+            <Text style={styles.statItem}>📺 Chaînes: {parserStats.totalChannels}</Text>
+            <Text style={styles.statItem}>📁 Groupes: {parserStats.totalGroups}</Text>
+            <Text style={styles.statItem}>🖼️ Logos: {parserStats.channelsWithLogo}</Text>
+          </View>
+        )}
+        
+        {/* Liste des chaînes existante (parser ancien) */}
+        <View style={styles.channelList}>
+          <Text style={styles.listTitle}>📋 Chaînes (parser existant - {channels.length}):</Text>
+          <FlatList 
+            data={channels}
+            renderItem={renderChannelItem}
+            keyExtractor={(item) => item.id}
+            showsVerticalScrollIndicator={false}
+          />
+        </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   const renderFavoritesTab = () => (
     <View style={styles.tabContent}>
@@ -350,8 +489,8 @@ function App(): React.JSX.Element {
       <SafeAreaView style={styles.container}>
         {/* En-tête principal */}
         <View style={styles.header}>
-          <Text style={styles.title}>📺 LECTEUR IPTV - Version 0.6</Text>
-          <Text style={styles.subtitle}>ÉTAPE 5: Navigation + Thèmes + Parser M3U</Text>
+          <Text style={styles.title}>📺 LECTEUR IPTV - Version 0.7</Text>
+          <Text style={styles.subtitle}>PHASE 6A: Parser M3U Modulaire Intégré</Text>
         </View>
         
         {/* Contenu de l'onglet actuel */}
@@ -645,6 +784,28 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
     textAlign: 'center',
+  },
+  // NOUVEAUX: Styles pour parser modulaire
+  statsPanel: {
+    backgroundColor: '#2a2a2a',
+    padding: 15,
+    marginVertical: 15,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#4CAF50',
+  },
+  statsTitle: {
+    color: '#4CAF50',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  statItem: {
+    color: '#fff',
+    fontSize: 14,
+    marginBottom: 5,
+    paddingLeft: 10,
   },
 });
 

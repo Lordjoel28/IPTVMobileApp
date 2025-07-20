@@ -7,11 +7,13 @@
 
 ## 🎯 OBJECTIF DU PROJET
 
-Développer une **application IPTV mobile premium** avec React Native offrant:
-- **Streaming HLS** haute performance
-- **Gestion playlists M3U** optimisée
+**Migration exacte** de l'application IPTV web ultra-optimisée vers React Native en préservant:
+- **Architecture modulaire** de 23 modules (95% business logic portable)
+- **Performances exceptionnelles** (18K chaînes/1-2s → <3s mobile)
+- **UltraOptimizedM3UParser** avec pool d'objets et string interning
+- **Cache 3-niveaux intelligent** (L1→L2→L3) adapté AsyncStorage/SQLite
+- **Support 25K+ chaînes** avec VirtualizedList optimisée
 - **Interface moderne** style IPTV Smarters Pro
-- **Fonctionnalités complètes** pour utilisateurs finaux
 
 ---
 
@@ -125,38 +127,66 @@ App Structure:
 
 ---
 
-## 🏗️ ARCHITECTURE PROJET
+## 🏗️ ARCHITECTURE PROJET - MIGRATION EXACTE WEB
 
-### **Structure Recommandée**
+### **Architecture Modulaire - 23 Modules Web → React Native**
 ```
 src/
-├── components/
-│   ├── common/         # Button, Card, Input
-│   ├── player/         # VideoPlayer, Controls
-│   └── lists/          # ChannelList, PlaylistGrid
-
-├── screens/
-│   ├── Home.tsx        # Écran accueil
-│   ├── Playlists.tsx   # Gestion M3U
-│   ├── Favorites.tsx   # Favoris utilisateur
-│   ├── Search.tsx      # Recherche avancée
-│   ├── Player.tsx      # Lecteur vidéo
-│   └── Settings.tsx    # Configuration
-
-├── services/
-│   ├── PlaylistService.ts    # Gestion M3U
-│   ├── PlayerService.ts      # Contrôle lecteur
-│   ├── StorageService.ts     # Persistance données
-│   └── NetworkService.ts     # API calls
-
-├── utils/
-│   ├── m3uParser.ts    # Parser playlists
-│   ├── validators.ts   # Validation URLs
-│   └── formatters.ts   # Formatage données
-
-└── types/
-    └── index.ts        # Types TypeScript
+├── services/          # 🔥 CORE: Migration directe business logic web
+│   ├── parsers/       # UltraOptimizedM3UParser (100% portable)
+│   │   ├── UltraOptimizedM3UParser.ts  # 18K chaînes/1-2s
+│   │   ├── OptimizedM3UParser.ts       # Pool objets + cache
+│   │   └── TraditionalM3UParser.ts     # Fallback
+│   ├── cache/         # Cache 3-niveaux adapté mobile
+│   │   ├── CacheManager.ts             # L1(Mémoire)→L2(AsyncStorage)→L3(SQLite)
+│   │   ├── MemoryCache.ts              # LRU avec éviction intelligente
+│   │   └── StorageAdapter.ts           # Abstraction localStorage→RN
+│   ├── playlist/      # Gestion playlists volumineuses
+│   │   ├── PlaylistManager.ts          # Orchestrateur principal (web logic)
+│   │   ├── PlaylistValidator.ts        # Validation intégrité M3U
+│   │   └── XtreamManager.ts            # Support API Xtream Codes
+│   ├── search/        # Moteur recherche avancé
+│   │   ├── SearchManager.ts            # Recherche fuzzy + opérateurs booléens
+│   │   ├── FuzzySearchWorker.ts        # Index N-grammes pour 25K+ items
+│   │   └── FilterEngine.ts             # Filtres multiples
+│   ├── users/         # Multi-utilisateurs avec PIN
+│   │   ├── UserManager.ts              # Gestion profils (admin/standard/child)
+│   │   └── ParentalController.ts       # Restrictions granulaires
+│   ├── performance/   # Monitoring temps réel
+│   │   ├── PerformanceMonitor.ts       # Métriques parsing/UI
+│   │   └── MemoryOptimizer.ts          # Cleanup automatique
+│   └── network/       # APIs et réseau
+│       ├── NetworkManager.ts           # Proxy cascade + resilience
+│       └── CorsProxyManager.ts         # Contournement CORS
+│
+├── storage/           # 🔄 ADAPTERS: Web storage → React Native
+│   ├── AsyncStorageAdapter.ts          # localStorage → AsyncStorage
+│   ├── SQLiteAdapter.ts                # IndexedDB → SQLite
+│   └── CloudSyncAdapter.ts             # Synchronisation cloud
+│
+├── components/        # 🆕 UI React Native (réécriture complète)
+│   ├── player/        # VideoPlayer avec react-native-video
+│   ├── lists/         # VirtualizedList optimisée 25K+ items
+│   ├── search/        # SearchBar avec auto-complétion
+│   └── themes/        # ThemeProvider adapté StyleSheet
+│
+├── screens/          # 🆕 Navigation React Native
+│   ├── HomeScreen.tsx
+│   ├── PlaylistsScreen.tsx
+│   ├── PlayerScreen.tsx
+│   └── SettingsScreen.tsx
+│
+├── navigation/       # React Navigation structure
+├── styles/          # Système thèmes (9 thèmes web → RN)
+└── types/           # Types migration web interfaces
 ```
+
+### **Patterns Architecturaux - Préservés du Web**
+- **Service Layer Architecture** avec injection dépendances
+- **Observer Pattern** pour events cross-modules
+- **Strategy Pattern** pour cache adaptatif selon taille
+- **Factory Pattern** pour pool d'objets parsers
+- **Singleton Pattern** pour managers avec app reference
 
 ### **Patterns Techniques**
 - **Custom Hooks**: Logique métier réutilisable
