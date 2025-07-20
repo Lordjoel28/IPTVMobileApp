@@ -1,0 +1,43 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx react-native:*)",
+      "Bash(echo $ANDROID_HOME)",
+      "Bash(echo $ANDROID_SDK_ROOT)",
+      "Bash(ls:*)",
+      "Bash(find:*)",
+      "Bash(/home/joel/Android/Sdk/cmdline-tools/latest/bin/sdkmanager:*)",
+      "Bash(chmod:*)",
+      "Bash(adb:*)",
+      "Bash(ss:*)",
+      "Bash(npm run:*)",
+      "Bash(npm install)",
+      "Bash(npm uninstall:*)",
+      "Bash(npm install:*)",
+      "Bash(/mnt/c/Users/JOEL/AppData/Local/Android/Sdk/platform-tools/adb.exe devices)",
+      "Bash(mkdir:*)",
+      "Bash(/mnt/c/Users/JOEL/AppData/Local/Android/Sdk/platform-tools/adb.exe -s emulator-5554 install android/app/build/outputs/apk/debug/app-debug.apk)",
+      "Bash(pkill:*)",
+      "Bash(true)",
+      "Bash(/mnt/c/Users/JOEL/AppData/Local/Android/Sdk/platform-tools/adb.exe -s emulator-5554 logcat -d)",
+      "Bash(/mnt/c/Users/JOEL/AppData/Local/Android/Sdk/platform-tools/adb.exe -s emulator-5554 logcat -s ReactNativeJS:* -s ReactNative:* -s IPTVMobileApp:* -d)",
+      "Bash(./gradlew:*)",
+      "Bash(/mnt/c/Users/JOEL/AppData/Local/Android/Sdk/platform-tools/adb.exe -s emulator-5554 install -r android/app/build/outputs/apk/debug/app-debug.apk)",
+      "Bash(/mnt/c/Users/JOEL/AppData/Local/Android/Sdk/platform-tools/adb.exe -s emulator-5554 install -r app/build/outputs/apk/debug/app-debug.apk)",
+      "Bash(/mnt/c/Users/JOEL/AppData/Local/Android/Sdk/platform-tools/adb.exe -s emulator-5554 reverse tcp:8081 tcp:8081)",
+      "Bash(/mnt/c/Users/JOEL/AppData/Local/Android/Sdk/platform-tools/adb.exe -s emulator-5554 shell am start -n com.iptvmobileapp/.MainActivity)",
+      "Bash(mv:*)",
+      "mcp__ide__getDiagnostics",
+      "Bash(npm start:*)",
+      "Bash(git add:*)",
+      "Bash(cp:*)",
+      "Bash(touch:*)",
+      "Bash(for screen in SearchScreen PlaylistDetailScreen UserProfileScreen ParentalControlScreen)",
+      "Bash(do echo \"Creating simple $screen...\")",
+      "Bash(done)",
+      "Bash(emulator:*)",
+      "Bash(./android/gradlew:*)"
+    ],
+    "deny": []
+  }
+}
