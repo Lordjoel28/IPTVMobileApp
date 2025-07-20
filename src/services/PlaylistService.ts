@@ -1,194 +1,219 @@
-import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Channel, Playlist } from '../types';
+/**
+ * 📋 PlaylistService - Migration du PlaylistManager web
+ * Gestion des playlists M3U/M3U8 avec cache intelligent multi-niveaux
+ */
+
+import { cacheService } from './CacheService';
+import { parsersService } from './ParsersService';
+import type { Playlist, Channel } from '../types';
+
+export interface PlaylistSource {
+  id: string;
+  name: string;
+  url?: string;
+  content?: string;
+  type: 'url' | 'file' | 'xtream';
+  dateAdded: string;
+  lastUpdated: string;
+}
 
 export class PlaylistService {
-  private static instance: PlaylistService;
+  private playlists: Map<string, Playlist> = new Map();
+  private currentPlaylistId: string | null = null;
 
-  public static getInstance(): PlaylistService {
-    if (!PlaylistService.instance) {
-      PlaylistService.instance = new PlaylistService();
-    }
-    return PlaylistService.instance;
+  constructor() {
+    console.log('📋 PlaylistService initialized with modular architecture');
   }
 
-  async parseM3U(content: string): Promise<Channel[]> {
-    const channels: Channel[] = [];
-    const lines = content.split('\n');
-    let currentChannel: Partial<Channel> = {};
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-
-      if (line.startsWith('#EXTINF:')) {
-        // Parse channel info
-        const info = line.substring(8);
-        const nameMatch = info.match(/,(.+)$/);
-        if (nameMatch) {
-          currentChannel.name = nameMatch[1].trim();
-        }
-
-        // Extract attributes
-        const logoMatch = info.match(/tvg-logo="([^"]+)"/);
-        if (logoMatch) {
-          currentChannel.logo = logoMatch[1];
-        }
-
-        const groupMatch = info.match(/group-title="([^"]+)"/);
-        if (groupMatch) {
-          currentChannel.group = groupMatch[1];
-          currentChannel.category = groupMatch[1];
-        }
-
-        const tvgIdMatch = info.match(/tvg-id="([^"]+)"/);
-        if (tvgIdMatch) {
-          currentChannel.tvgId = tvgIdMatch[1];
-        }
-
-        const languageMatch = info.match(/tvg-language="([^"]+)"/);
-        if (languageMatch) {
-          currentChannel.language = languageMatch[1];
-        }
-
-        const countryMatch = info.match(/tvg-country="([^"]+)"/);
-        if (countryMatch) {
-          currentChannel.country = countryMatch[1];
-        }
-      } else if (line && !line.startsWith('#')) {
-        // URL line
-        if (currentChannel.name) {
-          channels.push({
-            id: this.generateChannelId(currentChannel.name, line),
-            name: currentChannel.name,
-            url: line,
-            logo: currentChannel.logo,
-            group: currentChannel.group,
-            category: currentChannel.category,
-            language: currentChannel.language,
-            country: currentChannel.country,
-            tvgId: currentChannel.tvgId,
-          });
-        }
-        currentChannel = {};
-      }
-    }
-
-    return channels;
-  }
-
-  async loadPlaylistFromUrl(url: string): Promise<Channel[]> {
+  /**
+   * Ajouter une playlist avec cache automatique - Migration directe web
+   */
+  async addPlaylist(name: string, content: string, source: string = 'manual'): Promise<string> {
+    const startTime = Date.now();
+    
     try {
-      const response = await axios.get(url, {
-        timeout: 10000,
-        headers: {
-          'User-Agent': 'IPTV Mobile App',
-        },
+      console.log(`📋 Ajout playlist: ${name}`);
+      
+      // Parser M3U avec sélection automatique du parser optimal
+      const parseResult = await parsersService.parseM3U(content, {
+        useUltraOptimized: true,
+        chunkSize: 2000,
+        yieldControl: true
       });
-      return this.parseM3U(response.data);
-    } catch (error) {
-      console.error('Error loading playlist from URL:', error);
-      throw new Error('Impossible de charger la playlist depuis l\'URL');
-    }
-  }
 
-  async loadPlaylistFromFile(content: string): Promise<Channel[]> {
-    try {
-      return this.parseM3U(content);
-    } catch (error) {
-      console.error('Error parsing playlist file:', error);
-      throw new Error('Format de fichier playlist invalide');
-    }
-  }
-
-  async savePlaylists(playlists: Playlist[]): Promise<void> {
-    try {
-      await AsyncStorage.setItem('iptv_playlists', JSON.stringify(playlists));
-    } catch (error) {
-      console.error('Error saving playlists:', error);
-      throw new Error('Impossible de sauvegarder les playlists');
-    }
-  }
-
-  async loadPlaylists(): Promise<Playlist[]> {
-    try {
-      const data = await AsyncStorage.getItem('iptv_playlists');
-      return data ? JSON.parse(data) : [];
-    } catch (error) {
-      console.error('Error loading playlists:', error);
-      return [];
-    }
-  }
-
-  async addPlaylist(name: string, url?: string, content?: string): Promise<Playlist> {
-    try {
-      let channels: Channel[] = [];
-
-      if (url) {
-        channels = await this.loadPlaylistFromUrl(url);
-      } else if (content) {
-        channels = await this.loadPlaylistFromFile(content);
-      }
-
+      const playlistId = `playlist_${Date.now()}`;
+      
       const playlist: Playlist = {
-        id: this.generatePlaylistId(name),
+        id: playlistId,
         name,
-        url,
-        channels,
-        isLocal: !url,
+        url: source.startsWith('http') ? source : undefined,
+        channels: parseResult.channels,
+        isLocal: !source.startsWith('http'),
         dateAdded: new Date().toISOString(),
         lastUpdated: new Date().toISOString(),
+        totalChannels: parseResult.channels.length,
+        categories: this.extractCategories(parseResult.channels),
+        type: 'M3U'
       };
 
-      const playlists = await this.loadPlaylists();
-      playlists.push(playlist);
-      await this.savePlaylists(playlists);
+      // Stockage en mémoire
+      this.playlists.set(playlistId, playlist);
 
+      // Cache intelligent selon taille
+      await this.cachePlaylist(playlistId, playlist);
+
+      const loadTime = Date.now() - startTime;
+      console.log(`✅ Playlist ajoutée: ${playlist.totalChannels} chaînes en ${loadTime}ms`);
+      console.log(`📊 Performance: ${parseResult.stats.channelsPerSecond} ch/s, efficacité pool: ${parseResult.stats.poolEfficiency}%`);
+      
+      return playlistId;
+    } catch (error) {
+      console.error('❌ Erreur ajout playlist:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Sélectionner une playlist active - Migration web
+   */
+  async selectPlaylist(playlistId: string): Promise<Playlist | null> {
+    console.log(`📋 Sélection playlist: ${playlistId}`);
+    
+    // Vérifier en mémoire d'abord
+    let playlist = this.playlists.get(playlistId);
+    
+    if (!playlist) {
+      // Charger depuis cache si nécessaire
+      playlist = await this.loadPlaylistFromCache(playlistId);
+      if (playlist) {
+        this.playlists.set(playlistId, playlist);
+      }
+    }
+
+    if (playlist) {
+      this.currentPlaylistId = playlistId;
+      console.log(`✅ Playlist sélectionnée: ${playlist.name} (${playlist.totalChannels} chaînes)`);
       return playlist;
-    } catch (error) {
-      console.error('Error adding playlist:', error);
-      throw error;
+    }
+
+    console.warn(`⚠️ Playlist non trouvée: ${playlistId}`);
+    return null;
+  }
+
+  /**
+   * Obtenir la playlist courante
+   */
+  getCurrentPlaylist(): Playlist | null {
+    if (!this.currentPlaylistId) return null;
+    return this.playlists.get(this.currentPlaylistId) || null;
+  }
+
+  /**
+   * Obtenir toutes les playlists
+   */
+  getAllPlaylists(): Playlist[] {
+    return Array.from(this.playlists.values());
+  }
+
+  /**
+   * Supprimer une playlist
+   */
+  async deletePlaylist(playlistId: string): Promise<boolean> {
+    console.log(`🗑️ Suppression playlist: ${playlistId}`);
+    
+    const deleted = this.playlists.delete(playlistId);
+    await cacheService.remove(`playlist_${playlistId}`, 'all');
+    
+    if (this.currentPlaylistId === playlistId) {
+      this.currentPlaylistId = null;
+    }
+
+    console.log(`✅ Playlist supprimée: ${deleted}`);
+    return deleted;
+  }
+
+  /**
+   * Parser M3U - délégué au ParsersService
+   */
+  async parseM3U(content: string) {
+    return await parsersService.parseM3U(content, {
+      useUltraOptimized: true,
+      chunkSize: 2000,
+      yieldControl: true
+    });
+  }
+
+  /**
+   * Cache intelligent selon taille - Migration logique web
+   */
+  private async cachePlaylist(playlistId: string, playlist: Playlist): Promise<void> {
+    const dataSize = this.estimatePlaylistSize(playlist);
+    const cacheKey = `playlist_${playlistId}`;
+    
+    console.log(`💾 Cache playlist ${playlist.name}: ${dataSize}KB`);
+
+    // Stratégie cache selon taille (logique identique au web)
+    if (dataSize > 2048) { // >2MB → L3 uniquement
+      await cacheService.set(cacheKey, playlist, 'L3');
+    } else if (dataSize > 512) { // >512KB → L2+L3
+      await cacheService.set(cacheKey, playlist, 'L2');
+      await cacheService.set(cacheKey, playlist, 'L3');
+    } else { // <512KB → Tous niveaux
+      await cacheService.set(cacheKey, playlist, 'all');
     }
   }
 
-  async updatePlaylist(playlistId: string): Promise<void> {
-    try {
-      const playlists = await this.loadPlaylists();
-      const playlist = playlists.find(p => p.id === playlistId);
-
-      if (!playlist) {
-        throw new Error('Playlist introuvable');
-      }
-
-      if (playlist.url) {
-        playlist.channels = await this.loadPlaylistFromUrl(playlist.url);
-        playlist.lastUpdated = new Date().toISOString();
-        await this.savePlaylists(playlists);
-      }
-    } catch (error) {
-      console.error('Error updating playlist:', error);
-      throw error;
+  /**
+   * Charger playlist depuis cache multi-niveaux
+   */
+  private async loadPlaylistFromCache(playlistId: string): Promise<Playlist | null> {
+    const cacheKey = `playlist_${playlistId}`;
+    
+    // Essayer cascade L1 → L2 → L3 (stratégie identique au web)
+    const playlist = await cacheService.get<Playlist>(cacheKey, 'all');
+    if (playlist) {
+      console.log(`📦 Playlist chargée depuis cache`);
+      return playlist;
     }
+    
+    return null;
   }
 
-  async deletePlaylist(playlistId: string): Promise<void> {
-    try {
-      const playlists = await this.loadPlaylists();
-      const filteredPlaylists = playlists.filter(p => p.id !== playlistId);
-      await this.savePlaylists(filteredPlaylists);
-    } catch (error) {
-      console.error('Error deleting playlist:', error);
-      throw error;
-    }
+  /**
+   * Estimer taille playlist en KB
+   */
+  private estimatePlaylistSize(playlist: Playlist): number {
+    const jsonStr = JSON.stringify(playlist);
+    return Math.round(jsonStr.length / 1024);
   }
 
-  private generateChannelId(name: string, url: string): string {
-    return `${name}_${url}`.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+  /**
+   * Extraire catégories uniques des chaînes
+   */
+  private extractCategories(channels: Channel[]): string[] {
+    const categories = new Set<string>();
+    channels.forEach(channel => {
+      if (channel.group) categories.add(channel.group);
+      if (channel.category) categories.add(channel.category);
+    });
+    return Array.from(categories).sort();
   }
 
-  private generatePlaylistId(name: string): string {
-    return `playlist_${name}_${Date.now()}`.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+  /**
+   * Rechercher dans les chaînes
+   */
+  searchChannels(channels: Channel[], query: string): Channel[] {
+    const lowerQuery = query.toLowerCase();
+    return channels.filter(channel =>
+      channel.name.toLowerCase().includes(lowerQuery) ||
+      (channel.category && channel.category.toLowerCase().includes(lowerQuery)) ||
+      (channel.group && channel.group.toLowerCase().includes(lowerQuery))
+    );
   }
 
+  /**
+   * Grouper chaînes par catégorie
+   */
   getChannelsByCategory(channels: Channel[]): { [key: string]: Channel[] } {
     const grouped: { [key: string]: Channel[] } = {};
     
@@ -203,12 +228,33 @@ export class PlaylistService {
     return grouped;
   }
 
-  searchChannels(channels: Channel[], query: string): Channel[] {
-    const lowerQuery = query.toLowerCase();
-    return channels.filter(channel =>
-      channel.name.toLowerCase().includes(lowerQuery) ||
-      (channel.category && channel.category.toLowerCase().includes(lowerQuery)) ||
-      (channel.group && channel.group.toLowerCase().includes(lowerQuery))
-    );
+  /**
+   * Obtenir statistiques playlists
+   */
+  getStats() {
+    const totalPlaylists = this.playlists.size;
+    const totalChannels = Array.from(this.playlists.values())
+      .reduce((sum, playlist) => sum + (playlist.totalChannels || 0), 0);
+    
+    return {
+      totalPlaylists,
+      totalChannels,
+      currentPlaylistId: this.currentPlaylistId,
+      memoryUsage: this.playlists.size * 0.5, // Estimation MB
+      cacheStats: cacheService.getStats(),
+      parserStats: parsersService.getStats()
+    };
+  }
+
+  /**
+   * Nettoyer ressources
+   */
+  dispose(): void {
+    this.playlists.clear();
+    this.currentPlaylistId = null;
+    console.log('🧹 PlaylistService disposed');
   }
 }
+
+// Export singleton instance
+export const playlistService = new PlaylistService();

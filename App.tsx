@@ -10,8 +10,11 @@ import {
   SafeAreaView,
 } from 'react-native';
 import Video from 'react-native-video';
+import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 
-// ÉTAPE 4: Parser M3U Ultra-Optimisé selon MIGRATION-ANALYSIS.md
+// ÉTAPE 5: Navigation + Thèmes fonctionnels
+// (Services modulaires créés mais pas encore intégrés - approche incrémentale)
+
 // Playlist M3U de test volumineuse (simule le parser ultra-optimisé)
 const testM3U = `#EXTM3U
 #EXTINF:-1 tvg-id="france24" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/8/8a/France24.png" group-title="News",France 24
@@ -27,7 +30,7 @@ https://example.com/tf1.m3u8
 #EXTINF:-1 tvg-id="france2" tvg-logo="" group-title="Généraliste",France 2 HD
 https://example.com/france2.m3u8`;
 
-// Parser M3U simple adapté pour React Native
+// Parser M3U simple qui fonctionnait
 const parseM3U = (m3uContent) => {
   const startTime = Date.now();
   const lines = m3uContent.split('\n');
@@ -38,7 +41,6 @@ const parseM3U = (m3uContent) => {
     const line = lines[i].trim();
     
     if (line.startsWith('#EXTINF:')) {
-      // Parser la ligne EXTINF
       const nameMatch = line.match(/,(.+)$/);
       const groupMatch = line.match(/group-title="([^"]*)"/);
       const logoMatch = line.match(/tvg-logo="([^"]*)"/);
@@ -52,7 +54,6 @@ const parseM3U = (m3uContent) => {
         url: null
       };
     } else if (line && !line.startsWith('#') && currentChannel) {
-      // URL de la chaîne
       currentChannel.url = line;
       channels.push(currentChannel);
       currentChannel = null;
@@ -63,6 +64,34 @@ const parseM3U = (m3uContent) => {
   console.log(`🚀 Parser M3U: ${channels.length} chaînes en ${parseTime}ms`);
   
   return { channels, parseTime };
+};
+
+// Composant sélecteur de thèmes
+const ThemeSelector = () => {
+  const { theme, themeType, availableThemes, setTheme } = useTheme();
+  
+  return (
+    <View style={styles.themeSection}>
+      <Text style={styles.sectionTitle}>🎨 Thèmes visuels</Text>
+      <Text style={styles.sectionSubtitle}>Thème actuel: {themeType}</Text>
+      
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.themeList}>
+        {availableThemes.map((themeItem) => (
+          <TouchableOpacity
+            key={themeItem.name}
+            style={[
+              styles.themeButton,
+              { backgroundColor: themeItem.primaryColor },
+              themeType === themeItem.name && styles.selectedTheme
+            ]}
+            onPress={() => setTheme(themeItem.name)}
+          >
+            <Text style={styles.themeButtonText}>{themeItem.displayName}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    </View>
+  );
 };
 
 function App(): React.JSX.Element {
@@ -297,7 +326,11 @@ function App(): React.JSX.Element {
     <View style={styles.tabContent}>
       <Text style={styles.tabTitle}>⚙️ Paramètres</Text>
       <Text style={styles.subtitle}>Configuration application</Text>
-      <Text style={styles.comingSoon}>🚧 Fonctionnalité en développement...</Text>
+      
+      {/* Sélecteur de thèmes */}
+      <ThemeSelector />
+      
+      <Text style={styles.comingSoon}>🚧 Autres paramètres en développement...</Text>
     </View>
   );
 
@@ -311,62 +344,65 @@ function App(): React.JSX.Element {
     );
   }
 
+
   return (
-    <SafeAreaView style={styles.container}>
-      {/* En-tête principal */}
-      <View style={styles.header}>
-        <Text style={styles.title}>📺 LECTEUR IPTV - Version 0.5</Text>
-        <Text style={styles.subtitle}>ÉTAPE 5: Navigation + Parser M3U</Text>
-      </View>
-      
-      {/* Contenu de l'onglet actuel */}
-      <View style={styles.contentContainer}>
-        {renderTabContent()}
-      </View>
-      
-      {/* Navigation bottom tabs */}
-      <View style={styles.bottomTabs}>
-        <TouchableOpacity 
-          style={[styles.tab, currentTab === 'home' && styles.activeTab]}
-          onPress={() => setCurrentTab('home')}
-        >
-          <Text style={[styles.tabText, currentTab === 'home' && styles.activeTabText]}>🏠</Text>
-          <Text style={[styles.tabLabel, currentTab === 'home' && styles.activeTabText]}>Accueil</Text>
-        </TouchableOpacity>
+    <ThemeProvider>
+      <SafeAreaView style={styles.container}>
+        {/* En-tête principal */}
+        <View style={styles.header}>
+          <Text style={styles.title}>📺 LECTEUR IPTV - Version 0.6</Text>
+          <Text style={styles.subtitle}>ÉTAPE 5: Navigation + Thèmes + Parser M3U</Text>
+        </View>
         
-        <TouchableOpacity 
-          style={[styles.tab, currentTab === 'playlists' && styles.activeTab]}
-          onPress={() => setCurrentTab('playlists')}
-        >
-          <Text style={[styles.tabText, currentTab === 'playlists' && styles.activeTabText]}>📋</Text>
-          <Text style={[styles.tabLabel, currentTab === 'playlists' && styles.activeTabText]}>Playlists</Text>
-        </TouchableOpacity>
+        {/* Contenu de l'onglet actuel */}
+        <View style={styles.contentContainer}>
+          {renderTabContent()}
+        </View>
         
-        <TouchableOpacity 
-          style={[styles.tab, currentTab === 'favorites' && styles.activeTab]}
-          onPress={() => setCurrentTab('favorites')}
-        >
-          <Text style={[styles.tabText, currentTab === 'favorites' && styles.activeTabText]}>⭐</Text>
-          <Text style={[styles.tabLabel, currentTab === 'favorites' && styles.activeTabText]}>Favoris</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={[styles.tab, currentTab === 'search' && styles.activeTab]}
-          onPress={() => setCurrentTab('search')}
-        >
-          <Text style={[styles.tabText, currentTab === 'search' && styles.activeTabText]}>🔍</Text>
-          <Text style={[styles.tabLabel, currentTab === 'search' && styles.activeTabText]}>Recherche</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={[styles.tab, currentTab === 'settings' && styles.activeTab]}
-          onPress={() => setCurrentTab('settings')}
-        >
-          <Text style={[styles.tabText, currentTab === 'settings' && styles.activeTabText]}>⚙️</Text>
-          <Text style={[styles.tabLabel, currentTab === 'settings' && styles.activeTabText]}>Paramètres</Text>
-        </TouchableOpacity>
-      </View>
-    </SafeAreaView>
+        {/* Navigation bottom tabs */}
+        <View style={styles.bottomTabs}>
+          <TouchableOpacity 
+            style={[styles.tab, currentTab === 'home' && styles.activeTab]}
+            onPress={() => setCurrentTab('home')}
+          >
+            <Text style={[styles.tabText, currentTab === 'home' && styles.activeTabText]}>🏠</Text>
+            <Text style={[styles.tabLabel, currentTab === 'home' && styles.activeTabText]}>Accueil</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.tab, currentTab === 'playlists' && styles.activeTab]}
+            onPress={() => setCurrentTab('playlists')}
+          >
+            <Text style={[styles.tabText, currentTab === 'playlists' && styles.activeTabText]}>📋</Text>
+            <Text style={[styles.tabLabel, currentTab === 'playlists' && styles.activeTabText]}>Playlists</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.tab, currentTab === 'favorites' && styles.activeTab]}
+            onPress={() => setCurrentTab('favorites')}
+          >
+            <Text style={[styles.tabText, currentTab === 'favorites' && styles.activeTabText]}>⭐</Text>
+            <Text style={[styles.tabLabel, currentTab === 'favorites' && styles.activeTabText]}>Favoris</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.tab, currentTab === 'search' && styles.activeTab]}
+            onPress={() => setCurrentTab('search')}
+          >
+            <Text style={[styles.tabText, currentTab === 'search' && styles.activeTabText]}>🔍</Text>
+            <Text style={[styles.tabLabel, currentTab === 'search' && styles.activeTabText]}>Recherche</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.tab, currentTab === 'settings' && styles.activeTab]}
+            onPress={() => setCurrentTab('settings')}
+          >
+            <Text style={[styles.tabText, currentTab === 'settings' && styles.activeTabText]}>⚙️</Text>
+            <Text style={[styles.tabLabel, currentTab === 'settings' && styles.activeTabText]}>Paramètres</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    </ThemeProvider>
   );
 }
 
@@ -458,7 +494,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
   },
-  // GROS BOUTON ULTRA-VISIBLE
   bigButton: {
     backgroundColor: '#FF4444',
     padding: 15,
@@ -471,20 +506,6 @@ const styles = StyleSheet.create({
   bigButtonText: {
     color: '#FFFFFF',
     fontSize: 18,
-    fontWeight: 'bold',
-  },
-  // Styles pour interface de validation
-  demoButton: {
-    backgroundColor: '#4CAF50',
-    padding: 10,
-    marginTop: 10,
-    marginBottom: 5,
-    borderRadius: 6,
-    alignItems: 'center',
-  },
-  demoButtonText: {
-    color: '#fff',
-    fontSize: 16,
     fontWeight: 'bold',
   },
   testPanel: {
@@ -558,7 +579,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 4,
   },
-  // Navigation Tabs
   bottomTabs: {
     flexDirection: 'row',
     backgroundColor: '#2a2a2a',
@@ -589,6 +609,42 @@ const styles = StyleSheet.create({
   activeTabText: {
     color: '#fff',
     fontWeight: 'bold',
+  },
+  // Styles pour le sélecteur de thèmes
+  themeSection: {
+    marginVertical: 20,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1E88E5',
+    marginBottom: 5,
+  },
+  sectionSubtitle: {
+    fontSize: 14,
+    color: '#999',
+    marginBottom: 15,
+  },
+  themeList: {
+    flexDirection: 'row',
+  },
+  themeButton: {
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    borderRadius: 20,
+    marginRight: 10,
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  selectedTheme: {
+    borderWidth: 3,
+    borderColor: '#fff',
+  },
+  themeButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+    textAlign: 'center',
   },
 });
 

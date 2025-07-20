@@ -409,10 +409,14 @@ export interface StorageAdapter {
   getSize(): Promise<number>;
 }
 
-// Export all types
-export type * from './navigation';
-export type * from './video';
-export type * from './api';
+// Import et re-export IPTVTheme depuis styles
+// import type { IPTVTheme } from '../styles/themes';
+// export type { IPTVTheme };
+
+// Export all types (commentés car fichiers n'existent pas encore)
+// export type * from './navigation';
+// export type * from './video'; 
+// export type * from './api';
 
 // Re-export common React Navigation types
 import type { RouteProp } from '@react-navigation/native';
