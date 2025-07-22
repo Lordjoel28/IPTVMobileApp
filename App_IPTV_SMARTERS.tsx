@@ -24,8 +24,24 @@ const App: React.FC = () => {
   // LOG POUR CONFIRMER LE CHARGEMENT
   console.log('🎬 APP_IPTV_SMARTERS LOADED - VERSION MODERNE 2.0');
   
-  // État pour l'horloge dynamique
+  // États pour l'horloge dynamique et données conditionnelles
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [playlistInfo, setPlaylistInfo] = useState({ name: null, expiration: null });
+  const [liveTvUpdateTime, setLiveTvUpdateTime] = useState(null);
+  const [filmsUpdateTime, setFilmsUpdateTime] = useState(null);
+
+  // Fonction pour formater le temps écoulé
+  const formatTimeAgo = (timestamp: Date) => {
+    const now = new Date();
+    const diffInMinutes = Math.floor((now.getTime() - timestamp.getTime()) / (1000 * 60));
+    
+    if (diffInMinutes < 1) return 'À l\'instant';
+    if (diffInMinutes < 60) return `${diffInMinutes} min`;
+    const hours = Math.floor(diffInMinutes / 60);
+    if (hours < 24) return `${hours}h`;
+    const days = Math.floor(hours / 24);
+    return `${days}j`;
+  };
   
   // Animations pour les cartes
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -117,12 +133,7 @@ const App: React.FC = () => {
         </View>
       </View>
 
-      <ScrollView 
-        style={styles.scrollContainer}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
+      <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
           
           {/* Section principale - Design moderne avec proportions parfaites */}
           <View style={styles.mainCardsSection}>
@@ -136,7 +147,7 @@ const App: React.FC = () => {
                 {...createPressAnimation(0)}
               >
                 <LinearGradient
-                  colors={['#00D4FF', '#0099CC', '#007399', '#004D66']}
+                  colors={['#00B4DB', '#0083B0']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.modernCardGradient}
@@ -147,22 +158,19 @@ const App: React.FC = () => {
                       <View style={styles.iconGlowEffect}>
                         <Icon name="tv" size={65} color="#FFFFFF" />
                       </View>
-                      <View style={styles.signalIndicator}>
-                        <View style={[styles.signalDot, styles.signalActive]} />
-                        <View style={[styles.signalDot, styles.signalActive]} />
-                        <View style={[styles.signalDot, styles.signalActive]} />
-                      </View>
                     </View>
                     <Text style={styles.modernTvTitle}>TV EN DIRECT</Text>
                     <Text style={styles.modernSubtitle}>Streaming Live</Text>
                     
-                    <View style={styles.modernUpdateContainer}>
-                      <View style={styles.statusDot} />
-                      <Text style={styles.modernUpdateText}>Mise à jour: 14 min</Text>
-                      <TouchableOpacity style={styles.modernRefreshButton}>
-                        <Icon name="refresh" size={18} color="#FFFFFF" />
-                      </TouchableOpacity>
-                    </View>
+                    {liveTvUpdateTime && (
+                      <View style={styles.modernUpdateContainer}>
+                        <View style={styles.statusDot} />
+                        <Text style={styles.modernUpdateText}>Mise à jour: {formatTimeAgo(liveTvUpdateTime)}</Text>
+                        <TouchableOpacity style={styles.modernRefreshButton}>
+                          <Icon name="refresh" size={14} color="#000000" />
+                        </TouchableOpacity>
+                      </View>
+                    )}
                   </View>
                 </LinearGradient>
               </TouchableOpacity>
@@ -183,7 +191,7 @@ const App: React.FC = () => {
                   {...createPressAnimation(1)}
                 >
                   <LinearGradient
-                    colors={['#FF6B6B', '#FF5722', '#E64A19', '#BF360C']}
+                    colors={['#FF5F6D', '#FFC371']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.modernCardGradient}
@@ -192,18 +200,20 @@ const App: React.FC = () => {
                     <View style={styles.cardContentCenter}>
                       <View style={styles.modernIconContainer}>
                         <View style={styles.playButtonModern}>
-                          <Icon name="play-arrow" size={35} color="#FFFFFF" />
+                          <Icon name="play-arrow" size={45} color="#FFFFFF" />
                         </View>
                       </View>
                       <Text style={styles.modernCardTitle}>FILMS</Text>
                       
-                      <View style={styles.modernUpdateContainer}>
-                        <View style={styles.statusDot} />
-                        <Text style={styles.modernUpdateText}>1 min ago</Text>
-                        <TouchableOpacity style={styles.modernRefreshButton}>
-                          <Icon name="refresh" size={14} color="#FFFFFF" />
-                        </TouchableOpacity>
-                      </View>
+                      {filmsUpdateTime && (
+                        <View style={styles.modernUpdateContainer}>
+                          <View style={styles.statusDot} />
+                          <Text style={styles.modernUpdateText}>{formatTimeAgo(filmsUpdateTime)}</Text>
+                          <TouchableOpacity style={styles.modernRefreshButton}>
+                            <Icon name="refresh" size={12} color="#000000" />
+                          </TouchableOpacity>
+                        </View>
+                      )}
                     </View>
                   </LinearGradient>
                 </TouchableOpacity>
@@ -217,7 +227,7 @@ const App: React.FC = () => {
                   {...createPressAnimation(2)}
                 >
                   <LinearGradient
-                    colors={['#9C27B0', '#7B1FA2', '#6A1B9A', '#4A148C']}
+                    colors={['#3A3897', '#23215B']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.modernCardGradient}
@@ -225,7 +235,7 @@ const App: React.FC = () => {
                     <View style={styles.modernGlowOverlay} />
                     <View style={styles.cardContentCenter}>
                       <View style={styles.modernIconContainer}>
-                        <Icon name="movie" size={45} color="#FFFFFF" />
+                        <Icon name="movie" size={55} color="#FFFFFF" />
                       </View>
                       <Text style={styles.modernCardTitle}>SERIES</Text>
                       
@@ -250,14 +260,14 @@ const App: React.FC = () => {
                   {...createPressAnimation(3)}
                 >
                   <LinearGradient
-                    colors={['#00E676', '#00C853', '#00A64F', '#00833A']}
+                    colors={['#66BB6A', '#43A047']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.modernSmallGradient}
                   >
                     <View style={styles.smallGlowOverlay} />
                     <View style={styles.modernSmallIconContainer}>
-                      <Icon name="event" size={24} color="#FFFFFF" />
+                      <Icon name="event" size={28} color="#FFFFFF" />
                     </View>
                     <Text style={styles.modernSmallTitle}>LIVE EPG</Text>
                     <Text style={styles.modernSmallSubtitle}>Guide TV</Text>
@@ -273,14 +283,14 @@ const App: React.FC = () => {
                   {...createPressAnimation(4)}
                 >
                   <LinearGradient
-                    colors={['#00E676', '#00C853', '#00A64F', '#00833A']}
+                    colors={['#66BB6A', '#43A047']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.modernSmallGradient}
                   >
                     <View style={styles.smallGlowOverlay} />
                     <View style={styles.modernSmallIconContainer}>
-                      <Icon name="apps" size={24} color="#FFFFFF" />
+                      <Icon name="apps" size={28} color="#FFFFFF" />
                     </View>
                     <Text style={styles.modernSmallTitle}>MULTI-ÉCR</Text>
                     <Text style={styles.modernSmallSubtitle}>Écrans</Text>
@@ -296,14 +306,14 @@ const App: React.FC = () => {
                   {...createPressAnimation(5)}
                 >
                   <LinearGradient
-                    colors={['#00E676', '#00C853', '#00A64F', '#00833A']}
+                    colors={['#66BB6A', '#43A047']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.modernSmallGradient}
                   >
                     <View style={styles.smallGlowOverlay} />
                     <View style={styles.modernSmallIconContainer}>
-                      <Icon name="replay" size={24} color="#FFFFFF" />
+                      <Icon name="replay" size={28} color="#FFFFFF" />
                     </View>
                     <Text style={styles.modernSmallTitle}>RATTRAPER</Text>
                     <Text style={styles.modernSmallSubtitle}>Replay</Text>
@@ -314,19 +324,16 @@ const App: React.FC = () => {
           </View>
         </View>
 
-        {/* Footer exact comme capture 7 */}
+        {/* Footer conditionnel */}
         <View style={styles.footer}>
-          <Text style={styles.footerText}>Expiration : février 9, 2026</Text>
-          
-          <TouchableOpacity style={styles.buyPremiumButton}>
-            <Icon name="shop" size={20} color="#FFD700" />
-            <Text style={styles.buyPremiumText}>Buy Premium Version</Text>
-          </TouchableOpacity>
-          
-          <Text style={styles.footerText}>Connecté : zz</Text>
+          {playlistInfo.expiration && (
+            <Text style={styles.footerText}>Expiration : {playlistInfo.expiration}</Text>
+          )}
+          {playlistInfo.name && (
+            <Text style={styles.footerText}>Connecté : {playlistInfo.name}</Text>
+          )}
         </View>
-        </Animated.View>
-      </ScrollView>
+      </Animated.View>
     </View>
   );
 };
@@ -340,9 +347,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 50,
-    paddingBottom: 16,
+    paddingHorizontal: 16,
+    paddingTop: 40,
+    paddingBottom: 8,
     backgroundColor: '#16213E',
   },
   headerLeft: {
@@ -395,47 +402,42 @@ const styles = StyleSheet.create({
     padding: 8,
     marginLeft: 8,
   },
-  scrollContainer: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-  },
   content: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 20,
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 8,
   },
   
   // Layout principal - Flexbox adaptatif
   mainCardsSection: {
     flexDirection: 'row',
-    minHeight: 280,
-    marginBottom: 20,
+    flex: 1,
+    marginBottom: 16,
     gap: 12,
   },
   
   // Colonnes
   leftColumn: {
-    flex: 1,
+    flex: 0.85,
   },
   rightColumn: {
-    flex: 1,
+    flex: 1.1,
     flexDirection: 'column',
-    gap: 8,
+    gap: 10,
   },
   
   // Rangées droite - Flexbox adaptatif
   topRow: {
     flexDirection: 'row',
-    flex: 1.3,
-    gap: 8,
-    marginBottom: 8,
+    flex: 0.7,
+    gap: 10,
+    marginBottom: 10,
   },
   bottomRow: {
     flexDirection: 'row',
-    flex: 1,
-    gap: 4,
+    flex: 0.3,
+    gap: 8,
   },
   
   // TV EN DIRECT - Design moderne
@@ -444,13 +446,15 @@ const styles = StyleSheet.create({
   },
   tvDirectCard: {
     flex: 1,
-    borderRadius: 24,
+    borderRadius: 28,
     overflow: 'hidden',
-    elevation: 12,
+    elevation: 16,
     shadowColor: '#00D4FF',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
   
   // FILMS et SERIES - Design moderne
@@ -462,12 +466,14 @@ const styles = StyleSheet.create({
   },
   modernCard: {
     flex: 1,
-    borderRadius: 20,
+    borderRadius: 24,
     overflow: 'hidden',
-    elevation: 8,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    elevation: 12,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
   
   // Petites cartes modernes (16.6% chacune)
@@ -476,13 +482,15 @@ const styles = StyleSheet.create({
   },
   modernSmallCard: {
     flex: 1,
-    borderRadius: 16,
+    borderRadius: 20,
     overflow: 'hidden',
-    elevation: 6,
+    elevation: 10,
     shadowColor: '#00E676',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
 
   // Dégradés modernes
@@ -490,19 +498,28 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
+    padding: 18,
     position: 'relative',
   },
   modernSmallGradient: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 12,
+    padding: 14,
     position: 'relative',
   },
   
-  // Effets lumineux
+  // Effets lumineux améliorés
   modernGlowOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 16,
+  },
+  smallGlowOverlay: {
     position: 'absolute',
     top: 0,
     left: 0,
@@ -511,67 +528,48 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.1)',
     borderRadius: 12,
   },
-  smallGlowOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 8,
-  },
 
   // Conteneurs d'icônes modernes
   modernIconContainer: {
-    marginBottom: 12,
+    marginBottom: 14,
     position: 'relative',
   },
   modernSmallIconContainer: {
-    marginBottom: 8,
+    marginBottom: 10,
+    padding: 4,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.1)',
   },
   
-  // Effets d'icônes
+  // Effets d'icônes améliorés
   iconGlowEffect: {
-    padding: 12,
+    padding: 16,
     borderRadius: 50,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: 'rgba(255,255,255,0.18)',
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#FFFFFF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 4,
   },
   
-  // Bouton play moderne
+  // Bouton play moderne amélioré
   playButtonModern: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: 'rgba(255,255,255,0.25)',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.3)',
-  },
-  
-  // Indicateur de signal
-  signalIndicator: {
-    flexDirection: 'row',
-    position: 'absolute',
-    top: -5,
-    right: -5,
-    gap: 2,
-  },
-  signalDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-  },
-  signalActive: {
-    backgroundColor: '#00FF88',
-    shadowColor: '#00FF88',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 3,
-    elevation: 3,
+    borderColor: 'rgba(255,255,255,0.4)',
+    shadowColor: '#FFFFFF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
 
   // Titres modernes
@@ -636,9 +634,19 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   modernRefreshButton: {
-    padding: 4,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)',
   },
   
   // Statut et indicateurs
@@ -681,11 +689,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
     backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 12,
-    marginBottom: 32,
+    borderRadius: 8,
   },
   footerText: {
     fontSize: 12,
