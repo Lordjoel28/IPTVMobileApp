@@ -65,6 +65,7 @@ const App: React.FC = () => {
 
   const createPressAnimation = (index: number) => ({
     onPressIn: () => {
+      console.log(`CARD PRESSED: ${index}`);
       Animated.spring(cardsScale[index], {
         toValue: 0.98,
         useNativeDriver: true,
@@ -73,6 +74,7 @@ const App: React.FC = () => {
       }).start();
     },
     onPressOut: () => {
+      console.log(`CARD RELEASED: ${index}`);
       Animated.spring(cardsScale[index], {
         toValue: 1,
         useNativeDriver: true,
@@ -82,8 +84,18 @@ const App: React.FC = () => {
     },
   });
 
+  const handleCardPress = (cardName: string, index: number) => {
+    console.log(`🎬 CARD CLICKED: ${cardName} (${index})`);
+    // TODO: Add navigation logic here
+  };
+
   return (
-    <View style={styles.container}>
+    <LinearGradient
+      colors={['#1A1F36', '#2C3E50']}
+      style={styles.container}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+    >
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
       
       {/* Header exact comme capture 7 */}
@@ -143,16 +155,22 @@ const App: React.FC = () => {
             <Animated.View style={[styles.tvDirectContainer, { transform: [{ scale: cardsScale[0] }] }]}>
               <TouchableOpacity 
                 style={styles.tvDirectCard}
-                activeOpacity={1}
+                activeOpacity={0.8}
+                onPress={() => handleCardPress('TV EN DIRECT', 0)}
                 {...createPressAnimation(0)}
               >
                 <LinearGradient
-                  colors={['#00B4DB', '#0083B0']}
+                  colors={['#1A237E', '#283593']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.modernCardGradient}
                 >
-                  <View style={styles.modernGlowOverlay} />
+                  <LinearGradient
+                    colors={['rgba(255,255,255,0.15)', 'rgba(255,255,255,0.05)', 'transparent']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 0, y: 1 }}
+                    style={styles.glassReflection}
+                  />
                   <View style={styles.cardContentCenter}>
                     <View style={styles.modernIconContainer}>
                       <View style={styles.iconGlowEffect}>
@@ -187,16 +205,22 @@ const App: React.FC = () => {
               <Animated.View style={[styles.filmsContainer, { transform: [{ scale: cardsScale[1] }] }]}>
                 <TouchableOpacity 
                   style={styles.modernCard}
-                  activeOpacity={1}
+                  activeOpacity={0.8}
+                  onPress={() => handleCardPress('FILMS', 1)}
                   {...createPressAnimation(1)}
                 >
                   <LinearGradient
-                    colors={['#FF5F6D', '#FFC371']}
+                    colors={['#e65100', '#fb8c00']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.modernCardGradient}
                   >
-                    <View style={styles.modernGlowOverlay} />
+                    <LinearGradient
+                    colors={['rgba(255,255,255,0.15)', 'rgba(255,255,255,0.05)', 'transparent']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 0, y: 1 }}
+                    style={styles.glassReflection}
+                  />
                     <View style={styles.cardContentCenter}>
                       <View style={styles.modernIconContainer}>
                         <View style={styles.playButtonModern}>
@@ -223,16 +247,22 @@ const App: React.FC = () => {
               <Animated.View style={[styles.seriesContainer, { transform: [{ scale: cardsScale[2] }] }]}>
                 <TouchableOpacity 
                   style={styles.modernCard}
-                  activeOpacity={1}
+                  activeOpacity={0.8}
+                  onPress={() => handleCardPress('SERIES', 2)}
                   {...createPressAnimation(2)}
                 >
                   <LinearGradient
-                    colors={['#3A3897', '#23215B']}
+                    colors={['#37474F', '#546E7A']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.modernCardGradient}
                   >
-                    <View style={styles.modernGlowOverlay} />
+                    <LinearGradient
+                    colors={['rgba(255,255,255,0.15)', 'rgba(255,255,255,0.05)', 'transparent']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 0, y: 1 }}
+                    style={styles.glassReflection}
+                  />
                     <View style={styles.cardContentCenter}>
                       <View style={styles.modernIconContainer}>
                         <Icon name="movie" size={55} color="#FFFFFF" />
@@ -256,16 +286,22 @@ const App: React.FC = () => {
               <Animated.View style={[styles.modernSmallContainer, { transform: [{ scale: cardsScale[3] }] }]}>
                 <TouchableOpacity 
                   style={styles.modernSmallCard}
-                  activeOpacity={1}
+                  activeOpacity={0.8}
+                  onPress={() => handleCardPress('LIVE EPG', 3)}
                   {...createPressAnimation(3)}
                 >
                   <LinearGradient
-                    colors={['#66BB6A', '#43A047']}
+                    colors={['#37474F', '#546E7A']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.modernSmallGradient}
                   >
-                    <View style={styles.smallGlowOverlay} />
+                    <LinearGradient
+                      colors={['rgba(255,255,255,0.12)', 'rgba(255,255,255,0.04)', 'transparent']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 0, y: 1 }}
+                      style={styles.smallGlassReflection}
+                    />
                     <View style={styles.modernSmallIconContainer}>
                       <Icon name="event" size={28} color="#FFFFFF" />
                     </View>
@@ -279,16 +315,22 @@ const App: React.FC = () => {
               <Animated.View style={[styles.modernSmallContainer, { transform: [{ scale: cardsScale[4] }] }]}>
                 <TouchableOpacity 
                   style={styles.modernSmallCard}
-                  activeOpacity={1}
+                  activeOpacity={0.8}
+                  onPress={() => handleCardPress('MULTI-ÉCR', 4)}
                   {...createPressAnimation(4)}
                 >
                   <LinearGradient
-                    colors={['#66BB6A', '#43A047']}
+                    colors={['#37474F', '#546E7A']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.modernSmallGradient}
                   >
-                    <View style={styles.smallGlowOverlay} />
+                    <LinearGradient
+                      colors={['rgba(255,255,255,0.12)', 'rgba(255,255,255,0.04)', 'transparent']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 0, y: 1 }}
+                      style={styles.smallGlassReflection}
+                    />
                     <View style={styles.modernSmallIconContainer}>
                       <Icon name="apps" size={28} color="#FFFFFF" />
                     </View>
@@ -306,12 +348,17 @@ const App: React.FC = () => {
                   {...createPressAnimation(5)}
                 >
                   <LinearGradient
-                    colors={['#66BB6A', '#43A047']}
+                    colors={['#37474F', '#546E7A']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.modernSmallGradient}
                   >
-                    <View style={styles.smallGlowOverlay} />
+                    <LinearGradient
+                      colors={['rgba(255,255,255,0.12)', 'rgba(255,255,255,0.04)', 'transparent']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 0, y: 1 }}
+                      style={styles.smallGlassReflection}
+                    />
                     <View style={styles.modernSmallIconContainer}>
                       <Icon name="replay" size={28} color="#FFFFFF" />
                     </View>
@@ -334,14 +381,13 @@ const App: React.FC = () => {
           )}
         </View>
       </Animated.View>
-    </View>
+    </LinearGradient>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1A1A2E',
   },
   header: {
     flexDirection: 'row',
@@ -350,7 +396,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 40,
     paddingBottom: 8,
-    backgroundColor: '#16213E',
+    backgroundColor: 'transparent',
   },
   headerLeft: {
     flexDirection: 'row',
@@ -448,6 +494,7 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 28,
     overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.08)',
     elevation: 16,
     shadowColor: '#00D4FF',
     shadowOffset: { width: 0, height: 8 },
@@ -468,6 +515,7 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 24,
     overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.08)',
     elevation: 12,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.4,
@@ -484,6 +532,7 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 20,
     overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.07)',
     elevation: 10,
     shadowColor: '#00E676',
     shadowOffset: { width: 0, height: 5 },
@@ -509,23 +558,21 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   
-  // Effets lumineux améliorés
-  modernGlowOverlay: {
+  // Effets lumineux glassmorphism
+  glassReflection: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    height: '50%',
     borderRadius: 16,
   },
-  smallGlowOverlay: {
+  smallGlassReflection: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    height: '50%',
     borderRadius: 12,
   },
 
