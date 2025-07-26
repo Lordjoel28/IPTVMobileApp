@@ -1,7 +1,6 @@
 /**
- * 🎬 IPTV Smarters Pro Interface - Design Moderne v2.0
- * Reproduction exacte avec dégradés stylés et icônes modernes
- * Dernière modification: ${new Date().toISOString()}
+ * 🎬 IPTV Smarters Pro Interface - Code Gemini Complet
+ * Implémentation avec catalogue d'icônes et structure optimisée
  */
 
 import React, { useRef, useEffect, useState } from 'react';
@@ -14,34 +13,32 @@ import {
   Dimensions,
   Animated,
   ScrollView,
+  Image,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { BlurView } from '@react-native-community/blur';
+
+// --- Catalogue des nouvelles icônes ---
+// On dit à l'application où trouver chaque image.
+const iconMap = {
+  tv: require('./assets/icons/icon_tv.png'),
+  films: require('./assets/icons/icon_films.png'),
+  series: require('./assets/icons/icon_series.png'),
+  epg: require('./assets/icons/icon_epg.png'),
+  multi: require('./assets/icons/icon_multi.png'),
+  replay: require('./assets/icons/icon_replay.png'),
+  download: require('./assets/icons/icon_download.png'),
+};
 
 const { width, height } = Dimensions.get('window');
 
 const App: React.FC = () => {
   // LOG POUR CONFIRMER LE CHARGEMENT
-  console.log('🎬 APP_IPTV_SMARTERS LOADED - VERSION MODERNE 2.0');
+  console.log('🎬 APP_IPTV_SMARTERS GEMINI VERSION LOADED');
   
   // États pour l'horloge dynamique et données conditionnelles
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [playlistInfo, setPlaylistInfo] = useState({ name: null, expiration: null });
-  const [liveTvUpdateTime, setLiveTvUpdateTime] = useState(null);
-  const [filmsUpdateTime, setFilmsUpdateTime] = useState(null);
-
-  // Fonction pour formater le temps écoulé
-  const formatTimeAgo = (timestamp: Date) => {
-    const now = new Date();
-    const diffInMinutes = Math.floor((now.getTime() - timestamp.getTime()) / (1000 * 60));
-    
-    if (diffInMinutes < 1) return 'À l\'instant';
-    if (diffInMinutes < 60) return `${diffInMinutes} min`;
-    const hours = Math.floor(diffInMinutes / 60);
-    if (hours < 24) return `${hours}h`;
-    const days = Math.floor(hours / 24);
-    return `${days}j`;
-  };
   
   // Animations pour les cartes
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -89,6 +86,23 @@ const App: React.FC = () => {
     // TODO: Add navigation logic here
   };
 
+  // Configuration des couleurs pour chaque carte
+  const cardColors = {
+    tv: ['rgba(255, 210, 78, 0.2)', 'rgba(255, 160, 50, 0.1)'],
+    films: ['rgba(255, 78, 78, 0.25)', 'rgba(255, 170, 170, 0.1)'],
+    series: ['rgba(78, 175, 255, 0.2)', 'rgba(170, 235, 255, 0.1)'],
+    epg: ['rgba(78, 255, 161, 0.2)', 'rgba(120, 255, 200, 0.1)'],
+    multi: ['rgba(192, 78, 255, 0.2)', 'rgba(220, 160, 255, 0.1)'],
+    replay: ['rgba(255, 150, 78, 0.2)', 'rgba(255, 200, 150, 0.1)'],
+  };
+
+  // Configuration des cartes de la rangée du bas
+  const bottomRowCards = [
+    { key: 'epg', title: 'LIVE EPG', subtitle: 'Guide TV', index: 3 },
+    { key: 'multi', title: 'MULTI-ÉCR', subtitle: 'Écrans', index: 4 },
+    { key: 'replay', title: 'RATTRAPER', subtitle: 'Replay', index: 5 },
+  ];
+
   return (
     <LinearGradient
       colors={['#1A1F36', '#2C3E50']}
@@ -96,7 +110,7 @@ const App: React.FC = () => {
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
     >
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      <StatusBar barStyle="light-content" backgroundColor="#1A1F36" />
       
       {/* Header exact comme capture 7 */}
       <View style={styles.header}>
@@ -146,624 +160,155 @@ const App: React.FC = () => {
       </View>
 
       <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
+        <View style={styles.mainCardsSection}>
           
-          {/* Section principale - Design moderne avec proportions parfaites */}
-          <View style={styles.mainCardsSection}>
-          
-          {/* Colonne gauche - TV EN DIRECT moderne */}
+          {/* Colonne gauche - TV EN DIRECT */}
           <View style={styles.leftColumn}>
-            <Animated.View style={[styles.tvDirectContainer, { transform: [{ scale: cardsScale[0] }] }]}>
+            <Animated.View style={[{ flex: 1, transform: [{ scale: cardsScale[0] }] }]}>
               <TouchableOpacity 
-                style={styles.tvDirectCard}
+                style={styles.cardBase}
                 activeOpacity={0.8}
                 onPress={() => handleCardPress('TV EN DIRECT', 0)}
                 {...createPressAnimation(0)}
               >
-                <LinearGradient
-                  colors={['#1A237E', '#283593']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.modernCardGradient}
-                >
-                  <LinearGradient
-                    colors={['rgba(255,255,255,0.15)', 'rgba(255,255,255,0.05)', 'transparent']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 0, y: 1 }}
-                    style={styles.glassReflection}
-                  />
-                  <View style={styles.cardContentCenter}>
-                    <View style={styles.modernIconContainer}>
-                      <View style={styles.iconGlowEffect}>
-                        <Icon name="tv" size={65} color="#FFFFFF" />
-                      </View>
-                    </View>
-                    <Text style={styles.modernTvTitle}>TV EN DIRECT</Text>
-                    <Text style={styles.modernSubtitle}>Streaming Live</Text>
-                    
-                    {liveTvUpdateTime && (
-                      <View style={styles.modernUpdateContainer}>
-                        <View style={styles.statusDot} />
-                        <Text style={styles.modernUpdateText}>Mise à jour: {formatTimeAgo(liveTvUpdateTime)}</Text>
-                        <TouchableOpacity style={styles.modernRefreshButton}>
-                          <Icon name="refresh" size={14} color="#000000" />
-                        </TouchableOpacity>
-                      </View>
-                    )}
+                <BlurView style={styles.absoluteFill} blurType="dark" blurAmount={15} />
+                <LinearGradient colors={cardColors.tv} style={styles.absoluteFill} />
+                <LinearGradient 
+                  colors={['rgba(255, 255, 255, 0.15)', 'transparent']} 
+                  style={styles.glassReflection} 
+                />
+                <View style={styles.cardContent}>
+                  <View style={[styles.iconWrapperBase, styles.iconWrapperTv]}>
+                    <Image source={iconMap.tv} style={styles.iconImageLg} />
                   </View>
-                </LinearGradient>
+                  <Text style={styles.modernTvTitle}>TV EN DIRECT</Text>
+                  <Text style={styles.modernSubtitle}>Streaming Live</Text>
+                </View>
               </TouchableOpacity>
             </Animated.View>
           </View>
 
-          {/* Colonne droite - Layout moderne */}
+          {/* Colonne droite */}
           <View style={styles.rightColumn}>
             
-            {/* Rangée 1 - FILMS et SERIES modernes */}
+            {/* Rangée 1 - FILMS et SERIES */}
             <View style={styles.topRow}>
               
-              {/* FILMS - Design moderne */}
-              <Animated.View style={[styles.filmsContainer, { transform: [{ scale: cardsScale[1] }] }]}>
+              {/* FILMS */}
+              <Animated.View style={[{ flex: 1, transform: [{ scale: cardsScale[1] }] }]}>
                 <TouchableOpacity 
-                  style={styles.modernCard}
+                  style={styles.cardBase}
                   activeOpacity={0.8}
                   onPress={() => handleCardPress('FILMS', 1)}
                   {...createPressAnimation(1)}
                 >
-                  <LinearGradient
-                    colors={['#e65100', '#fb8c00']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.modernCardGradient}
-                  >
-                    <LinearGradient
-                    colors={['rgba(255,255,255,0.15)', 'rgba(255,255,255,0.05)', 'transparent']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 0, y: 1 }}
-                    style={styles.glassReflection}
+                  <BlurView style={styles.absoluteFill} blurType="dark" blurAmount={15} />
+                  <LinearGradient colors={cardColors.films} style={styles.absoluteFill} />
+                  <LinearGradient 
+                    colors={['rgba(255, 255, 255, 0.15)', 'transparent']} 
+                    style={styles.glassReflection} 
                   />
-                    <View style={styles.cardContentCenter}>
-                      <View style={styles.modernIconContainer}>
-                        <View style={styles.playButtonModern}>
-                          <Icon name="play-arrow" size={45} color="#FFFFFF" />
-                        </View>
-                      </View>
-                      <Text style={styles.modernCardTitle}>FILMS</Text>
-                      
-                      {filmsUpdateTime && (
-                        <View style={styles.modernUpdateContainer}>
-                          <View style={styles.statusDot} />
-                          <Text style={styles.modernUpdateText}>{formatTimeAgo(filmsUpdateTime)}</Text>
-                          <TouchableOpacity style={styles.modernRefreshButton}>
-                            <Icon name="refresh" size={12} color="#000000" />
-                          </TouchableOpacity>
-                        </View>
-                      )}
+                  <View style={styles.cardContent}>
+                    <View style={[styles.iconWrapperBase, styles.iconWrapperFilms]}>
+                      <Image source={iconMap.films} style={styles.iconImageMd} />
                     </View>
-                  </LinearGradient>
+                    <Text style={styles.modernCardTitle}>FILMS</Text>
+                  </View>
                 </TouchableOpacity>
               </Animated.View>
 
-              {/* SERIES - Design moderne */}
-              <Animated.View style={[styles.seriesContainer, { transform: [{ scale: cardsScale[2] }] }]}>
+              {/* SERIES */}
+              <Animated.View style={[{ flex: 1, transform: [{ scale: cardsScale[2] }] }]}>
                 <TouchableOpacity 
-                  style={styles.modernCard}
+                  style={styles.cardBase}
                   activeOpacity={0.8}
                   onPress={() => handleCardPress('SERIES', 2)}
                   {...createPressAnimation(2)}
                 >
-                  <LinearGradient
-                    colors={['#37474F', '#546E7A']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.modernCardGradient}
-                  >
-                    <LinearGradient
-                    colors={['rgba(255,255,255,0.15)', 'rgba(255,255,255,0.05)', 'transparent']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 0, y: 1 }}
-                    style={styles.glassReflection}
+                  <BlurView style={styles.absoluteFill} blurType="dark" blurAmount={15} />
+                  <LinearGradient colors={cardColors.series} style={styles.absoluteFill} />
+                  <LinearGradient 
+                    colors={['rgba(255, 255, 255, 0.15)', 'transparent']} 
+                    style={styles.glassReflection} 
                   />
-                    <View style={styles.cardContentCenter}>
-                      <View style={styles.modernIconContainer}>
-                        <Icon name="movie" size={55} color="#FFFFFF" />
-                      </View>
-                      <Text style={styles.modernCardTitle}>SERIES</Text>
-                      
-                      <TouchableOpacity style={styles.modernDownloadButton}>
-                        <Icon name="download" size={14} color="#FFFFFF" />
-                        <Text style={styles.modernDownloadText}>Télécharger</Text>
-                      </TouchableOpacity>
+                  <View style={styles.cardContent}>
+                    <View style={[styles.iconWrapperBase, styles.iconWrapperSeries]}>
+                      <Image source={iconMap.series} style={styles.iconImageMd} />
                     </View>
-                  </LinearGradient>
+                    <Text style={styles.modernCardTitle}>SERIES</Text>
+                  </View>
                 </TouchableOpacity>
               </Animated.View>
             </View>
 
-            {/* Rangée 2 - 3 petites cartes modernes (16.6% chacune) */}
             <View style={styles.bottomRow}>
-              
-              {/* LIVE AVEC EPG - Moderne */}
-              <Animated.View style={[styles.modernSmallContainer, { transform: [{ scale: cardsScale[3] }] }]}>
-                <TouchableOpacity 
-                  style={styles.modernSmallCard}
-                  activeOpacity={0.8}
-                  onPress={() => handleCardPress('LIVE EPG', 3)}
-                  {...createPressAnimation(3)}
-                >
-                  <LinearGradient
-                    colors={['#37474F', '#546E7A']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.modernSmallGradient}
-                  >
-                    <LinearGradient
-                      colors={['rgba(255,255,255,0.12)', 'rgba(255,255,255,0.04)', 'transparent']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 0, y: 1 }}
-                      style={styles.smallGlassReflection}
-                    />
-                    <View style={styles.modernSmallIconContainer}>
-                      <Icon name="event" size={28} color="#FFFFFF" />
+              {bottomRowCards.map(card => (
+                <Animated.View key={card.key} style={[{ flex: 1, transform: [{ scale: cardsScale[card.index] }] }]}>
+                  <TouchableOpacity style={styles.cardBaseSmall} {...createPressAnimation(card.index)}>
+                    <BlurView style={styles.absoluteFill} blurType="dark" blurAmount={15} />
+                    <LinearGradient colors={cardColors[card.key]} style={styles.absoluteFill} />
+                    <LinearGradient colors={['rgba(255, 255, 255, 0.15)', 'transparent']} style={styles.glassReflection} />
+                    <View style={styles.cardContent}>
+                      <View style={styles[`iconWrapper${card.key.charAt(0).toUpperCase() + card.key.slice(1)}`]}>
+                        <Image source={iconMap[card.key]} style={styles.iconImageSm} />
+                      </View>
+                      <Text style={styles.modernSmallTitle}>{card.title}</Text>
+                      <Text style={styles.modernSmallSubtitle}>{card.subtitle}</Text>
                     </View>
-                    <Text style={styles.modernSmallTitle}>LIVE EPG</Text>
-                    <Text style={styles.modernSmallSubtitle}>Guide TV</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-              </Animated.View>
-
-              {/* MULTI-ÉCRANS - Moderne */}
-              <Animated.View style={[styles.modernSmallContainer, { transform: [{ scale: cardsScale[4] }] }]}>
-                <TouchableOpacity 
-                  style={styles.modernSmallCard}
-                  activeOpacity={0.8}
-                  onPress={() => handleCardPress('MULTI-ÉCR', 4)}
-                  {...createPressAnimation(4)}
-                >
-                  <LinearGradient
-                    colors={['#37474F', '#546E7A']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.modernSmallGradient}
-                  >
-                    <LinearGradient
-                      colors={['rgba(255,255,255,0.12)', 'rgba(255,255,255,0.04)', 'transparent']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 0, y: 1 }}
-                      style={styles.smallGlassReflection}
-                    />
-                    <View style={styles.modernSmallIconContainer}>
-                      <Icon name="apps" size={28} color="#FFFFFF" />
-                    </View>
-                    <Text style={styles.modernSmallTitle}>MULTI-ÉCR</Text>
-                    <Text style={styles.modernSmallSubtitle}>Écrans</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-              </Animated.View>
-              
-              {/* RATTRAPER - Moderne */}
-              <Animated.View style={[styles.modernSmallContainer, { transform: [{ scale: cardsScale[5] }] }]}>
-                <TouchableOpacity 
-                  style={styles.modernSmallCard}
-                  activeOpacity={1}
-                  {...createPressAnimation(5)}
-                >
-                  <LinearGradient
-                    colors={['#37474F', '#546E7A']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.modernSmallGradient}
-                  >
-                    <LinearGradient
-                      colors={['rgba(255,255,255,0.12)', 'rgba(255,255,255,0.04)', 'transparent']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 0, y: 1 }}
-                      style={styles.smallGlassReflection}
-                    />
-                    <View style={styles.modernSmallIconContainer}>
-                      <Icon name="replay" size={28} color="#FFFFFF" />
-                    </View>
-                    <Text style={styles.modernSmallTitle}>RATTRAPER</Text>
-                    <Text style={styles.modernSmallSubtitle}>Replay</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-              </Animated.View>
+                  </TouchableOpacity>
+                </Animated.View>
+              ))}
             </View>
           </View>
         </View>
-
-        {/* Footer conditionnel */}
-        <View style={styles.footer}>
-          {playlistInfo.expiration && (
-            <Text style={styles.footerText}>Expiration : {playlistInfo.expiration}</Text>
-          )}
-          {playlistInfo.name && (
-            <Text style={styles.footerText}>Connecté : {playlistInfo.name}</Text>
-          )}
-        </View>
       </Animated.View>
+      {/* Le Footer a été supprimé comme demandé */}
     </LinearGradient>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 40,
-    paddingBottom: 8,
-    backgroundColor: 'transparent',
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  logoContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: 32,
-  },
-  logoIcon: {
-    width: 32,
-    height: 32,
-    backgroundColor: '#4A90E2',
-    borderRadius: 6,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  logoText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  timeText: {
-    fontSize: 14,
-    color: '#B0BEC5',
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  headerButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginRight: 12,
-  },
-  headerButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    marginLeft: 8,
-  },
-  headerIconButton: {
-    padding: 8,
-    marginLeft: 8,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 8,
-  },
-  
-  // Layout principal - Flexbox adaptatif
-  mainCardsSection: {
-    flexDirection: 'row',
-    flex: 1,
-    marginBottom: 16,
-    gap: 12,
-  },
-  
-  // Colonnes
-  leftColumn: {
-    flex: 0.85,
-  },
-  rightColumn: {
-    flex: 1.1,
-    flexDirection: 'column',
-    gap: 10,
-  },
-  
-  // Rangées droite - Flexbox adaptatif
-  topRow: {
-    flexDirection: 'row',
-    flex: 0.7,
-    gap: 10,
-    marginBottom: 10,
-  },
-  bottomRow: {
-    flexDirection: 'row',
-    flex: 0.3,
-    gap: 8,
-  },
-  
-  // TV EN DIRECT - Design moderne
-  tvDirectContainer: {
-    flex: 1,
-  },
-  tvDirectCard: {
-    flex: 1,
-    borderRadius: 28,
-    overflow: 'hidden',
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    elevation: 16,
-    shadowColor: '#00D4FF',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.5,
-    shadowRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  
-  // FILMS et SERIES - Design moderne
-  filmsContainer: {
-    flex: 1,
-  },
-  seriesContainer: {
-    flex: 1,
-  },
-  modernCard: {
-    flex: 1,
-    borderRadius: 24,
-    overflow: 'hidden',
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    elevation: 12,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-  },
-  
-  // Petites cartes modernes (16.6% chacune)
-  modernSmallContainer: {
-    flex: 1,
-  },
-  modernSmallCard: {
-    flex: 1,
-    borderRadius: 20,
-    overflow: 'hidden',
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    elevation: 10,
-    shadowColor: '#00E676',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-  },
+  absoluteFill: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
+  container: { flex: 1 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8, backgroundColor: 'transparent' },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+  logoContainer: { flexDirection: 'row', alignItems: 'center', marginRight: 32 },
+  logoIcon: { width: 32, height: 32, backgroundColor: '#4A90E2', borderRadius: 6, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+  logoText: { fontSize: 18, fontWeight: '600', color: '#FFFFFF' },
+  timeText: { fontSize: 14, color: '#B0BEC5' },
+  headerRight: { flexDirection: 'row', alignItems: 'center' },
+  headerButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, marginRight: 12 },
+  headerButtonText: { color: '#FFFFFF', fontSize: 14, marginLeft: 8 },
+  headerIconButton: { padding: 8, marginLeft: 8 },
+  content: { flex: 1, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 24 },
+  mainCardsSection: { flexDirection: 'row', flex: 1, gap: 12 },
+  leftColumn: { flex: 1 },
+  rightColumn: { flex: 1, flexDirection: 'column', gap: 10 },
+  topRow: { flexDirection: 'row', flex: 1, gap: 10 },
+  bottomRow: { flexDirection: 'row', flex: 0.6, gap: 8 },
 
-  // Dégradés modernes
-  modernCardGradient: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 18,
-    position: 'relative',
-  },
-  modernSmallGradient: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 14,
-    position: 'relative',
-  },
-  
-  // Effets lumineux glassmorphism
-  glassReflection: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: '50%',
-    borderRadius: 16,
-  },
-  smallGlassReflection: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: '50%',
-    borderRadius: 12,
-  },
+  cardBase: { flex: 1, borderRadius: 24, overflow: 'hidden', justifyContent: 'center', alignItems: 'center' },
+  cardBaseSmall: { flex: 1, borderRadius: 20, overflow: 'hidden', justifyContent: 'center', alignItems: 'center' },
+  glassReflection: { position: 'absolute', top: 0, left: 0, right: 0, height: '60%' },
+  cardContent: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 12 },
 
-  // Conteneurs d'icônes modernes
-  modernIconContainer: {
-    marginBottom: 14,
-    position: 'relative',
-  },
-  modernSmallIconContainer: {
-    marginBottom: 10,
-    padding: 4,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-  },
-  
-  // Effets d'icônes améliorés
-  iconGlowEffect: {
-    padding: 16,
-    borderRadius: 50,
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#FFFFFF',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  
-  // Bouton play moderne amélioré
-  playButtonModern: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.4)',
-    shadowColor: '#FFFFFF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
+  iconWrapperBase: { marginBottom: 10 },
+  iconWrapperTv: { marginBottom: 15 },
+  iconWrapperFilms: { marginBottom: 15 },
+  iconWrapperSeries: { marginBottom: 15 },
+  iconWrapperEpg: {},
+  iconWrapperMulti: {},
+  iconWrapperReplay: {},
 
-  // Titres modernes
-  modernTvTitle: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    textAlign: 'center',
-    marginBottom: 4,
-    textShadowColor: 'rgba(0,0,0,0.5)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 6,
-    letterSpacing: 0.5,
-  },
-  modernSubtitle: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.8)',
-    textAlign: 'center',
-    marginBottom: 16,
-    fontWeight: '500',
-  },
-  modernCardTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    textAlign: 'center',
-    marginBottom: 8,
-    textShadowColor: 'rgba(0,0,0,0.3)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
-  },
-  modernSmallTitle: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    textAlign: 'center',
-    marginBottom: 2,
-  },
-  modernSmallSubtitle: {
-    fontSize: 9,
-    color: 'rgba(255,255,255,0.7)',
-    textAlign: 'center',
-    fontWeight: '500',
-  },
+  iconImageLg: { width: 90, height: 90, resizeMode: 'contain' },
+  iconImageMd: { width: 70, height: 70, resizeMode: 'contain' },
+  iconImageSm: { width: 40, height: 40, resizeMode: 'contain' },
 
-  // Conteneurs d'info modernes
-  modernUpdateContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.25)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-  },
-  modernUpdateText: {
-    fontSize: 10,
-    color: '#FFFFFF',
-    marginLeft: 6,
-    marginRight: 6,
-    fontWeight: '500',
-  },
-  modernRefreshButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    elevation: 5,
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.05)',
-  },
-  
-  // Statut et indicateurs
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#00FF88',
-    shadowColor: '#00FF88',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  
-  // Bouton téléchargement moderne
-  modernDownloadButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.25)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 15,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-  },
-  modernDownloadText: {
-    fontSize: 9,
-    color: '#FFFFFF',
-    marginLeft: 4,
-    fontWeight: '600',
-  },
-
-  cardContentCenter: {
-    alignItems: 'center',
-  },
-  
-  // Footer
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 8,
-  },
-  footerText: {
-    fontSize: 12,
-    color: '#90A4AE',
-    flex: 1,
-  },
-  buyPremiumButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,215,0,0.2)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#FFD700',
-    flex: 1,
-    justifyContent: 'center',
-  },
-  buyPremiumText: {
-    fontSize: 12,
-    color: '#FFD700',
-    fontWeight: 'bold',
-    marginLeft: 6,
-  },
+  modernTvTitle: { fontSize: 24, fontWeight: '800', color: '#FFFFFF', textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 8 },
+  modernSubtitle: { fontSize: 12, color: 'rgba(255,255,255,0.8)', textAlign: 'center', fontWeight: '500' },
+  modernCardTitle: { fontSize: 16, fontWeight: '700', color: '#FFFFFF', textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
+  modernSmallTitle: { fontSize: 11, fontWeight: '700', color: '#FFFFFF', textAlign: 'center' },
+  modernSmallSubtitle: { fontSize: 9, color: 'rgba(255,255,255,0.7)', textAlign: 'center', fontWeight: '500' },
 });
 
 export default App;
