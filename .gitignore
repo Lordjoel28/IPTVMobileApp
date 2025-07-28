@@ -64,3 +64,19 @@ yarn-error.log
 
 # testing
 /coverage
+
+# IPTV App Specific
+*.apk
+*.aab
+*.log
+.env
+*.env
+
+# Build outputs
+android/app/build/
+ios/build/
+dist/
+
+# Backup files
+backups/
+*.backup

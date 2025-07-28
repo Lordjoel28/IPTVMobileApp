@@ -9,6 +9,7 @@ import {
   ScrollView,
   StyleSheet,
   Dimensions,
+  TouchableOpacity,
 } from 'react-native';
 import {
   Surface,
@@ -22,6 +23,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FlashList } from '@shopify/flash-list';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import LinearGradient from 'react-native-linear-gradient';
 
 // Types
 import type { HomeScreenNavigationProp } from '../types';
@@ -36,6 +38,7 @@ interface Props {
 }
 
 const { width } = Dimensions.get('window');
+
 
 const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const theme = useTheme();
@@ -134,6 +137,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     />
   );
 
+
   if (loading) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -148,9 +152,59 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+    <View style={styles.container}>
+      <LinearGradient
+        colors={['#0A0A0A', '#10141C']}
+        style={styles.backgroundGradient}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      />
+      <SafeAreaView style={styles.safeArea}>
+        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         
+        {/* Interface IPTV Smarters Pro - Code exact de ChatGPT adapté */}
+        <View style={styles.iptvContainer}>
+          {/* Première ligne */}
+          <View style={styles.rowTop}>
+            <TouchableOpacity style={[styles.card, styles.cardLargeBlue]}> 
+              <Icon name="live-tv" size={40} color="white" />
+              <Text style={styles.cardTitle}>TV EN DIRECT - TEST 2025</Text>
+              <Text style={styles.cardSubtitle}>Streaming Live</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={[styles.card, styles.cardMediumOrange]}> 
+              <Icon name="play-arrow" size={40} color="white" />
+              <Text style={styles.cardTitle}>FILMS</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={[styles.card, styles.cardMediumGray]}> 
+              <Icon name="movie" size={36} color="white" />
+              <Text style={styles.cardTitle}>SÉRIES</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Deuxième ligne */}
+          <View style={styles.rowBottom}>
+            <TouchableOpacity style={styles.smallCard}>
+              <Icon name="event" size={24} color="white" />
+              <Text style={styles.cardSmallTitle}>LIVE EPG</Text>
+              <Text style={styles.cardSmallSubtitle}>Guide TV</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.smallCard}>
+              <Icon name="dashboard" size={24} color="white" />
+              <Text style={styles.cardSmallTitle}>MULTI-ÉCR</Text>
+              <Text style={styles.cardSmallSubtitle}>Écrans</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.smallCard}>
+              <Icon name="replay" size={24} color="white" />
+              <Text style={styles.cardSmallTitle}>RATTRAPER</Text>
+              <Text style={styles.cardSmallSubtitle}>Replay</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {/* En-tête avec statistiques */}
         <Surface style={[styles.headerCard, { backgroundColor: theme.colors.surface }]} elevation={2}>
           <Text variant="headlineSmall" style={[styles.welcomeText, { color: theme.colors.onSurface }]}>
@@ -279,12 +333,23 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         {/* Espacement en bas */}
         <View style={{ height: 20 }} />
       </ScrollView>
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+  },
+  backgroundGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  safeArea: {
     flex: 1,
   },
   scrollView: {
@@ -344,6 +409,78 @@ const styles = StyleSheet.create({
   },
   playlistInfo: {
     flex: 1,
+  },
+  
+  // ========== STYLES CHATGPT EXACTS ========== //
+  iptvContainer: {
+    paddingTop: 60,
+    paddingHorizontal: 16,
+  },
+  rowTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 24,
+  },
+  rowBottom: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  card: {
+    borderRadius: 20,
+    padding: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  cardLargeBlue: {
+    flex: 1.3,
+    backgroundColor: '#007BFF',
+    marginRight: 12,
+  },
+  cardMediumOrange: {
+    flex: 1,
+    backgroundColor: '#f16a20',
+    marginRight: 12,
+  },
+  cardMediumGray: {
+    flex: 1,
+    backgroundColor: '#5c6370',
+  },
+  cardTitle: {
+    fontSize: 18,
+    color: 'white',
+    fontWeight: 'bold',
+    marginTop: 12,
+  },
+  cardSubtitle: {
+    fontSize: 14,
+    color: 'white',
+    opacity: 0.9,
+    marginTop: 4,
+  },
+  smallCard: {
+    flex: 1,
+    backgroundColor: '#28a745',
+    borderRadius: 18,
+    padding: 12,
+    marginHorizontal: 4,
+    alignItems: 'center',
+  },
+  cardSmallTitle: {
+    fontSize: 14,
+    color: 'white',
+    fontWeight: 'bold',
+    marginTop: 8,
+  },
+  cardSmallSubtitle: {
+    fontSize: 12,
+    color: 'white',
+    opacity: 0.7,
+    marginTop: 2,
   },
 });
 

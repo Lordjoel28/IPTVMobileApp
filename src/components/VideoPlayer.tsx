@@ -128,7 +128,10 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
             resizeMode="contain"
             paused={isPaused}
             onLoad={handleLoad}
-            onError={handleError}
+            onError={(error) => {
+              Alert.alert('Erreur Video', JSON.stringify(error));
+              handleError(error);
+            }}
             onProgress={handleProgress}
             onBuffer={(data) => setIsLoading(data.isBuffering)}
             bufferConfig={{
