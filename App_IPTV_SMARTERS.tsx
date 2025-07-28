@@ -83,7 +83,13 @@ const App: React.FC = () => {
 
   const handleCardPress = (cardName: string, index: number) => {
     console.log(`🎬 CARD CLICKED: ${cardName} (${index})`);
-    // TODO: Add navigation logic here
+    if (cardName === 'TV EN DIRECT') {
+      console.log('🎬 TV Card Pressed! - TEMPORARILY DISABLED');
+      console.log('✅ App ready for fresh VideoPlayer installation');
+      // VideoPlayer functionality will be added next
+      return;
+    }
+    // TODO: Add navigation logic for other cards
   };
 
   // Configuration des couleurs pour chaque carte
