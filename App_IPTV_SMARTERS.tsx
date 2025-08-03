@@ -13,11 +13,15 @@ import {
   Animated,
   Image,
   Modal,
+  Alert,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { BlurView } from '@react-native-community/blur';
 import VideoPlayer from './src/components/VideoPlayer';
+import ConnectionModal from './src/components/ConnectionModal';
+import XtreamCodeModal from './src/components/XtreamCodeModal';
+import M3UUrlModal from './src/components/M3UUrlModal';
 import type { Channel } from './src/types';
 
 // --- Catalogue des icônes PNG ---
@@ -48,6 +52,9 @@ const App: React.FC = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showVideoPlayer, setShowVideoPlayer] = useState(false);
   const [currentChannel, setCurrentChannel] = useState<Channel | null>(null);
+  const [showConnectionModal, setShowConnectionModal] = useState(false);
+  const [showXtreamModal, setShowXtreamModal] = useState(false);
+  const [showM3UModal, setShowM3UModal] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const cardsScale = useRef([...Array(6)].map(() => new Animated.Value(1))).current;
 
@@ -60,27 +67,72 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
+    console.log('🚀 APP DÉMARRE!');
+    Alert.alert('DEBUG', 'APP IPTV DÉMARRÉE!');
     Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }).start();
     const timeInterval = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timeInterval);
   }, []);
 
-  const createPressAnimation = (index: number) => ({
-    onPressIn: () => Animated.spring(cardsScale[index], { toValue: 0.98, useNativeDriver: true, tension: 200, friction: 7 }).start(),
-    onPressOut: () => Animated.spring(cardsScale[index], { toValue: 1, useNativeDriver: true, tension: 200, friction: 7 }).start(),
-  });
+  // Animations supprimées pour assurer clics fonctionnels
 
   const handleTVCardPress = () => {
-    console.log('🎬 TV Card Pressed! - TEMPORARILY DISABLED');
-    console.log('✅ Perfect design restored! VideoPlayer will be added next');
-    // VideoPlayer functionality temporarily disabled to avoid RCTVideo error
-    return;
+    console.log('🎬 TV Card Pressed!');
+    Alert.alert('TEST CARD', '📺 TV EN DIRECT CLIQUÉ!');
   };
 
   const handleClosePlayer = () => {
     console.log('❌ Closing Video Player');
     setShowVideoPlayer(false);
     setCurrentChannel(null);
+  };
+
+  // Handlers pour le modal de connexion
+  const handleXtreamConnect = () => {
+    console.log('🔐 Ouvrir modal Xtream Codes');
+    setShowConnectionModal(false);
+    setShowXtreamModal(true);
+  };
+
+  const handleM3UConnect = () => {
+    console.log('📁 Ouvrir modal M3U URL');
+    setShowConnectionModal(false);
+    setShowM3UModal(true);
+  };
+
+  const handleUsersList = () => {
+    console.log('👥 Liste d\'utilisateurs');
+    setShowConnectionModal(false);
+  };
+
+  // Handler pour la connexion Xtream Codes
+  const handleXtreamConnection = async (credentials: any) => {
+    console.log('🔐 Connexion Xtream avec:', credentials);
+    setShowXtreamModal(false);
+  };
+
+  // Handler pour la connexion M3U URL
+  const handleM3UConnection = async (source: any) => {
+    console.log('📁 Connexion M3U avec:', source);
+    setShowM3UModal(false);
+  };
+
+  // Handler pour fermer Xtream Modal et retourner au Connection Modal
+  const handleXtreamClose = () => {
+    console.log('🔙 Fermer Xtream Modal et retourner au Connection Modal');
+    setShowXtreamModal(false);
+    setTimeout(() => {
+      setShowConnectionModal(true);
+    }, 100);
+  };
+
+  // Handler pour fermer M3U Modal et retourner au Connection Modal
+  const handleM3UClose = () => {
+    console.log('🔙 Fermer M3U Modal et retourner au Connection Modal');
+    setShowM3UModal(false);
+    setTimeout(() => {
+      setShowConnectionModal(true);
+    }, 100);
   };
 
   return (
@@ -104,36 +156,101 @@ const App: React.FC = () => {
           </Text>
         </View>
         <View style={styles.headerRight}>
-          <TouchableOpacity style={styles.headerButton}><Icon name="search" size={24} color="#FFFFFF" /><Text style={styles.headerButtonText}>Main Recherche</Text></TouchableOpacity>
-          <TouchableOpacity style={styles.headerIconButton}><Icon name="download" size={24} color="#FFFFFF" /></TouchableOpacity>
-          <TouchableOpacity style={styles.headerIconButton}><Icon name="notifications" size={24} color="#FFFFFF" /></TouchableOpacity>
-          <TouchableOpacity style={styles.headerIconButton}><Icon name="person" size={24} color="#FFFFFF" /></TouchableOpacity>
-          <TouchableOpacity style={styles.headerIconButton}><Icon name="cast" size={24} color="#FFFFFF" /></TouchableOpacity>
-          <TouchableOpacity style={styles.headerIconButton}><Icon name="settings" size={24} color="#FFFFFF" /></TouchableOpacity>
-          <TouchableOpacity style={styles.headerIconButton}><Icon name="logout" size={24} color="#FFFFFF" /></TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.headerButton}
+            onPress={() => {
+              console.log('🔍 RECHERCHE PRINCIPALE!');
+              Alert.alert('DEBUG', '🔍 RECHERCHE CLIQUÉ!');
+            }}
+          >
+            <Icon name="search" size={24} color="#FFFFFF" />
+            <Text style={styles.headerButtonText}>Main Recherche</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.headerIconButton}
+            onPress={() => {
+              console.log('📥 TÉLÉCHARGEMENTS!');
+              Alert.alert('DEBUG', '📥 TÉLÉCHARGEMENTS CLIQUÉ!');
+            }}
+          >
+            <Icon name="download" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.headerIconButton}
+            onPress={() => {
+              console.log('🔔 NOTIFICATIONS!');
+              Alert.alert('DEBUG', '🔔 NOTIFICATIONS CLIQUÉ!');
+            }}
+          >
+            <Icon name="notifications" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.headerIconButton}
+            onPress={() => {
+              console.log('🔥 BOUTON CONNEXION!');
+              setShowConnectionModal(true);
+            }}
+          >
+            <Icon name="person" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.headerIconButton}
+            onPress={() => {
+              console.log('📺 CAST/CHROMECAST!');
+              Alert.alert('DEBUG', 'CAST CLIQUÉ!');
+            }}
+          >
+            <Icon name="cast" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.headerIconButton}
+            onPress={() => {
+              console.log('⚙️ PARAMÈTRES!');
+              Alert.alert('DEBUG', 'PARAMÈTRES CLIQUÉ!');
+            }}
+          >
+            <Icon name="settings" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.headerIconButton}
+            onPress={() => {
+              console.log('🚪 DÉCONNEXION!');
+              Alert.alert('DEBUG', 'DÉCONNEXION CLIQUÉ!');
+            }}
+          >
+            <Icon name="logout" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
         </View>
       </View>
 
-      <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
+      <View style={styles.content}>
         <View style={styles.mainCardsSection}>
           
           <View style={styles.leftColumn}>
-            <Animated.View style={[{ flex: 1, transform: [{ scale: cardsScale[0] }] }]}>
+            <View style={{ flex: 1 }}>
               <TouchableOpacity 
-                style={styles.cardBase} 
-                {...createPressAnimation(0)}
+                style={styles.cardTV}
                 onPress={() => {
                   console.log('🎬 TV Card CLICKED!');
+                  Alert.alert('TEST CARTE', '📺 TV EN DIRECT CLIQUÉ! ✅');
                   handleTVCardPress();
                 }}
+                activeOpacity={0.8}
               >
-                <BlurView style={styles.absoluteFill} blurType="light" blurAmount={15} reducedTransparencyFallbackColor="rgba(255,255,255,0.15)" />
+                <BlurView 
+                  style={styles.absoluteFill} 
+                  blurType="light" 
+                  blurAmount={15} 
+                  reducedTransparencyFallbackColor="rgba(255,255,255,0.15)"
+                  pointerEvents="none"
+                />
                 <LinearGradient 
                   colors={['rgba(28, 138, 208, 0.7)', 'rgba(20, 100, 160, 0.5)', 'rgba(15, 76, 117, 0.8)']} 
                   locations={[0, 0.5, 1]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
-                  style={styles.absoluteFill} 
+                  style={styles.absoluteFill}
+                  pointerEvents="none"
                 />
                 <LinearGradient
                   colors={['rgba(50, 120, 255, 0.3)', 'rgba(30, 90, 200, 0.15)', 'transparent']}
@@ -141,13 +258,15 @@ const App: React.FC = () => {
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.absoluteFill}
+                  pointerEvents="none"
                 />
                 <LinearGradient 
                   colors={['rgba(255, 255, 255, 0.6)', 'rgba(255, 255, 255, 0.2)', 'transparent']} 
                   locations={[0, 0.2, 1]}
-                  style={styles.premiumReflectionEffect} 
+                  style={styles.premiumReflectionEffect}
+                  pointerEvents="none"
                 />
-                <View style={styles.cardContent}>
+                <View style={styles.cardContent} pointerEvents="box-none">
                   <View style={styles.premiumIconWrapper}>
                     <Image source={iconMap.tv} style={styles.iconImageLg} />
                   </View>
@@ -155,20 +274,34 @@ const App: React.FC = () => {
                   <Text style={styles.modernSubtitle}>Streaming Live</Text>
                 </View>
               </TouchableOpacity>
-            </Animated.View>
+            </View>
           </View>
 
           <View style={styles.rightColumn}>
             <View style={styles.topRow}>
-              <Animated.View style={[{ flex: 1, transform: [{ scale: cardsScale[1] }] }]}>
-                <TouchableOpacity style={styles.cardBase} {...createPressAnimation(1)}>
-                  <BlurView style={styles.absoluteFill} blurType="light" blurAmount={15} reducedTransparencyFallbackColor="rgba(255,255,255,0.15)" />
+              <View style={{ flex: 1 }}>
+                <TouchableOpacity 
+                  style={styles.cardFilms}
+                  onPress={() => {
+                    console.log('🎬 Films CLICKED!');
+                    Alert.alert('TEST CARTE', '🎬 FILMS CLIQUÉ! ✅');
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <BlurView 
+                    style={styles.absoluteFill} 
+                    blurType="light" 
+                    blurAmount={15} 
+                    reducedTransparencyFallbackColor="rgba(255,255,255,0.15)"
+                    pointerEvents="none"
+                  />
                   <LinearGradient 
                     colors={['rgba(241, 106, 32, 0.7)', 'rgba(230, 81, 0, 0.5)', 'rgba(200, 60, 0, 0.8)']} 
                     locations={[0, 0.5, 1]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
-                    style={styles.absoluteFill} 
+                    style={styles.absoluteFill}
+                    pointerEvents="none"
                   />
                   <LinearGradient
                     colors={['rgba(240, 55, 55, 0.3)', 'rgba(170, 30, 30, 0.15)', 'transparent']}
@@ -176,30 +309,46 @@ const App: React.FC = () => {
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.absoluteFill}
+                    pointerEvents="none"
                   />
                   <LinearGradient 
-                  colors={['rgba(255, 255, 255, 0.6)', 'rgba(255, 255, 255, 0.2)', 'transparent']} 
-                  locations={[0, 0.2, 1]}
-                  style={styles.premiumReflectionEffect} 
-                />
-                  <View style={styles.cardContent}>
+                    colors={['rgba(255, 255, 255, 0.6)', 'rgba(255, 255, 255, 0.2)', 'transparent']} 
+                    locations={[0, 0.2, 1]}
+                    style={styles.premiumReflectionEffect}
+                    pointerEvents="none"
+                  />
+                  <View style={styles.cardContent} pointerEvents="box-none">
                     <View style={styles.premiumIconWrapperFilms}>
                       <Image source={iconMap.films} style={styles.iconImageMd} />
                     </View>
                     <Text style={styles.modernCardTitle}>FILMS</Text>
                   </View>
                 </TouchableOpacity>
-              </Animated.View>
+              </View>
 
-              <Animated.View style={[{ flex: 1, transform: [{ scale: cardsScale[2] }] }]}>
-                <TouchableOpacity style={styles.cardBase} {...createPressAnimation(2)}>
-                  <BlurView style={styles.absoluteFill} blurType="light" blurAmount={15} reducedTransparencyFallbackColor="rgba(255,255,255,0.15)" />
+              <View style={{ flex: 1 }}>
+                <TouchableOpacity 
+                  style={styles.cardSeries}
+                  onPress={() => {
+                    console.log('📺 Series CLICKED!');
+                    Alert.alert('TEST CARTE', '📺 SERIES CLIQUÉ! ✅');
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <BlurView 
+                    style={styles.absoluteFill} 
+                    blurType="light" 
+                    blurAmount={15} 
+                    reducedTransparencyFallbackColor="rgba(255,255,255,0.15)"
+                    pointerEvents="none"
+                  />
                   <LinearGradient 
                     colors={['rgba(130, 100, 160, 0.7)', 'rgba(110, 85, 140, 0.5)', 'rgba(95, 70, 125, 0.8)']} 
                     locations={[0, 0.5, 1]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
-                    style={styles.absoluteFill} 
+                    style={styles.absoluteFill}
+                    pointerEvents="none"
                   />
                   <LinearGradient
                     colors={['rgba(160, 90, 255, 0.7)', 'rgba(120, 60, 200, 0.5)', 'transparent']}
@@ -207,31 +356,41 @@ const App: React.FC = () => {
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.absoluteFill}
+                    pointerEvents="none"
                   />
                   <LinearGradient 
-                  colors={['rgba(255, 255, 255, 0.6)', 'rgba(255, 255, 255, 0.2)', 'transparent']} 
-                  locations={[0, 0.2, 1]}
-                  style={styles.premiumReflectionEffect} 
-                />
-                  <View style={styles.cardContent}>
+                    colors={['rgba(255, 255, 255, 0.6)', 'rgba(255, 255, 255, 0.2)', 'transparent']} 
+                    locations={[0, 0.2, 1]}
+                    style={styles.premiumReflectionEffect}
+                    pointerEvents="none"
+                  />
+                  <View style={styles.cardContent} pointerEvents="box-none">
                     <View style={styles.premiumIconWrapperSeries}>
                       <Image source={iconMap.series} style={styles.iconImageMd} />
                     </View>
                     <Text style={styles.modernCardTitle}>SERIES</Text>
                   </View>
                 </TouchableOpacity>
-              </Animated.View>
+              </View>
             </View>
 
             <View style={styles.bottomRow}>
               {bottomRowCards.map(card => (
-                <Animated.View key={card.key} style={[{ flex: 1, transform: [{ scale: cardsScale[card.index] }] }]}>
-                  <TouchableOpacity style={[styles.cardBaseSmall, styles.liquidGlassCard]} {...createPressAnimation(card.index)}>
+                <View key={card.key} style={{ flex: 1 }}>
+                  <TouchableOpacity 
+                    style={[styles.cardBottom, styles.liquidGlassCard]}
+                    onPress={() => {
+                      console.log(`${card.title} CLICKED!`);
+                      Alert.alert('TEST CARTE', `${card.title} CLIQUÉ! ✅`);
+                    }}
+                    activeOpacity={0.8}
+                  >
                     <BlurView 
                       style={styles.absoluteFill} 
                       blurType="light" 
                       blurAmount={8} 
                       reducedTransparencyFallbackColor="rgba(255,255,255,0.18)"
+                      pointerEvents="none"
                     />
                     <LinearGradient
                       colors={['rgba(65, 85, 75, 0.7)', 'rgba(55, 70, 60, 0.5)', 'rgba(45, 60, 50, 0.8)']}
@@ -239,21 +398,22 @@ const App: React.FC = () => {
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 1 }}
                       style={styles.absoluteFill}
+                      pointerEvents="none"
                     />
-                    <View style={styles.cardContent}>
+                    <View style={styles.cardContent} pointerEvents="box-none">
                       <View style={[styles.iconWrapper, styles.liquidGlassIconWrapper]}>
-                        <Image source={iconMap[card.key]} style={[styles.iconImageSm, styles.liquidGlassIcon]} />
+                        <Image source={iconMap[card.key as keyof typeof iconMap]} style={[styles.iconImageSm, styles.liquidGlassIcon]} />
                       </View>
                       <Text style={styles.modernSmallTitle}>{card.title}</Text>
                       <Text style={styles.modernSmallSubtitle}>{card.subtitle}</Text>
                     </View>
                   </TouchableOpacity>
-                </Animated.View>
+                </View>
               ))}
             </View>
           </View>
         </View>
-      </Animated.View>
+      </View>
 
       {/* Video Player Modal */}
       <Modal
@@ -280,6 +440,29 @@ const App: React.FC = () => {
           />
         </View>
       </Modal>
+
+      {/* Connection Modal */}
+      <ConnectionModal
+        visible={showConnectionModal}
+        onClose={() => setShowConnectionModal(false)}
+        onXtreamConnect={handleXtreamConnect}
+        onM3UConnect={handleM3UConnect}
+        onUsersList={handleUsersList}
+      />
+
+      {/* Xtream Codes Modal */}
+      <XtreamCodeModal
+        visible={showXtreamModal}
+        onClose={handleXtreamClose}
+        onConnect={handleXtreamConnection}
+      />
+
+      {/* M3U URL Modal */}
+      <M3UUrlModal
+        visible={showM3UModal}
+        onClose={handleM3UClose}
+        onConnect={handleM3UConnection}
+      />
     </LinearGradient>
   );
 };
@@ -287,7 +470,7 @@ const App: React.FC = () => {
 const styles = StyleSheet.create({
   absoluteFill: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   container: { flex: 1 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 20, paddingBottom: 8, backgroundColor: 'transparent' },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 20, paddingBottom: 8, backgroundColor: 'transparent', zIndex: 10 },
   headerLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
   logoContainer: { flexDirection: 'row', alignItems: 'center', marginRight: 16 },
   logoIcon: { width: 32, height: 32, backgroundColor: 'rgba(74, 144, 226, 0.5)', borderRadius: 6, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
@@ -304,7 +487,8 @@ const styles = StyleSheet.create({
   topRow: { flexDirection: 'row', flex: 0.65, gap: 12 },
   bottomRow: { flexDirection: 'row', flex: 0.35, gap: 10 },
 
-  cardBase: { 
+  // Cards refactorisées - TouchableOpacity Standard
+  cardTV: { 
     flex: 1, 
     borderRadius: 24, 
     overflow: 'hidden', 
@@ -319,7 +503,37 @@ const styles = StyleSheet.create({
     shadowRadius: 32,
     elevation: 25,
   },
-  cardBaseSmall: { 
+  cardFilms: { 
+    flex: 1, 
+    borderRadius: 24, 
+    overflow: 'hidden', 
+    justifyContent: 'center', 
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.5,
+    shadowRadius: 32,
+    elevation: 25,
+  },
+  cardSeries: { 
+    flex: 1, 
+    borderRadius: 24, 
+    overflow: 'hidden', 
+    justifyContent: 'center', 
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.5,
+    shadowRadius: 32,
+    elevation: 25,
+  },
+  cardBottom: { 
     flex: 1, 
     borderRadius: 20, 
     overflow: 'hidden', 
@@ -345,6 +559,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
   },
   cardContent: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 8 },
+  // TouchableOverlay supprimé - fusionné dans les cartes
 
   iconWrapper: {
     marginBottom: 8,
