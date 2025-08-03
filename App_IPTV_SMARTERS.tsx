@@ -67,8 +67,6 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
-    console.log('🚀 APP DÉMARRE!');
-    Alert.alert('DEBUG', 'APP IPTV DÉMARRÉE!');
     Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }).start();
     const timeInterval = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timeInterval);

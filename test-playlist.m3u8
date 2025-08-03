@@ -1,0 +1,11 @@
+#EXTM3U
+#EXTINF:-1 tvg-logo="https://example.com/news1.png" group-title="News",BBC News
+https://example.com/stream1.m3u8
+#EXTINF:-1 tvg-logo="https://example.com/news2.png" group-title="News",CNN International  
+https://example.com/stream2.m3u8
+#EXTINF:-1 tvg-logo="https://example.com/sport1.png" group-title="Sport",ESPN
+https://example.com/stream3.m3u8
+#EXTINF:-1 tvg-logo="https://example.com/sport2.png" group-title="Sport",Fox Sports
+https://example.com/stream4.m3u8
+#EXTINF:-1 tvg-logo="https://example.com/movie1.png" group-title="Movies",HBO
+https://example.com/stream5.m3u8
