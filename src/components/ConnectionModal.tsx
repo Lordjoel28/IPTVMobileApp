@@ -3,7 +3,7 @@
  * Interface basique avec cartes cliquables garanties
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
   StatusBar,
   Dimensions,
   Image,
+  Animated,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -41,7 +42,95 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
   onM3UConnect,
   onUsersList,
 }) => {
-  // Si la modale n'est pas visible, ne rien rendre du tout
+  // Animations - hooks toujours au début
+  const [fadeAnim] = useState(new Animated.Value(0));
+  const [scaleAnim] = useState(new Animated.Value(0.9));
+  
+  // Animations des cartes - créées une seule fois
+  const [cardAnimations] = useState(() => [
+    {
+      scale: new Animated.Value(0.9),
+      opacity: new Animated.Value(0),
+    },
+    {
+      scale: new Animated.Value(0.9),
+      opacity: new Animated.Value(0),
+    },
+    {
+      scale: new Animated.Value(0.9),
+      opacity: new Animated.Value(0),
+    },
+  ]);
+  
+  React.useEffect(() => {
+    if (visible) {
+      // Animation d'entrée ultra-rapide pour masquer immédiatement l'arrière-plan
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          tension: 120,
+          friction: 8,
+          useNativeDriver: true,
+        }),
+      ]).start();
+      
+      // Animation des cartes en staggeré
+      cardAnimations.forEach((cardAnim, index) => {
+        Animated.sequence([
+          Animated.delay(100 + index * 150),
+          Animated.parallel([
+            Animated.spring(cardAnim.scale, {
+              toValue: 1,
+              tension: 120,
+              friction: 7,
+              useNativeDriver: true,
+            }),
+            Animated.timing(cardAnim.opacity, {
+              toValue: 1,
+              duration: 400,
+              useNativeDriver: true,
+            }),
+          ]),
+        ]).start();
+      });
+      
+    } else {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 0.9,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        // Reset des animations des cartes
+        ...cardAnimations.map(cardAnim => 
+          Animated.parallel([
+            Animated.timing(cardAnim.scale, {
+              toValue: 0.9,
+              duration: 200,
+              useNativeDriver: true,
+            }),
+            Animated.timing(cardAnim.opacity, {
+              toValue: 0,
+              duration: 200,
+              useNativeDriver: true,
+            }),
+          ])
+        ),
+      ]).start();
+    }
+  }, [visible]);
+
+  // Si la modale n'est pas visible, ne rien rendre après tous les hooks
   if (!visible) {
     return null;
   }
@@ -77,15 +166,32 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
     >
       <StatusBar barStyle="light-content" backgroundColor="rgba(0,0,0,0.9)" />
       
-      <View style={styles.overlay} pointerEvents="box-none">
-        {/* Fond granulé premium */}
+      <Animated.View 
+        style={[
+          styles.overlay,
+          {
+            opacity: fadeAnim,
+          },
+        ]} 
+        pointerEvents="box-none"
+      >
+        {/* Fond granulé premium - Plus opaque */}
         <LinearGradient
-          colors={['#0a0a0a', '#121212', '#181818', '#0e0e0e']}
+          colors={['#050505', '#0a0a0a', '#0f0f0f', '#080808']}
           locations={[0, 0.3, 0.7, 1]}
           style={StyleSheet.absoluteFill}
         />
         
-        <View style={styles.container} pointerEvents="box-none">
+        <Animated.View 
+          style={[
+            styles.container,
+            {
+              transform: [{ scale: scaleAnim }],
+              opacity: fadeAnim,
+            },
+          ]} 
+          pointerEvents="box-none"
+        >
           {/* Bouton fermer */}
           <TouchableOpacity onPress={onClose} style={styles.closeButton}>
             <View style={styles.closeButtonContent}>
@@ -100,42 +206,55 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
 
           {/* Cartes */}
           <View style={styles.cardsContainer} pointerEvents="box-none">
-            {connectionOptions.map((option) => (
-              <View key={option.id} style={styles.cardWrapper}>
-                <TouchableOpacity
-                  onPress={option.onPress}
-                  style={styles.card}
-                  activeOpacity={0.8}
+            {connectionOptions.map((option, index) => {
+              const cardAnim = cardAnimations[index];
+              
+              return (
+                <Animated.View 
+                  key={option.id} 
+                  style={[
+                    styles.cardWrapper,
+                    {
+                      transform: [{ scale: cardAnim.scale }],
+                      opacity: cardAnim.opacity,
+                    },
+                  ]}
                 >
-                  {/* Fond carte */}
-                  <LinearGradient
-                    colors={[
-                      'rgba(255, 255, 255, 0.15)',
-                      'rgba(255, 255, 255, 0.05)',
-                      'rgba(255, 255, 255, 0.02)'
-                    ]}
-                    locations={[0, 0.5, 1]}
-                    style={styles.cardGradient}
-                  />
-                  
-                  {/* Icône PNG */}
-                  <View style={styles.iconContainer}>
-                    <Image source={option.icon} style={styles.iconImage} />
-                  </View>
-                  
-                  {/* Texte */}
-                  <Text style={styles.cardText}>{option.title}</Text>
-                </TouchableOpacity>
-              </View>
-            ))}
+                  <TouchableOpacity
+                    onPress={option.onPress}
+                    style={styles.card}
+                    activeOpacity={0.85}
+                  >
+                    {/* Fond carte */}
+                    <LinearGradient
+                      colors={[
+                        'rgba(255, 255, 255, 0.18)',
+                        'rgba(255, 255, 255, 0.08)',
+                        'rgba(255, 255, 255, 0.03)'
+                      ]}
+                      locations={[0, 0.5, 1]}
+                      style={styles.cardGradient}
+                    />
+                    
+                    {/* Icône PNG */}
+                    <View style={styles.iconContainer}>
+                      <Image source={option.icon} style={styles.iconImage} />
+                    </View>
+                    
+                    {/* Texte */}
+                    <Text style={styles.cardText}>{option.title}</Text>
+                  </TouchableOpacity>
+                </Animated.View>
+              );
+            })}
           </View>
 
           {/* Texte de guidage */}
           <View style={styles.guidanceContainer}>
             <Text style={styles.guidanceText}>Choisissez votre mode de connexion</Text>
           </View>
-        </View>
-      </View>
+        </Animated.View>
+      </Animated.View>
     </Modal>
   );
 };
@@ -145,16 +264,20 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.95)',
+    paddingHorizontal: 12,
+    paddingVertical: 20,
   },
   container: {
+    width: width * 0.94,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 60,
-    paddingTop: 80,
+    paddingTop: 100,
   },
   closeButton: {
     position: 'absolute',
-    top: 50,
+    top: 70,
     right: 50,
     zIndex: 10,
   },
@@ -170,7 +293,7 @@ const styles = StyleSheet.create({
   },
   titleContainer: {
     position: 'absolute',
-    top: 80,
+    top: 100,
     left: 0,
     right: 0,
     alignItems: 'center',
@@ -201,18 +324,18 @@ const styles = StyleSheet.create({
   card: {
     width: '100%',
     height: height * 0.46,
-    borderRadius: 28,
+    borderRadius: 32,
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
-    backgroundColor: 'rgba(20, 20, 20, 0.8)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-    elevation: 10,
+    backgroundColor: 'rgba(15, 15, 15, 0.9)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+    elevation: 15,
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 15 },
+    shadowOpacity: 0.4,
+    shadowRadius: 25,
     paddingVertical: 28,
     paddingHorizontal: 16,
   },
@@ -227,8 +350,8 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   iconImage: {
-    width: 80,
-    height: 80,
+    width: 90,
+    height: 90,
     resizeMode: 'contain',
   },
   icon: {

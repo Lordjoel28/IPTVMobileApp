@@ -24,6 +24,9 @@ import XtreamCodeModal from './src/components/XtreamCodeModal';
 import M3UUrlModal from './src/components/M3UUrlModal';
 import type { Channel } from './src/types';
 
+// Import des nouveaux services migrés
+import IPTVService from './src/services/IPTVService';
+
 // --- Catalogue des icônes PNG ---
 const iconMap = {
   tv: require('./assets/icons/icon_tv.png'),
@@ -69,6 +72,37 @@ const App: React.FC = () => {
   useEffect(() => {
     Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }).start();
     const timeInterval = setInterval(() => setCurrentTime(new Date()), 1000);
+    
+    // Test d'initialisation des nouveaux services IPTV
+    const testServices = async () => {
+      try {
+        console.log('🚀 Initialisation des services IPTV...');
+        const iptv = IPTVService.getInstance({
+          enableParentalControl: true,
+          enableUserManagement: true,
+          enableAdvancedSearch: true,
+          enablePerformanceMonitoring: true
+        });
+        
+        await iptv.initialize();
+        console.log('✅ Services IPTV initialisés avec succès!');
+        
+        // Obtenir stats pour validation
+        const stats = await iptv.getServiceStats();
+        console.log('📊 Stats services:', {
+          isReady: stats.initialization.isReady,
+          users: stats.users.totalUsers,
+          playlists: stats.playlists.totalPlaylists
+        });
+        
+      } catch (error) {
+        console.log('⚠️ Services pas encore complètement prêts:', error.message);
+        // L'app continue de fonctionner normalement
+      }
+    };
+    
+    testServices();
+    
     return () => clearInterval(timeInterval);
   }, []);
 

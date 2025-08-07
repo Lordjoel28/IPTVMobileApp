@@ -71,7 +71,7 @@ export const PlaylistProvider: React.FC<{children: ReactNode}> = ({ children }) 
 export const usePlaylist = (): PlaylistContextData => {
   const context = useContext(PlaylistContext);
   if (!context) {
-    throw new Error('usePlaylist doit être utilisé au sein d'un PlaylistProvider');
+    throw new Error('usePlaylist doit etre utilise au sein d un PlaylistProvider');
   }
   return context;
 };

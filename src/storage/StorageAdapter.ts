@@ -5,8 +5,9 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-// TODO: À installer -> import { MMKV } from 'react-native-mmkv';
-// TODO: À installer -> import SQLite from 'react-native-sqlite-2';
+// Temporairement désactivé - problème de compatibilité build
+// import { MMKV } from 'react-native-mmkv';
+// import SQLite from 'react-native-sqlite-2';
 
 export interface StorageConfig {
   enableL1Cache: boolean;
@@ -100,8 +101,8 @@ class MemoryLRUCache {
 
 export class StorageAdapter {
   private l1Cache: MemoryLRUCache;
-  private mmkv: any; // MMKV instance - TODO: Proper typing when installed
-  private sqliteDb: any; // SQLite instance - TODO: Proper typing when installed
+  private mmkv: any; // MMKV instance - Temporairement désactivé
+  private sqliteDb: any; // SQLite instance - Temporairement désactivé
   private config: StorageConfig;
   private stats: StorageStats;
 
@@ -129,12 +130,15 @@ export class StorageAdapter {
    */
   private async initializeStorage(): Promise<void> {
     try {
-      // TODO: Initialiser MMKV quand la lib sera installée
+      // Initialiser MMKV - Temporairement désactivé pour compatibilité build
       // if (this.config.enableL2MMKV) {
-      //   this.mmkv = new MMKV();
+      //   this.mmkv = new MMKV({
+      //     id: 'iptv-storage',
+      //     encryptionKey: 'iptv-secure-key-2024'
+      //   });
       // }
 
-      // TODO: Initialiser SQLite quand la lib sera installée
+      // Initialiser SQLite - Temporairement désactivé pour compatibilité build
       // if (this.config.enableL3SQLite) {
       //   this.sqliteDb = await SQLite.openDatabase({
       //     name: 'iptv_playlist.db',
@@ -146,6 +150,35 @@ export class StorageAdapter {
       console.log('✅ StorageAdapter initialized with config:', this.config);
     } catch (error) {
       console.error('❌ StorageAdapter initialization failed:', error);
+    }
+  }
+
+  /**
+   * Initialiser tables SQLite
+   */
+  private async initializeSQLiteTables(): Promise<void> {
+    if (!this.sqliteDb) return;
+
+    try {
+      // Table pour données volumineuses (playlists, etc.)
+      await this.sqliteDb.executeSql(`
+        CREATE TABLE IF NOT EXISTS storage_data (
+          key TEXT PRIMARY KEY,
+          value TEXT NOT NULL,
+          size INTEGER NOT NULL,
+          created_at INTEGER NOT NULL,
+          accessed_at INTEGER NOT NULL
+        )
+      `);
+
+      // Index pour performance
+      await this.sqliteDb.executeSql(`
+        CREATE INDEX IF NOT EXISTS idx_accessed_at ON storage_data(accessed_at)
+      `);
+
+      console.log('✅ SQLite tables initialized');
+    } catch (error) {
+      console.error('❌ SQLite table initialization failed:', error);
     }
   }
 
@@ -166,13 +199,10 @@ export class StorageAdapter {
         this.stats.l1HitRate = this.updateHitRate(this.stats.l1HitRate, false);
       }
 
-      // L2 Cache (MMKV) - Fallback AsyncStorage for now
+      // L2 Cache (AsyncStorage fallback)
       let value: any;
       if (this.config.enableL2MMKV) {
-        // TODO: Utiliser MMKV quand installé
-        // value = this.mmkv?.getString(key);
-        
-        // Fallback AsyncStorage (temporaire)
+        // Utiliser AsyncStorage comme fallback temporaire
         const storedValue = await AsyncStorage.getItem(key);
         if (storedValue) {
           value = JSON.parse(storedValue);
