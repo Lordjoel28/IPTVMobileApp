@@ -177,18 +177,17 @@ export class PlaylistManager {
     try {
       console.log(`🌐 Importing playlist from URL: ${url}`);
       
-      // Vérifier cache d'abord
+      // 🛡️ CACHE ROBUSTE avec validation selon best practices GitHub/Reddit
       const cacheKey = `playlist_url_${btoa(url)}`;
       if (options.enableCache !== false) {
-        const cached = await this.storage.get(cacheKey);
-        if (cached && this.isCacheValid(cached, 1)) { // 1 heure de cache
-          console.log('⚡ Using cached playlist data');
+        const cachedResult = await this.getCachedPlaylistSafely(cacheKey);
+        if (cachedResult) {
+          console.log('⚡ Using validated cached playlist data');
           this.stats.cacheHitRate = this.updateHitRate(this.stats.cacheHitRate, true);
-          return this.createImportResult(cached, [], warnings, errors);
+          return this.createImportResult(cachedResult.playlist, [], warnings, errors);
         }
+        this.stats.cacheHitRate = this.updateHitRate(this.stats.cacheHitRate, false);
       }
-      
-      this.stats.cacheHitRate = this.updateHitRate(this.stats.cacheHitRate, false);
 
       // Fetch contenu M3U
       const response = await fetch(url, {
@@ -205,6 +204,13 @@ export class PlaylistManager {
       }
 
       const content = await response.text();
+      
+      // Vérification du contenu téléchargé
+      if (!content || typeof content !== 'string') {
+        console.error('❌ Downloaded content is empty or invalid');
+        throw new Error('Le contenu de la playlist est vide ou invalide');
+      }
+      
       const contentSize = new Blob([content]).size;
       console.log(`📥 Downloaded ${Math.round(contentSize / 1024)}KB of M3U content`);
 
@@ -243,12 +249,9 @@ export class PlaylistManager {
       // Sauvegarder avec cache intelligent
       await this.savePlaylist(playlist);
       
-      // Cache le contenu pour réimport rapide
+      // 💾 CACHE SÉCURISÉ selon best practices GitHub/Reddit
       if (options.enableCache !== false) {
-        await this.storage.set(cacheKey, {
-          playlist,
-          timestamp: Date.now()
-        });
+        await this.cachePlaylistSafely(cacheKey, playlist);
       }
 
       // Mettre à jour stats
@@ -259,6 +262,13 @@ export class PlaylistManager {
       return this.createImportResult(playlist, parseResult.stats, warnings, errors);
 
     } catch (error) {
+      // 🧹 AUTO-NETTOYAGE cache corrompu si erreur de parsing
+      if (error.message && error.message.includes('length of undefined')) {
+        console.warn('🧹 Auto-cleaning corrupted cache due to parsing error');
+        const cacheKey = `playlist_url_${btoa(url)}`;
+        await this.storage.delete(cacheKey);
+      }
+      
       errors.push(error.message || 'Unknown import error');
       console.error('❌ Playlist import failed:', error);
       
@@ -507,6 +517,210 @@ export class PlaylistManager {
       averageParseTime: 0,
       storageUsageMB: 0,
       lastImportTime: 0
+    };
+  }
+
+  /**
+   * 🛡️ CACHE ROBUSTE - Récupération sécurisée selon GitHub/Reddit best practices
+   */
+  private async getCachedPlaylistSafely(cacheKey: string): Promise<{playlist: Playlist} | null> {
+    try {
+      // Étape 1: Récupération avec try-catch
+      const cachedData = await this.storage.get(cacheKey);
+      
+      // Étape 2: Validation null/undefined (GitHub pattern)
+      if (cachedData == null) {
+        return null;
+      }
+      
+      // Étape 3: Validation structure de base
+      if (!cachedData || typeof cachedData !== 'object') {
+        console.warn('🗑️ Invalid cache data format, clearing');
+        await this.storage.delete(cacheKey);
+        return null;
+      }
+      
+      // Étape 4: Validation métadonnées (version + timestamp)
+      if (!cachedData.version || !cachedData.timestamp) {
+        console.warn('🗑️ Cache missing metadata, clearing');
+        await this.storage.delete(cacheKey);
+        return null;
+      }
+      
+      // Étape 5: Validation âge du cache (24h max selon Reddit)
+      const maxAge = 24 * 60 * 60 * 1000; // 24 heures
+      const isRecent = Date.now() - cachedData.timestamp < maxAge;
+      if (!isRecent) {
+        console.log('🗑️ Cache expired, clearing');
+        await this.storage.delete(cacheKey);
+        return null;
+      }
+      
+      // Étape 6: Validation structure playlist
+      const playlist = cachedData.playlist;
+      if (!playlist || typeof playlist !== 'object') {
+        console.warn('🗑️ Cache missing playlist object, clearing');
+        await this.storage.delete(cacheKey);
+        return null;
+      }
+      
+      // Étape 7: Validation propriétés playlist critiques
+      if (!playlist.id || !playlist.name || !Array.isArray(playlist.channels)) {
+        console.warn('🗑️ Cache corrupted playlist structure, clearing');
+        await this.storage.delete(cacheKey);
+        return null;
+      }
+      
+      // Étape 8: Validation channels array (défense vs .length undefined)
+      if (playlist.channels.length === undefined) {
+        console.warn('🗑️ Cache channels array corrupted, clearing');
+        await this.storage.delete(cacheKey);
+        return null;
+      }
+      
+      console.log(`🔍 Cache validation OK: ${playlist.channels.length} channels`);
+      return { playlist };
+      
+    } catch (error) {
+      // Étape 9: Auto-cleanup en cas d'erreur (GitHub pattern)
+      console.error('🗑️ Cache error, auto-cleaning:', error.message);
+      await this.storage.delete(cacheKey);
+      return null;
+    }
+  }
+
+  /**
+   * 💾 CACHE SÉCURISÉ - Sauvegarde robuste selon GitHub/Reddit best practices  
+   */
+  private async cachePlaylistSafely(cacheKey: string, playlist: Playlist): Promise<void> {
+    try {
+      // Validation avant sauvegarde (défensive)
+      if (!playlist || typeof playlist !== 'object') {
+        throw new Error('Invalid playlist data for caching');
+      }
+      
+      if (!Array.isArray(playlist.channels)) {
+        throw new Error('Invalid playlist channels for caching');
+      }
+      
+      // Création entry avec metadata (GitHub pattern)
+      const cacheEntry = {
+        version: '1.0', // Pour migration future
+        timestamp: Date.now(),
+        playlist: {
+          ...playlist,
+          // Assurer que les propriétés critiques existent
+          id: playlist.id || `fallback_${Date.now()}`,
+          name: playlist.name || 'Unknown Playlist',
+          channels: playlist.channels || []
+        }
+      };
+      
+      await this.storage.set(cacheKey, cacheEntry);
+      console.log(`💾 Cached playlist safely: ${playlist.channels.length} channels`);
+      
+    } catch (error) {
+      console.error('💾 Error caching playlist:', error.message);
+      // Ne pas rethrow - cache failing ne doit pas casser l'import
+    }
+  }
+
+  /**
+   * 🔍 VALIDATION ROBUSTE des données cachées (legacy - remplacée par getCachedPlaylistSafely)
+   */
+  private validateCachedPlaylist(cached: any): boolean {
+    try {
+      // Vérifier structure de base
+      if (!cached || !cached.playlist || !cached.timestamp) {
+        console.warn('🔍 Cache validation: Missing basic structure');
+        return false;
+      }
+
+      const playlist = cached.playlist;
+      
+      // Vérifier propriétés playlist obligatoires
+      if (!playlist.id || !playlist.name || !Array.isArray(playlist.channels)) {
+        console.warn('🔍 Cache validation: Invalid playlist structure');
+        return false;
+      }
+
+      // Vérifier chaque chaîne dans le cache
+      const invalidChannels = playlist.channels.some((channel: any, index: number) => {
+        if (!channel || typeof channel !== 'object') {
+          console.warn(`🔍 Cache validation: Channel ${index} is not an object`);
+          return true;
+        }
+
+        // Propriétés obligatoires
+        if (!channel.name || typeof channel.name !== 'string') {
+          console.warn(`🔍 Cache validation: Channel ${index} missing valid name`);
+          return true;
+        }
+
+        if (!channel.url || typeof channel.url !== 'string') {
+          console.warn(`🔍 Cache validation: Channel ${index} missing valid URL`);
+          return true;
+        }
+
+        if (!channel.id || typeof channel.id !== 'string') {
+          console.warn(`🔍 Cache validation: Channel ${index} missing valid ID`);
+          return true;
+        }
+
+        return false; // Channel valide
+      });
+
+      if (invalidChannels) {
+        console.warn('🔍 Cache validation: Found invalid channels');
+        return false;
+      }
+
+      console.log(`🔍 Cache validation: OK - ${playlist.channels.length} channels validated`);
+      return true;
+
+    } catch (error) {
+      console.warn('🔍 Cache validation error:', error.message);
+      return false;
+    }
+  }
+
+  /**
+   * 🛠️ SÉRIALISATION SÉCURISÉE des chaînes pour cache
+   */
+  private cleanChannelForStorage(channel: Channel): Channel {
+    return {
+      id: channel.id || `unknown_${Date.now()}`,
+      name: channel.name || 'Unknown Channel',
+      url: channel.url || '',
+      logo: channel.logo || '',
+      category: channel.category || '',
+      quality: channel.quality || 'SD',
+      language: channel.language || '',
+      country: channel.country || '',
+      tvgId: channel.tvgId || '',
+      groupTitle: channel.groupTitle || ''
+    };
+  }
+
+  /**
+   * 🛠️ DÉSÉRIALISATION SÉCURISÉE des chaînes depuis cache
+   */
+  private restoreChannelFromStorage(data: any): Channel {
+    if (!data || typeof data !== 'object') {
+      throw new Error('Invalid channel data from storage');
+    }
+
+    return {
+      id: String(data.id || ''),
+      name: String(data.name || ''),
+      url: String(data.url || ''),
+      logo: String(data.logo || ''),
+      category: String(data.category || ''),
+      quality: String(data.quality || 'SD'),
+      language: String(data.language || ''),
+      country: String(data.country || ''),
+      tvgId: String(data.tvgId || ''),
+      groupTitle: String(data.groupTitle || '')
     };
   }
 

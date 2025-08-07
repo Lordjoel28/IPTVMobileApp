@@ -60,6 +60,9 @@ const App: React.FC = () => {
   const [showM3UModal, setShowM3UModal] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const cardsScale = useRef([...Array(6)].map(() => new Animated.Value(1))).current;
+  
+  // Instance IPTV unique pour toute l'app
+  const iptvServiceRef = useRef<any>(null);
 
   // Test channel for demo
   const testChannel: Channel = {
@@ -73,21 +76,26 @@ const App: React.FC = () => {
     Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }).start();
     const timeInterval = setInterval(() => setCurrentTime(new Date()), 1000);
     
-    // Test d'initialisation des nouveaux services IPTV
+    // Test d'initialisation des nouveaux services IPTV - INSTANCE UNIQUE
     const testServices = async () => {
       try {
         console.log('🚀 Initialisation des services IPTV...');
-        const iptv = IPTVService.getInstance({
-          enableParentalControl: true,
-          enableUserManagement: true,
-          enableAdvancedSearch: true,
-          enablePerformanceMonitoring: true
-        });
         
+        // Utiliser toujours la même instance
+        if (!iptvServiceRef.current) {
+          iptvServiceRef.current = IPTVService.getInstance({
+            enableParentalControl: true,
+            enableUserManagement: true,
+            enableAdvancedSearch: true,
+            enablePerformanceMonitoring: true
+          });
+        }
+        
+        const iptv = iptvServiceRef.current;
         await iptv.initialize();
         console.log('✅ Services IPTV initialisés avec succès!');
         
-        // Obtenir stats pour validation
+        // Obtenir stats pour validation  
         const stats = await iptv.getServiceStats();
         console.log('📊 Stats services:', {
           isReady: stats.initialization.isReady,
@@ -143,10 +151,78 @@ const App: React.FC = () => {
     setShowXtreamModal(false);
   };
 
-  // Handler pour la connexion M3U URL
+  // Handler pour la connexion M3U URL - VRAI TEST SERVICES IPTV  
   const handleM3UConnection = async (source: any) => {
     console.log('📁 Connexion M3U avec:', source);
     setShowM3UModal(false);
+    
+    // 🚀 TEST COMPLET DES SERVICES IPTV - UTILISER L'INSTANCE EXISTANTE
+    try {
+      console.log('🚀 Utilisation des services IPTV...');
+      
+      // Utiliser l'instance déjà initialisée
+      const iptv = iptvServiceRef.current || IPTVService.getInstance({
+        enableParentalControl: true,
+        enableUserManagement: true, 
+        enableAdvancedSearch: true,
+        enablePerformanceMonitoring: true
+      });
+      
+      // Sauvegarder la référence si pas déjà fait
+      if (!iptvServiceRef.current) {
+        iptvServiceRef.current = iptv;
+      }
+      
+      // Vérifier si déjà initialisé
+      if (!iptv.isReady) {
+        console.log('⏳ Initialisation du service...');
+        await iptv.initialize();
+        console.log('✅ Service initialisé:', iptv.isReady);
+      }
+      
+      // Test import playlist
+      console.log('📥 Import playlist depuis:', source.source || source.url);
+      const result = await iptv.importPlaylistFromUrl(
+        source.source || source.url, 
+        source.name || 'Test Playlist',
+        {
+          validateUrls: false, // Skip validation pour test rapide
+          chunkSize: 500,
+          maxChannels: 2000,
+          enableCache: true,
+          parserMode: 'ultra'
+        }
+      );
+      
+      console.log('✅ Import IPTV SUCCESS:', {
+        totalChannels: result.playlist.channels.length,
+        parseTime: result.stats?.parseTime,
+        categories: result.stats?.categories?.length,
+        success: result.success
+      });
+      
+      // Test recherche si on a des chaînes
+      if (result.playlist.channels.length > 0) {
+        console.log('🔍 Test recherche...');
+        const searchResults = await iptv.searchChannels('tf1', {
+          fuzzySearch: true,
+          maxResults: 5
+        });
+        console.log(`🔍 Recherche "tf1": ${searchResults.length} résultats`);
+      }
+      
+      Alert.alert(
+        '🎉 Test Services IPTV Réussi!', 
+        `✅ Import: ${result.playlist.channels.length} chaînes\n⏱️ Temps: ${result.stats?.parseTime || '?'}ms\n📂 Catégories: ${result.stats?.categories?.length || 0}\n🔍 Services: ${iptv.isReady ? 'OK' : 'KO'}`
+      );
+      
+    } catch (error) {
+      console.error('❌ TEST SERVICES IPTV FAILED:', error);
+      Alert.alert(
+        '❌ Erreur Services IPTV', 
+        `Erreur: ${error.message || 'Inconnue'}\n\nStack: ${error.stack?.substring(0, 200) || 'N/A'}`
+      );
+    }
   };
 
   // Handler pour fermer Xtream Modal et retourner au Connection Modal

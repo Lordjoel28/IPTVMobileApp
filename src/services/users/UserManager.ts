@@ -118,6 +118,7 @@ export class UserManager {
   private currentSession: Session | null = null;
   private stats: UserManagerStats;
   private isInitialized = false;
+  private isInitializing = false;
 
   constructor(storageAdapter?: StorageAdapter) {
     this.storage = storageAdapter || new StorageAdapter();
@@ -129,21 +130,31 @@ export class UserManager {
    */
   async initialize(): Promise<void> {
     if (this.isInitialized) return;
+    if (this.isInitializing) {
+      console.log('⏳ UserManager already initializing, waiting...');
+      return; // Éviter l'attente active qui peut créer des problèmes
+    }
 
+    this.isInitializing = true;
+    
     try {
       console.log('🔄 Initializing UserManager...');
       
-      // Charger utilisateurs
+      // Charger utilisateurs existants
       const userIds = await this.storage.get('user_ids') || [];
+      console.log(`📋 Found ${userIds.length} existing user(s)`);
+      
       for (const userId of userIds) {
         const user = await this.storage.get(`user_${userId}`);
         if (user) {
           this.users.set(userId, user);
+          console.log(`👤 Loaded user: ${user.name} (${user.type})`);
         }
       }
 
       // Créer utilisateur admin par défaut si aucun utilisateur
       if (this.users.size === 0) {
+        console.log('🆕 No users found, creating default admin...');
         await this.createDefaultAdminUser();
       }
 
@@ -163,11 +174,13 @@ export class UserManager {
 
       this.updateStats();
       this.isInitialized = true;
+      this.isInitializing = false;
       
       console.log('✅ UserManager initialized:', this.getStats());
     } catch (error) {
       console.error('❌ UserManager initialization failed:', error);
       this.isInitialized = true;
+      this.isInitializing = false;
     }
   }
 
@@ -497,12 +510,26 @@ export class UserManager {
   private async createDefaultAdminUser(): Promise<void> {
     console.log('👤 Creating default admin user');
     
-    await this.createUser(
-      'Administrateur',
-      'admin',
-      '0000', // PIN par défaut - À CHANGER !
-      'admin'
-    );
+    // Créer directement sans passer par createUser() pour éviter la récursion
+    const userId = this.generateUserId();
+    const hashedPin = await PinHashService.hashPin('0000');
+
+    const user: User = {
+      id: userId,
+      name: 'Administrateur',
+      type: 'admin',
+      avatar: 'admin',
+      pin: hashedPin,
+      dateCreated: new Date().toISOString(),
+      lastLogin: '',
+      preferences: this.getDefaultPreferences('admin'),
+      restrictions: undefined,
+      stats: this.getDefaultStats()
+    };
+
+    // Sauvegarder directement
+    await this.saveUser(user);
+    console.log('👤 Default admin user created successfully');
   }
 
   private async createSession(user: User): Promise<Session> {

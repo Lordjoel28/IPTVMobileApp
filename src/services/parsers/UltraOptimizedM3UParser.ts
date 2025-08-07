@@ -155,6 +155,12 @@ export class UltraOptimizedM3UParser {
     this.errors = [];
 
     try {
+      // Vérification du contenu
+      if (!content || typeof content !== 'string') {
+        console.error('❌ Parse error: Content is undefined or not a string');
+        throw new Error('Content de playlist invalide ou vide');
+      }
+
       // Preprocessing ultra-optimisé
       const lines = this.preprocessLinesOptimized(content);
       const channels = await this.parseChannelsOptimized(lines, chunkSize);
@@ -176,6 +182,12 @@ export class UltraOptimizedM3UParser {
    * Preprocessing ultra-optimisé des lignes
    */
   private preprocessLinesOptimized(content: string): string[] {
+    // Vérification de sécurité pour React Native
+    if (!content || typeof content !== 'string') {
+      console.warn('⚠️ Content is undefined or not a string:', typeof content);
+      return [];
+    }
+    
     const lines: string[] = [];
     const contentLength = content.length;
     let start = 0;
@@ -319,27 +331,48 @@ export class UltraOptimizedM3UParser {
   }
 
   /**
-   * Parse EXTINF avec extraction métadonnées optimisée
+   * Parse EXTINF avec extraction métadonnées ultra-robuste
+   * Gère guillemets doubles, simples et valeurs sans guillemets
    */
   private parseExtinf(extinf: string, channel: Channel): void {
-    // Extraction nom chaîne
-    const nameMatch = extinf.match(/,(.+)$/);
-    if (nameMatch) {
+    // Extraction nom chaîne (texte après dernière virgule)
+    const nameMatch = extinf.match(/,([^,]*)$/);
+    if (nameMatch && nameMatch[1]) {
       channel.name = this.internString(nameMatch[1].trim());
     }
 
-    // Extraction attributs avec RegExp optimisées
-    const extractAttribute = (attr: string): string => {
-      const regex = new RegExp(`${attr}="([^"]+)"`);
-      const match = extinf.match(regex);
-      return match ? this.internString(match[1]) : '';
-    };
+    // RegExp robuste pour tous types d'attributs M3U
+    // Capture: key="value" | key='value' | key=value
+    const attributeRegex = /(\w+(?:-\w+)*)=(?:"([^"]*)"|'([^']*)'|([^\s,]+))/g;
+    let match;
 
-    channel.tvgId = extractAttribute('tvg-id');
-    channel.logo = extractAttribute('tvg-logo');
-    channel.groupTitle = extractAttribute('group-title');
-    channel.language = extractAttribute('tvg-language');
-    channel.country = extractAttribute('tvg-country');
+    while ((match = attributeRegex.exec(extinf)) !== null) {
+      const [, key, doubleQuoted, singleQuoted, unquoted] = match;
+      const value = doubleQuoted || singleQuoted || unquoted || '';
+      
+      if (value) {
+        const internedValue = this.internString(value);
+        
+        switch (key) {
+          case 'tvg-id':
+            channel.tvgId = internedValue;
+            break;
+          case 'tvg-logo':
+            channel.logo = internedValue;
+            break;
+          case 'group-title':
+            channel.groupTitle = internedValue;
+            break;
+          case 'tvg-language':
+            channel.language = internedValue;
+            break;
+          case 'tvg-country':
+            channel.country = internedValue;
+            break;
+          // Ajouter d'autres attributs si nécessaire
+        }
+      }
+    }
 
     // Déduction qualité depuis nom
     const name = channel.name.toLowerCase();
