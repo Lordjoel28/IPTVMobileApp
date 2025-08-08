@@ -18,11 +18,14 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { BlurView } from '@react-native-community/blur';
+import { useNavigation } from '@react-navigation/native';
+import type { StackNavigationProp } from '@react-navigation/stack';
 import VideoPlayer from './src/components/VideoPlayer';
 import ConnectionModal from './src/components/ConnectionModal';
 import XtreamCodeModal from './src/components/XtreamCodeModal';
 import M3UUrlModal from './src/components/M3UUrlModal';
 import type { Channel } from './src/types';
+import type { SimpleRootStackParamList } from './AppWithNavigation';
 
 // Import des nouveaux services migrés
 import IPTVService from './src/services/IPTVService';
@@ -51,7 +54,12 @@ const bottomRowCards = [
   { key: 'replay', title: 'RATTRAPER', subtitle: 'Replay', index: 5 },
 ];
 
+// Type pour navigation
+type NavigationProp = StackNavigationProp<SimpleRootStackParamList>;
+
 const App: React.FC = () => {
+  const navigation = useNavigation<NavigationProp>();
+  
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showVideoPlayer, setShowVideoPlayer] = useState(false);
   const [currentChannel, setCurrentChannel] = useState<Channel | null>(null);
@@ -117,8 +125,37 @@ const App: React.FC = () => {
   // Animations supprimées pour assurer clics fonctionnels
 
   const handleTVCardPress = () => {
-    console.log('🎬 TV Card Pressed!');
-    Alert.alert('TEST CARD', '📺 TV EN DIRECT CLIQUÉ!');
+    console.log('🎬 TV Card Pressed - NAVIGATION DIRECTE!');
+    
+    // 🧪 DONNÉES MOCK POUR TEST NAVIGATION
+    const mockChannels = [
+      { id: '1', name: 'TF1 HD', url: 'https://example.com/tf1.m3u8', category: 'Généraliste' },
+      { id: '2', name: 'France 2 HD', url: 'https://example.com/france2.m3u8', category: 'Généraliste' },
+      { id: '3', name: 'Canal+ Sport', url: 'https://example.com/canal.m3u8', category: 'Sport' },
+      { id: '4', name: 'M6 HD', url: 'https://example.com/m6.m3u8', category: 'Généraliste' },
+      { id: '5', name: 'Arte HD', url: 'https://example.com/arte.m3u8', category: 'Culture' },
+      { id: '6', name: 'BFM TV', url: 'https://example.com/bfm.m3u8', category: 'Actualités' },
+      { id: '7', name: 'Eurosport 1', url: 'https://example.com/eurosport.m3u8', category: 'Sport' },
+      { id: '8', name: 'Discovery Channel', url: 'https://example.com/discovery.m3u8', category: 'Documentaires' },
+    ];
+    
+    console.log('🎬 NAVIGATION vers ChannelListScreen avec:', {
+      channels: mockChannels.length,
+      playlistName: '📺 Chaînes TV Test'
+    });
+    
+    // Navigation immédiate sans Alert
+    try {
+      navigation.navigate('ChannelList', {
+        playlistId: 'mock-tv-channels',
+        playlistName: '📺 Chaînes TV Test',
+        channels: mockChannels,
+        totalChannels: mockChannels.length
+      });
+      console.log('✅ Navigation TV réussie!');
+    } catch (error) {
+      console.error('❌ ERREUR NAVIGATION TV:', error);
+    }
   };
 
   const handleClosePlayer = () => {
@@ -201,20 +238,34 @@ const App: React.FC = () => {
         success: result.success
       });
       
-      // Test recherche si on a des chaînes
+      // 🎬 NAVIGATION IMMÉDIATE VERS CHANNELLISTSCREEN (AVANT TEST RECHERCHE)
+      console.log('🎬 Navigation vers ChannelListScreen avec:', {
+        channels: result.playlist.channels.length,
+        playlistName: source.name || 'Test Playlist'
+      });
+      
+      console.log('🎬 Tentative de navigation...');
+      navigation.navigate('ChannelList', {
+        playlistId: result.playlist.id,
+        playlistName: source.name || 'Test Playlist',
+        channels: result.playlist.channels,
+        totalChannels: result.playlist.channels.length
+      });
+      console.log('🎬 Navigation appelée avec succès');
+      
+      // Test recherche si on a des chaînes (APRÈS NAVIGATION)
       if (result.playlist.channels.length > 0) {
         console.log('🔍 Test recherche...');
-        const searchResults = await iptv.searchChannels('tf1', {
-          fuzzySearch: true,
-          maxResults: 5
-        });
-        console.log(`🔍 Recherche "tf1": ${searchResults.length} résultats`);
+        try {
+          const searchResults = await iptv.searchChannels('tf1', {
+            fuzzySearch: true,
+            maxResults: 5
+          });
+          console.log(`🔍 Recherche "tf1": ${searchResults.length} résultats`);
+        } catch (searchError) {
+          console.log('⚠️ Erreur recherche:', searchError.message);
+        }
       }
-      
-      Alert.alert(
-        '🎉 Test Services IPTV Réussi!', 
-        `✅ Import: ${result.playlist.channels.length} chaînes\n⏱️ Temps: ${result.stats?.parseTime || '?'}ms\n📂 Catégories: ${result.stats?.categories?.length || 0}\n🔍 Services: ${iptv.isReady ? 'OK' : 'KO'}`
-      );
       
     } catch (error) {
       console.error('❌ TEST SERVICES IPTV FAILED:', error);
@@ -338,11 +389,7 @@ const App: React.FC = () => {
             <View style={{ flex: 1 }}>
               <TouchableOpacity 
                 style={styles.cardTV}
-                onPress={() => {
-                  console.log('🎬 TV Card CLICKED!');
-                  Alert.alert('TEST CARTE', '📺 TV EN DIRECT CLIQUÉ! ✅');
-                  handleTVCardPress();
-                }}
+                onPress={handleTVCardPress}
                 activeOpacity={0.8}
               >
                 <BlurView 
@@ -391,8 +438,7 @@ const App: React.FC = () => {
                 <TouchableOpacity 
                   style={styles.cardFilms}
                   onPress={() => {
-                    console.log('🎬 Films CLICKED!');
-                    Alert.alert('TEST CARTE', '🎬 FILMS CLIQUÉ! ✅');
+                    console.log('🎬 Films CLICKED! - NAVIGATION FUTURE');
                   }}
                   activeOpacity={0.8}
                 >
@@ -438,8 +484,7 @@ const App: React.FC = () => {
                 <TouchableOpacity 
                   style={styles.cardSeries}
                   onPress={() => {
-                    console.log('📺 Series CLICKED!');
-                    Alert.alert('TEST CARTE', '📺 SERIES CLIQUÉ! ✅');
+                    console.log('📺 Series CLICKED! - NAVIGATION FUTURE');
                   }}
                   activeOpacity={0.8}
                 >
@@ -488,8 +533,7 @@ const App: React.FC = () => {
                   <TouchableOpacity 
                     style={[styles.cardBottom, styles.liquidGlassCard]}
                     onPress={() => {
-                      console.log(`${card.title} CLICKED!`);
-                      Alert.alert('TEST CARTE', `${card.title} CLIQUÉ! ✅`);
+                      console.log(`${card.title} CLICKED! - NAVIGATION FUTURE`);
                     }}
                     activeOpacity={0.8}
                   >

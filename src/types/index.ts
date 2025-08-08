@@ -6,6 +6,12 @@
 // Navigation Types
 export type RootStackParamList = {
   Home: undefined;
+  ChannelList: {
+    playlistId?: string;
+    playlistName?: string;
+    channels?: Channel[];
+    totalChannels?: number;
+  };
   Player: { channel: Channel; playlist?: Playlist };
   Settings: undefined;
   PlaylistDetail: { playlist: Playlist };

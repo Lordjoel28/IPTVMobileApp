@@ -15,6 +15,7 @@ import type { RootStackParamList, BottomTabParamList } from '../types';
 
 // Screens (à créer)
 import HomeScreen from '../screens/HomeScreen';
+import ChannelListScreen from '../screens/ChannelListScreen';
 import PlayerScreen from '../screens/PlayerScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import PlaylistDetailScreen from '../screens/PlaylistDetailScreen';
@@ -233,6 +234,16 @@ const AppNavigator: React.FC = () => {
         options={{
           headerShown: false,
         }}
+      />
+      
+      {/* Liste des chaînes d'une playlist */}
+      <Stack.Screen
+        name="ChannelList"
+        component={ChannelListScreen}
+        options={({ route }) => ({
+          title: route.params?.playlistName || 'Chaînes IPTV',
+          headerShown: false, // Interface custom dans ChannelListScreen
+        })}
       />
       
       {/* Lecteur vidéo en plein écran */}
