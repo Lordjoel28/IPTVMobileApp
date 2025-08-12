@@ -24,8 +24,10 @@ import VideoPlayer from './src/components/VideoPlayer';
 import ConnectionModal from './src/components/ConnectionModal';
 import XtreamCodeModal from './src/components/XtreamCodeModal';
 import M3UUrlModal from './src/components/M3UUrlModal';
+import ProfilesModal from './src/components/ProfilesModal';
 import type { Channel } from './src/types';
 import type { SimpleRootStackParamList } from './AppWithNavigation';
+import { useApp } from './src/context/AppContext';
 
 // Import des nouveaux services migrés
 import IPTVService from './src/services/IPTVService';
@@ -59,6 +61,7 @@ type NavigationProp = StackNavigationProp<SimpleRootStackParamList>;
 
 const App: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
+  const { showLoading, updateLoading, hideLoading, showNotification } = useApp();
   
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showVideoPlayer, setShowVideoPlayer] = useState(false);
@@ -66,6 +69,8 @@ const App: React.FC = () => {
   const [showConnectionModal, setShowConnectionModal] = useState(false);
   const [showXtreamModal, setShowXtreamModal] = useState(false);
   const [showM3UModal, setShowM3UModal] = useState(false);
+  const [showProfilesModal, setShowProfilesModal] = useState(false);
+  const [selectedPlaylistId, setSelectedPlaylistId] = useState<string | undefined>();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const cardsScale = useRef([...Array(6)].map(() => new Animated.Value(1))).current;
   
@@ -125,37 +130,25 @@ const App: React.FC = () => {
   // Animations supprimées pour assurer clics fonctionnels
 
   const handleTVCardPress = () => {
-    console.log('🎬 TV Card Pressed - NAVIGATION DIRECTE!');
+    console.log('📺 TV Card Pressed - Vérification playlist active');
     
-    // 🧪 DONNÉES MOCK POUR TEST NAVIGATION
-    const mockChannels = [
-      { id: '1', name: 'TF1 HD', url: 'https://example.com/tf1.m3u8', category: 'Généraliste' },
-      { id: '2', name: 'France 2 HD', url: 'https://example.com/france2.m3u8', category: 'Généraliste' },
-      { id: '3', name: 'Canal+ Sport', url: 'https://example.com/canal.m3u8', category: 'Sport' },
-      { id: '4', name: 'M6 HD', url: 'https://example.com/m6.m3u8', category: 'Généraliste' },
-      { id: '5', name: 'Arte HD', url: 'https://example.com/arte.m3u8', category: 'Culture' },
-      { id: '6', name: 'BFM TV', url: 'https://example.com/bfm.m3u8', category: 'Actualités' },
-      { id: '7', name: 'Eurosport 1', url: 'https://example.com/eurosport.m3u8', category: 'Sport' },
-      { id: '8', name: 'Discovery Channel', url: 'https://example.com/discovery.m3u8', category: 'Documentaires' },
-    ];
-    
-    console.log('🎬 NAVIGATION vers ChannelListScreen avec:', {
-      channels: mockChannels.length,
-      playlistName: '📺 Chaînes TV Test'
-    });
-    
-    // Navigation immédiate sans Alert
-    try {
-      navigation.navigate('ChannelList', {
-        playlistId: 'mock-tv-channels',
-        playlistName: '📺 Chaînes TV Test',
-        channels: mockChannels,
-        totalChannels: mockChannels.length
-      });
-      console.log('✅ Navigation TV réussie!');
-    } catch (error) {
-      console.error('❌ ERREUR NAVIGATION TV:', error);
+    // Vérifier s'il y a une playlist sélectionnée
+    if (!selectedPlaylistId) {
+      console.log('❌ Aucune playlist sélectionnée');
+      Alert.alert(
+        '📺 Aucune playlist',
+        'Veuillez d\'abord importer et sélectionner une playlist depuis le menu "Profils".',
+        [{ text: 'OK' }]
+      );
+      return;
     }
+    
+    console.log('✅ Playlist active détectée:', selectedPlaylistId);
+    Alert.alert(
+      '📺 TV En Direct',
+      'Navigation vers les chaînes TV en direct à implémenter.',
+      [{ text: 'OK' }]
+    );
   };
 
   const handleClosePlayer = () => {
@@ -178,8 +171,9 @@ const App: React.FC = () => {
   };
 
   const handleUsersList = () => {
-    console.log('👥 Liste d\'utilisateurs');
+    console.log('👤 Ouverture modal Profils');
     setShowConnectionModal(false);
+    setShowProfilesModal(true);
   };
 
   // Handler pour la connexion Xtream Codes
@@ -193,9 +187,16 @@ const App: React.FC = () => {
     console.log('📁 Connexion M3U avec:', source);
     setShowM3UModal(false);
     
+    // 🚀 AFFICHER LOADING OVERLAY AVEC ANIMATION
+    showLoading('Téléchargement...', `Import de la playlist ${source.name}...`, 0);
+    
     // 🚀 TEST COMPLET DES SERVICES IPTV - UTILISER L'INSTANCE EXISTANTE
     try {
       console.log('🚀 Utilisation des services IPTV...');
+      
+      // Simuler progression de téléchargement
+      updateLoading({ progress: 10, subtitle: 'Connexion au serveur...' });
+      await new Promise(resolve => setTimeout(resolve, 200));
       
       // Utiliser l'instance déjà initialisée
       const iptv = iptvServiceRef.current || IPTVService.getInstance({
@@ -213,12 +214,16 @@ const App: React.FC = () => {
       // Vérifier si déjà initialisé
       if (!iptv.isReady) {
         console.log('⏳ Initialisation du service...');
+        updateLoading({ progress: 25, subtitle: 'Initialisation des services...' });
         await iptv.initialize();
         console.log('✅ Service initialisé:', iptv.isReady);
       }
       
-      // Test import playlist
+      // Test import playlist avec progression
       console.log('📥 Import playlist depuis:', source.source || source.url);
+      updateLoading({ progress: 40, subtitle: 'Téléchargement playlist...' });
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
       const result = await iptv.importPlaylistFromUrl(
         source.source || source.url, 
         source.name || 'Test Playlist',
@@ -231,6 +236,10 @@ const App: React.FC = () => {
         }
       );
       
+      // Progression parsing
+      updateLoading({ progress: 70, subtitle: 'Analyse des chaînes...' });
+      await new Promise(resolve => setTimeout(resolve, 400));
+      
       console.log('✅ Import IPTV SUCCESS:', {
         totalChannels: result.playlist.channels.length,
         parseTime: result.stats?.parseTime,
@@ -238,37 +247,71 @@ const App: React.FC = () => {
         success: result.success
       });
       
-      // 🎬 NAVIGATION IMMÉDIATE VERS CHANNELLISTSCREEN (AVANT TEST RECHERCHE)
-      console.log('🎬 Navigation vers ChannelListScreen avec:', {
-        channels: result.playlist.channels.length,
-        playlistName: source.name || 'Test Playlist'
-      });
+      // 💾 Sauvegarde de la playlist dans AsyncStorage pour ProfilesModal
+      console.log('💾 Sauvegarde de la playlist...');
+      updateLoading({ progress: 90, subtitle: 'Sauvegarde...' });
+      await new Promise(resolve => setTimeout(resolve, 200));
       
-      console.log('🎬 Tentative de navigation...');
-      navigation.navigate('ChannelList', {
-        playlistId: result.playlist.id,
-        playlistName: source.name || 'Test Playlist',
-        channels: result.playlist.channels,
-        totalChannels: result.playlist.channels.length
-      });
-      console.log('🎬 Navigation appelée avec succès');
-      
-      // Test recherche si on a des chaînes (APRÈS NAVIGATION)
-      if (result.playlist.channels.length > 0) {
-        console.log('🔍 Test recherche...');
-        try {
-          const searchResults = await iptv.searchChannels('tf1', {
-            fuzzySearch: true,
-            maxResults: 5
-          });
-          console.log(`🔍 Recherche "tf1": ${searchResults.length} résultats`);
-        } catch (searchError) {
-          console.log('⚠️ Erreur recherche:', searchError.message);
-        }
+      try {
+        // Importer AsyncStorage
+        const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+        
+        // Créer l'objet playlist pour ProfilesModal
+        const playlistForProfiles = {
+          id: result.playlist.id,
+          name: source.name || 'Playlist M3U',
+          type: 'M3U' as const,
+          url: source.source || source.url,
+          dateAdded: new Date().toISOString(),
+          channelsCount: result.playlist.channels.length,
+          status: 'active' as const
+        };
+        
+        // Récupérer les playlists existantes
+        const existingPlaylists = await AsyncStorage.getItem('saved_m3u_playlists');
+        const playlists = existingPlaylists ? JSON.parse(existingPlaylists) : [];
+        
+        // Ajouter la nouvelle playlist
+        playlists.push(playlistForProfiles);
+        
+        // Sauvegarder
+        await AsyncStorage.setItem('saved_m3u_playlists', JSON.stringify(playlists));
+        console.log('💾 Playlist sauvegardée:', playlistForProfiles.name, `(${playlistForProfiles.channelsCount} chaînes)`);
+        
+        // Définir comme playlist active
+        setSelectedPlaylistId(result.playlist.id);
+        
+      } catch (saveError) {
+        console.error('❌ Erreur sauvegarde playlist:', saveError);
       }
+      
+      // 🎯 FINALISATION - CACHER LOADING ET AFFICHER NOTIFICATION SUCCESS
+      updateLoading({ progress: 100, subtitle: 'Terminé!' });
+      await new Promise(resolve => setTimeout(resolve, 300));
+      hideLoading();
+      
+      // 🎉 NOTIFICATION SUCCESS POPUP
+      showNotification(
+        `Playlist ajoutée ! ${result.playlist.channels.length} chaînes importées`,
+        'success',
+        4000
+      );
+      
+      console.log('🎬 Import terminé - playlist disponible dans Profils');
       
     } catch (error) {
       console.error('❌ TEST SERVICES IPTV FAILED:', error);
+      
+      // Cacher le loading en cas d'erreur
+      hideLoading();
+      
+      // Afficher notification d'erreur
+      showNotification(
+        `Erreur import: ${error.message || 'Problème de connexion'}`,
+        'error',
+        5000
+      );
+      
       Alert.alert(
         '❌ Erreur Services IPTV', 
         `Erreur: ${error.message || 'Inconnue'}\n\nStack: ${error.stack?.substring(0, 200) || 'N/A'}`
@@ -289,6 +332,84 @@ const App: React.FC = () => {
   const handleM3UClose = () => {
     console.log('🔙 Fermer M3U Modal et retourner au Connection Modal');
     setShowM3UModal(false);
+    setTimeout(() => {
+      setShowConnectionModal(true);
+    }, 100);
+  };
+
+  // Handlers pour ProfilesModal
+  const handleProfilesClose = () => {
+    console.log('🔙 Fermer Profiles Modal - retour écran principal');
+    setShowProfilesModal(false);
+    // Pas de retour au ConnectionModal - rester sur l'écran principal
+  };
+
+  const handlePlaylistSelect = async (playlist: any) => {
+    console.log('🎬 Playlist sélectionnée:', playlist.name);
+    
+    // Animation de connexion à la playlist
+    const channelCount = playlist.channelsCount || 50;
+    const totalDuration = Math.max(3000, Math.min(8000, channelCount * 5));
+    const stepDuration = totalDuration / 7;
+    
+    console.log(`🎬 Animation calculée: ${channelCount} chaînes → ${totalDuration}ms`);
+    
+    // Afficher l'animation de chargement
+    showLoading(
+      `Connexion à "${playlist.name}"`, 
+      `Préparation de ${channelCount} chaînes...`, 
+      0
+    );
+    
+    // Animation progressive de connexion
+    const connectionSteps = [
+      { progress: 10, subtitle: '🔍 Lecture de la playlist...' },
+      { progress: 25, subtitle: '🔗 Connexion au serveur...' },
+      { progress: 45, subtitle: `📺 Chargement de ${channelCount} chaînes...` },
+      { progress: 65, subtitle: '📂 Organisation par catégories...' },
+      { progress: 80, subtitle: '⚙️ Configuration des paramètres...' },
+      { progress: 95, subtitle: '✅ Finalisation de la connexion...' },
+      { progress: 100, subtitle: '🎉 Playlist connectée avec succès !' }
+    ];
+    
+    for (let i = 0; i < connectionSteps.length; i++) {
+      const step = connectionSteps[i];
+      await new Promise(resolve => setTimeout(resolve, stepDuration));
+      
+      updateLoading({ 
+        progress: step.progress, 
+        subtitle: step.subtitle 
+      });
+      
+      // Pause plus longue sur l'étape de chargement des chaînes
+      if (step.progress === 45) {
+        await new Promise(resolve => setTimeout(resolve, stepDuration * 1.5));
+      }
+    }
+    
+    // Attendre finalisation
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Masquer chargement
+    hideLoading();
+    
+    // Activer la playlist
+    setSelectedPlaylistId(playlist.id);
+    
+    // Fermer le ProfilesModal
+    setShowProfilesModal(false);
+    
+    // Afficher notification de succès
+    setTimeout(() => {
+      showNotification('Connexion réussie', 'success', 3000);
+    }, 300);
+    
+    console.log('✅ Playlist activée - retour écran principal');
+  };
+
+  const handleAddPlaylist = () => {
+    console.log('➕ Ajouter nouvelle playlist');
+    setShowProfilesModal(false);
     setTimeout(() => {
       setShowConnectionModal(true);
     }, 100);
@@ -614,6 +735,15 @@ const App: React.FC = () => {
         visible={showM3UModal}
         onClose={handleM3UClose}
         onConnect={handleM3UConnection}
+      />
+
+      {/* Profiles Modal */}
+      <ProfilesModal
+        visible={showProfilesModal}
+        onClose={handleProfilesClose}
+        onPlaylistSelect={handlePlaylistSelect}
+        onAddPlaylist={handleAddPlaylist}
+        selectedPlaylistId={selectedPlaylistId}
       />
     </LinearGradient>
   );

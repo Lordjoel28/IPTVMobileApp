@@ -273,11 +273,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 60,
-    paddingTop: 100,
+    paddingTop: 140,
+    paddingBottom: 40,
   },
   closeButton: {
     position: 'absolute',
-    top: 70,
+    top: 50,
     right: 50,
     zIndex: 10,
   },
@@ -293,7 +294,7 @@ const styles = StyleSheet.create({
   },
   titleContainer: {
     position: 'absolute',
-    top: 100,
+    top: 80,
     left: 0,
     right: 0,
     alignItems: 'center',
@@ -374,8 +375,10 @@ const styles = StyleSheet.create({
     maxWidth: '100%',
   },
   guidanceContainer: {
-    marginTop: 30,
+    marginTop: 35,
+    marginBottom: 20,
     alignItems: 'center',
+    paddingHorizontal: 20,
   },
   guidanceText: {
     fontSize: 14,

@@ -70,6 +70,14 @@ const M3UUrlModal: React.FC<M3UUrlModalProps> = ({
         }),
       ]).start();
     } else {
+      // Réinitialiser les champs quand le modal se ferme
+      setUrl('');
+      setPlaylistName('');
+      setSelectedFile(null);
+      setConnectionMode('url');
+      setIsConnecting(false);
+      toggleAnim.setValue(0);
+      
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 0,
