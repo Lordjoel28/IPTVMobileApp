@@ -183,6 +183,121 @@ const App: React.FC = () => {
   const handleXtreamConnection = async (credentials: any) => {
     console.log('🔐 Connexion Xtream avec:', credentials);
     setShowXtreamModal(false);
+    
+    // 🚀 FERMER TOUS LES MODALS D'ABORD !
+    console.log('🔄 Fermeture de tous les modals avant import Xtream...');
+    setShowConnectionModal(false);
+    
+    // Délai ultra-minimal pour fermeture modals
+    await new Promise(resolve => setTimeout(resolve, 20));
+    
+    // 🚀 AFFICHER LOADING OVERLAY AVEC ANIMATION XTREAM
+    showLoading('Connexion Xtream...', `Authentification ${credentials.username}...`, 0);
+    
+    try {
+      console.log('🚀 Initialisation XtreamExtremeManager...');
+      
+      // Importer dynamiquement le XtreamExtremeManager
+      const { XtreamExtremeManager } = await import('./src/modules/xtream/XtreamExtremeManager.js');
+      const xtreamManager = new XtreamExtremeManager();
+      
+      // Charger config existante puis définir credentials
+      await xtreamManager.loadConfig();
+      xtreamManager.setCredentials(credentials.url, credentials.username, credentials.password);
+      
+      // Étape 1: Authentification
+      updateLoading({ progress: 10, subtitle: '🔐 Authentification serveur...' });
+      await xtreamManager.authenticate();
+      
+      // Étape 2: Récupération des chaînes avec progression
+      updateLoading({ progress: 30, subtitle: '📡 Récupération chaînes...' });
+      
+      // Écouter les événements de progression
+      xtreamManager.addEventListener('syncProgress', (event) => {
+        const { progress, step } = event.detail;
+        const stepLabels = {
+          'categories': '📂 Chargement catégories...',
+          'channels': '📺 Récupération chaînes...',
+          'processing': '⚙️ Traitement données...',
+          'parsing': '🔄 Parsing chaînes...',
+          'complete': '✅ Import terminé !'
+        };
+        updateLoading({ 
+          progress: Math.min(95, progress), 
+          subtitle: stepLabels[step] || 'Traitement...' 
+        });
+      });
+      
+      const channels = await xtreamManager.fetchChannelsExtreme();
+      
+      // Étape 3: Conversion au format standard
+      updateLoading({ progress: 90, subtitle: '🔄 Conversion format...' });
+      const playlistData = xtreamManager.exportToPlaylistFormat();
+      
+      // Étape 4: Sauvegarde avec AsyncStorage (format compatible ProfilesModal)
+      updateLoading({ progress: 95, subtitle: '💾 Sauvegarde playlist...' });
+      
+      const playlistName = `${credentials.username} (Xtream)`;
+      
+      // Récupérer les informations d'authentification pour la date d'expiration
+      const accountInfo = xtreamManager.accountInfo;
+      let expirationDate = undefined;
+      
+      // Convertir le timestamp Unix en date ISO si disponible
+      if (accountInfo?.user_info?.exp_date) {
+        const expTimestamp = parseInt(accountInfo.user_info.exp_date);
+        if (!isNaN(expTimestamp)) {
+          expirationDate = new Date(expTimestamp * 1000).toISOString();
+          console.log(`📅 Date d'expiration Xtream: ${expirationDate}`);
+        }
+      }
+      
+      // Créer la playlist au format attendu par ProfilesModal
+      const newPlaylist = {
+        id: `xtream_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        name: playlistName,
+        type: 'XTREAM' as const,
+        url: credentials.url,
+        server: credentials.url,
+        username: credentials.username,
+        password: credentials.password,
+        dateAdded: new Date().toISOString(),
+        expirationDate: expirationDate, // ✅ Ajouter la vraie date d'expiration
+        channelsCount: channels.length,
+        status: 'active' as const
+      };
+      
+      // Sauvegarder dans AsyncStorage pour ProfilesModal
+      const AsyncStorage = await import('@react-native-async-storage/async-storage');
+      const existingData = await AsyncStorage.default.getItem('saved_xtream_playlists');
+      const playlists = existingData ? JSON.parse(existingData) : [];
+      playlists.push(newPlaylist);
+      await AsyncStorage.default.setItem('saved_xtream_playlists', JSON.stringify(playlists));
+      
+      // Finalisation
+      updateLoading({ progress: 100, subtitle: `✅ ${channels.length} chaînes importées !` });
+      
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      hideLoading();
+      
+      // Ouvrir automatiquement le ProfilesModal pour sélection
+      console.log('📋 Ouverture automatique du ProfilesModal');
+      setShowProfilesModal(true);
+      
+      console.log(`✅ Import Xtream réussi: ${channels.length} chaînes`);
+      
+    } catch (error) {
+      console.error('❌ Erreur import Xtream:', error);
+      hideLoading();
+      
+      // Afficher erreur détaillée
+      const errorMessage = error.message || 'Erreur inconnue';
+      Alert.alert(
+        'Erreur Xtream Codes',
+        `Impossible d'importer la playlist Xtream:\n\n${errorMessage}\n\nVérifiez vos identifiants et la connexion réseau.`,
+        [{ text: 'OK' }]
+      );
+    }
   };
 
   // Handler pour la connexion M3U URL - VRAI TEST SERVICES IPTV  

@@ -38,9 +38,6 @@ export class XtreamExtremeManager {
             totalChannels: 0
         };
         
-        // Charger config sauvegardée
-        this.loadConfig();
-        
         console.log('🚀 XtreamExtremeManager initialisé (parsing synchrone optimisé)');
     }
     
@@ -108,17 +105,21 @@ export class XtreamExtremeManager {
         this.saveConfig();
     }
     
-    saveConfig() {
+    async saveConfig() {
         try {
-            localStorage.setItem('xtream_extreme_config', JSON.stringify(this.config));
+            // React Native: utiliser AsyncStorage au lieu de localStorage
+            const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+            await AsyncStorage.setItem('xtream_extreme_config', JSON.stringify(this.config));
         } catch (error) {
             console.warn('⚠️ Erreur sauvegarde config:', error);
         }
     }
     
-    loadConfig() {
+    async loadConfig() {
         try {
-            const saved = localStorage.getItem('xtream_extreme_config');
+            // React Native: utiliser AsyncStorage au lieu de localStorage
+            const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+            const saved = await AsyncStorage.getItem('xtream_extreme_config');
             if (saved) {
                 this.config = { ...this.config, ...JSON.parse(saved) };
             }
@@ -507,14 +508,12 @@ export class XtreamExtremeManager {
     normalizeLogoURL(url) {
         if (!url || typeof url !== 'string') return '';
         
-        try {
-            // Valider URL
-            const urlObj = new URL(url);
-            return urlObj.toString();
-        } catch {
-            // URL invalide, retourner vide
-            return '';
+        // React Native: validation simple sans new URL()
+        if (url.startsWith('http://') || url.startsWith('https://')) {
+            return url.trim();
         }
+        
+        return '';
     }
     
     detectQuality(channel) {
@@ -557,19 +556,26 @@ export class XtreamExtremeManager {
     }
     
     buildURL(action, params = {}) {
-        const url = new URL(`${this.config.server}/player_api.php`);
+        // React Native: construire URL manuellement sans URLSearchParams
+        const baseUrl = `${this.config.server}/player_api.php`;
+        const searchParams = new Map();
         
-        url.searchParams.set('username', this.config.username);
-        url.searchParams.set('password', this.config.password);
-        url.searchParams.set('action', action);
+        searchParams.set('username', this.config.username);
+        searchParams.set('password', this.config.password);
+        searchParams.set('action', action);
         
         Object.entries(params).forEach(([key, value]) => {
             if (value !== undefined && value !== null) {
-                url.searchParams.set(key, value);
+                searchParams.set(key, value);
             }
         });
         
-        return url.toString();
+        // Construire la query string manuellement
+        const queryString = Array.from(searchParams.entries())
+            .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+            .join('&');
+        
+        return `${baseUrl}?${queryString}`;
     }
     
     // Utilitaires
@@ -729,7 +735,8 @@ class XtreamCORSProxy {
                 console.log(`✅ Succès avec proxy en cache: ${workingProxy}`);
                 return result;
             } catch (error) {
-                console.warn(`❌ Proxy en cache échoué: ${workingProxy}`, error.message);
+                // Masquer le message pour une meilleure UX - c'est normal que direct échoue
+                // console.warn(`❌ Proxy en cache échoué: ${workingProxy}`, error.message);
                 this.workingProxies.delete(workingProxy);
                 this.failedProxies.add(workingProxy);
             }
@@ -751,7 +758,8 @@ class XtreamCORSProxy {
                 this.currentMethod = i;
                 return result;
             } catch (error) {
-                console.warn(`❌ Échec ${method}:`, error.message);
+                // Log silencieux pour éviter les messages d'erreur inutiles
+                // console.warn(`❌ Échec ${method}:`, error.message);
                 this.failedProxies.add(method);
                 
                 // Attendre un peu avant le prochain essai
@@ -787,19 +795,29 @@ class XtreamCORSProxy {
     
     async useDirect(url, options) {
         console.log('🎯 Tentative requête directe');
-        const response = await fetch(url, {
-            method: 'GET',
-            mode: 'cors',
-            credentials: 'omit',
-            headers: {
-                'Accept': 'application/json, text/plain, */*',
-                'User-Agent': 'IPTV-Player/2.0'
-            },
-            signal: AbortSignal.timeout(options.timeout || 15000)
-        });
         
-        if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        return response.json();
+        // React Native: créer timeout controller manuellement
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), options.timeout || 15000);
+        
+        try {
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json, text/plain, */*',
+                    'User-Agent': 'IPTV-Player/2.0'
+                },
+                signal: controller.signal
+            });
+            
+            clearTimeout(timeoutId);
+            
+            if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            return response.json();
+        } catch (error) {
+            clearTimeout(timeoutId);
+            throw error;
+        }
     }
     
     
@@ -807,28 +825,39 @@ class XtreamCORSProxy {
         console.log('🟢 Tentative proxy Node.js');
         const proxiedURL = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`;
         
-        const response = await fetch(proxiedURL, {
-            method: 'GET',
-            headers: {
-                'Accept': 'application/json'
-            },
-            signal: AbortSignal.timeout(options.timeout || 15000)
-        });
-        
-        if (!response.ok) throw new Error(`Proxy Node.js failed: ${response.status} - ${response.statusText}`);
-        const text = await response.text();
-        
-        // Debug: afficher la réponse brute
-        console.log('🔍 Réponse brute proxy Node.js:', text.substring(0, 500) + (text.length > 500 ? '...' : ''));
+        // React Native: créer timeout controller manuellement
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), options.timeout || 15000);
         
         try {
-            const parsed = JSON.parse(text);
-            console.log('🔍 JSON parsé avec succès:', typeof parsed);
-            return parsed;
-        } catch (e) {
-            console.error('❌ Erreur parsing JSON:', e.message);
-            console.error('❌ Texte brut:', text);
-            throw new Error('Réponse proxy invalide');
+            const response = await fetch(proxiedURL, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json'
+                },
+                signal: controller.signal
+            });
+            
+            clearTimeout(timeoutId);
+            
+            if (!response.ok) throw new Error(`Proxy Node.js failed: ${response.status} - ${response.statusText}`);
+            const text = await response.text();
+            
+            // Debug: afficher la réponse brute
+            console.log('🔍 Réponse brute proxy Node.js:', text.substring(0, 500) + (text.length > 500 ? '...' : ''));
+            
+            try {
+                const parsed = JSON.parse(text);
+                console.log('🔍 JSON parsé avec succès:', typeof parsed);
+                return parsed;
+            } catch (e) {
+                console.error('❌ Erreur parsing JSON:', e.message);
+                console.error('❌ Texte brut:', text);
+                throw new Error('Réponse proxy invalide');
+            }
+        } catch (error) {
+            clearTimeout(timeoutId);
+            throw error;
         }
     }
     
@@ -836,42 +865,75 @@ class XtreamCORSProxy {
         console.log('🔵 Tentative corsproxy.io');
         const proxiedURL = `https://corsproxy.io/?${encodeURIComponent(url)}`;
         
-        const response = await fetch(proxiedURL, {
-            method: 'GET',
-            signal: AbortSignal.timeout(options.timeout || 15000)
-        });
+        // React Native: créer timeout controller manuellement
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), options.timeout || 15000);
         
-        if (!response.ok) throw new Error(`CORS Proxy IO failed: ${response.status}`);
-        return response.json();
+        try {
+            const response = await fetch(proxiedURL, {
+                method: 'GET',
+                signal: controller.signal
+            });
+            
+            clearTimeout(timeoutId);
+            
+            if (!response.ok) throw new Error(`CORS Proxy IO failed: ${response.status}`);
+            return response.json();
+        } catch (error) {
+            clearTimeout(timeoutId);
+            throw error;
+        }
     }
     
     async useCorsfix(url, options) {
         console.log('🟣 Tentative Corsfix');
         const proxiedURL = `https://api.corsfix.com/${encodeURIComponent(url)}`;
         
-        const response = await fetch(proxiedURL, {
-            method: 'GET',
-            headers: {
-                'Accept': 'application/json'
-            },
-            signal: AbortSignal.timeout(options.timeout || 15000)
-        });
+        // React Native: créer timeout controller manuellement
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), options.timeout || 15000);
         
-        if (!response.ok) throw new Error(`Corsfix failed: ${response.status}`);
-        return response.json();
+        try {
+            const response = await fetch(proxiedURL, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json'
+                },
+                signal: controller.signal
+            });
+            
+            clearTimeout(timeoutId);
+            
+            if (!response.ok) throw new Error(`Corsfix failed: ${response.status}`);
+            return response.json();
+        } catch (error) {
+            clearTimeout(timeoutId);
+            throw error;
+        }
     }
     
     async useCloudflareWorker(url, options) {
         console.log('☁️ Tentative Cloudflare Worker');
         const proxiedURL = `https://test.cors.workers.dev/corsproxy/?apiurl=${encodeURIComponent(url)}`;
         
-        const response = await fetch(proxiedURL, {
-            method: 'GET',
-            signal: AbortSignal.timeout(options.timeout || 15000)
-        });
+        // React Native: créer timeout controller manuellement
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), options.timeout || 15000);
         
-        if (!response.ok) throw new Error(`Cloudflare Worker failed: ${response.status}`);
-        return response.json();
+        try {
+            const response = await fetch(proxiedURL, {
+                method: 'GET',
+                signal: controller.signal
+            });
+            
+            clearTimeout(timeoutId);
+            
+            if (!response.ok) throw new Error(`Cloudflare Worker failed: ${response.status}`);
+            return response.json();
+        } catch (error) {
+            clearTimeout(timeoutId);
+            throw error;
+        }
     }
     
     wait(ms) {

@@ -110,7 +110,20 @@ const ProfilesModal: React.FC<ProfilesModalProps> = ({
   const calculateStatus = (expirationDate?: string): 'active' | 'expiring' | 'expired' => {
     if (!expirationDate) return 'active';
     
-    const expDate = new Date(expirationDate);
+    let expDate: Date;
+    
+    // Gérer les timestamps Unix (Xtream Codes) et les dates ISO
+    if (/^\d+$/.test(expirationDate)) {
+      // Timestamp Unix (comme "1778248620")
+      expDate = new Date(parseInt(expirationDate) * 1000);
+    } else {
+      // Date ISO standard
+      expDate = new Date(expirationDate);
+    }
+    
+    // Vérifier si la date est valide
+    if (isNaN(expDate.getTime())) return 'active';
+    
     const now = new Date();
     const diffTime = expDate.getTime() - now.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -124,7 +137,20 @@ const ProfilesModal: React.FC<ProfilesModalProps> = ({
   const formatExpirationDate = (expirationDate?: string) => {
     if (!expirationDate) return 'Unlimited';
     
-    const expDate = new Date(expirationDate);
+    let expDate: Date;
+    
+    // Gérer les timestamps Unix (Xtream Codes) et les dates ISO
+    if (/^\d+$/.test(expirationDate)) {
+      // Timestamp Unix (comme "1778248620")
+      expDate = new Date(parseInt(expirationDate) * 1000);
+    } else {
+      // Date ISO standard
+      expDate = new Date(expirationDate);
+    }
+    
+    // Vérifier si la date est valide
+    if (isNaN(expDate.getTime())) return 'Invalid';
+    
     const now = new Date();
     const diffTime = expDate.getTime() - now.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
