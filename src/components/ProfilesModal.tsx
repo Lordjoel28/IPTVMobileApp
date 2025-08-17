@@ -339,13 +339,10 @@ const ProfilesModal: React.FC<ProfilesModalProps> = ({
   // Animation simple de la carte puis passage à l'App principal
   const handlePlaylistSelect = async (item: PlaylistItem) => {
     try {
-      // Animation immédiate de feedback visuel sur la carte
+      // Animation de feedback visuel sur la carte en parallèle
       animateCardSelection(item.id);
       
-      // Petit délai pour l'animation de carte
-      await new Promise(resolve => setTimeout(resolve, 600));
-      
-      // Appeler la fonction parent qui gère l'animation complète
+      // Appeler immédiatement la fonction parent qui gère l'animation complète
       onPlaylistSelect(item);
       
     } catch (error) {

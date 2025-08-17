@@ -30,6 +30,10 @@ interface AppContextData {
   notification: NotificationState;
   showNotification: (message: string, type?: 'success' | 'error' | 'warning' | 'info', duration?: number) => void;
   hideNotification: () => void;
+  
+  // Modal management
+  closeAllModals: () => void;
+  registerModalCloser: (closer: () => void) => void;
 }
 
 const AppContext = createContext<AppContextData | undefined>(undefined);
@@ -48,6 +52,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     type: 'info',
     duration: 3000,
   });
+
+  // Gestionnaire des modals
+  const [modalClosers, setModalClosers] = useState<Array<() => void>>([]);
 
   const showLoading = (title: string, subtitle?: string, progress?: number) => {
     setLoading({
@@ -88,6 +95,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setNotification(prev => ({ ...prev, visible: false }));
   };
 
+  const registerModalCloser = (closer: () => void) => {
+    setModalClosers(prev => [...prev, closer]);
+  };
+
+  const closeAllModals = () => {
+    modalClosers.forEach(closer => closer());
+    setModalClosers([]); // Clear après usage
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -98,6 +114,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         notification,
         showNotification,
         hideNotification,
+        closeAllModals,
+        registerModalCloser,
       }}
     >
       {children}

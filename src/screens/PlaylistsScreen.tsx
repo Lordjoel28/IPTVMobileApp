@@ -14,6 +14,8 @@ import {
 import DocumentPicker from 'react-native-document-picker';
 import { AppManager } from '../modules/app/AppManager';
 import { Playlist } from '../types';
+import { usePlaylistSelection } from '../hooks/usePlaylistSelection';
+import { useApp } from '../context/AppContext';
 
 const PlaylistsScreen: React.FC = () => {
   const [appManager] = useState(() => AppManager.getInstance());
@@ -24,10 +26,18 @@ const PlaylistsScreen: React.FC = () => {
   const [newPlaylistUrl, setNewPlaylistUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const isDarkMode = useColorScheme() === 'dark';
+  
+  // 🎬 Hook pour l'animation de sélection de playlist
+  const { selectPlaylistWithAnimation, initializePlaylistService } = usePlaylistSelection();
+  
+  // 🔄 Hook pour la gestion globale de l'app 
+  const { closeAllModals } = useApp();
 
   useEffect(() => {
     loadPlaylists();
-  }, []);
+    // Initialiser le service de playlist avec les callbacks d'animation
+    initializePlaylistService();
+  }, [initializePlaylistService]);
 
   const loadPlaylists = async () => {
     try {
@@ -133,6 +143,40 @@ const PlaylistsScreen: React.FC = () => {
     }
   };
 
+  const handleSelectPlaylist = async (playlist: Playlist) => {
+    try {
+      // 🚀 FERMER TOUS LES MODALS D'ABORD !
+      console.log('🔄 Fermeture de tous les modals avant animation...');
+      closeAllModals();
+      
+      // Petit délai pour s'assurer que les modals se ferment
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // 🎬 Puis déclencher l'animation
+      const selectedPlaylist = await selectPlaylistWithAnimation(playlist.id, playlist.name);
+      
+      if (selectedPlaylist) {
+        console.log(`✅ Playlist "${selectedPlaylist.name}" sélectionnée avec succès`);
+        
+        // Aussi mettre à jour l'AppManager pour cohérence
+        await appManager.selectPlaylist(playlist.id);
+        
+        // Navigation exemple (si vous avez la navigation):
+        // navigation.navigate('ChannelList', { 
+        //   playlistId: playlist.id,
+        //   playlistName: playlist.name,
+        //   channels: selectedPlaylist.channels,
+        //   totalChannels: selectedPlaylist.totalChannels
+        // });
+      } else {
+        Alert.alert('Erreur', 'Impossible de charger cette playlist');
+      }
+    } catch (error) {
+      console.error('❌ Erreur sélection playlist:', error);
+      Alert.alert('Erreur', 'Une erreur est survenue lors du chargement de la playlist');
+    }
+  };
+
   const handleDeletePlaylist = (playlist: Playlist) => {
     Alert.alert(
       'Confirmer la suppression',
@@ -158,7 +202,11 @@ const PlaylistsScreen: React.FC = () => {
   };
 
   const renderPlaylistItem = ({ item }: { item: Playlist }) => (
-    <View style={[styles.playlistCard, isDarkMode && styles.playlistCardDark]}>
+    <TouchableOpacity 
+      style={[styles.playlistCard, isDarkMode && styles.playlistCardDark]}
+      onPress={() => handleSelectPlaylist(item)}
+      activeOpacity={0.7}
+    >
       <View style={styles.playlistHeader}>
         <Text style={[styles.playlistName, isDarkMode && styles.playlistNameDark]}>
           {item.name}
@@ -185,17 +233,13 @@ const PlaylistsScreen: React.FC = () => {
       </View>
 
       <View style={styles.playlistActions}>
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => appManager.selectPlaylist(item.id)}
-        >
-          <Text style={styles.actionButtonText}>📺 Voir</Text>
-        </TouchableOpacity>
-        
         {item.url && (
           <TouchableOpacity
             style={[styles.actionButton, styles.updateButton]}
-            onPress={() => handleUpdatePlaylist(item)}
+            onPress={(e) => {
+              e.stopPropagation(); // Empêcher le clic sur la carte
+              handleUpdatePlaylist(item);
+            }}
           >
             <Text style={styles.actionButtonText}>🔄 MAJ</Text>
           </TouchableOpacity>
@@ -203,12 +247,15 @@ const PlaylistsScreen: React.FC = () => {
         
         <TouchableOpacity
           style={[styles.actionButton, styles.deleteButton]}
-          onPress={() => handleDeletePlaylist(item)}
+          onPress={(e) => {
+            e.stopPropagation(); // Empêcher le clic sur la carte
+            handleDeletePlaylist(item);
+          }}
         >
           <Text style={styles.actionButtonText}>🗑️</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 
   return (

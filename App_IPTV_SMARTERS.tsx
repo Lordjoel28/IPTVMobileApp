@@ -61,7 +61,7 @@ type NavigationProp = StackNavigationProp<SimpleRootStackParamList>;
 
 const App: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
-  const { showLoading, updateLoading, hideLoading, showNotification } = useApp();
+  const { showLoading, updateLoading, hideLoading, showNotification, registerModalCloser } = useApp();
   
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showVideoPlayer, setShowVideoPlayer] = useState(false);
@@ -88,6 +88,9 @@ const App: React.FC = () => {
   useEffect(() => {
     Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }).start();
     const timeInterval = setInterval(() => setCurrentTime(new Date()), 1000);
+    
+    // Enregistrer la fonction de fermeture du modal de connexion
+    registerModalCloser(() => setShowConnectionModal(false));
     
     // Test d'initialisation des nouveaux services IPTV - INSTANCE UNIQUE
     const testServices = async () => {
@@ -352,6 +355,14 @@ const App: React.FC = () => {
 
   const handlePlaylistSelect = async (playlist: any) => {
     console.log('🎬 Playlist sélectionnée:', playlist.name);
+    
+    // 🚀 FERMER TOUS LES MODALS D'ABORD !
+    console.log('🔄 Fermeture de tous les modals avant animation...');
+    setShowConnectionModal(false);
+    setShowProfilesModal(false);
+    
+    // Délai ultra-minimal pour fermeture modals
+    await new Promise(resolve => setTimeout(resolve, 20));
     
     // Animation de connexion à la playlist
     const channelCount = playlist.channelsCount || 50;

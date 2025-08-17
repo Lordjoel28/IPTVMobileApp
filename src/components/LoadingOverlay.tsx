@@ -261,8 +261,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    zIndex: 10002,
-    elevation: 1002,
+    zIndex: 999999, // Maximum z-index pour être au-dessus de tous les modals
+    elevation: 999999, // Maximum elevation pour Android
   },
   blurOverlay: {
     flex: 1,
