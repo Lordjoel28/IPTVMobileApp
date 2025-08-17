@@ -21,7 +21,7 @@ export class M3UParserBasic {
   }
   
   /**
-   * Parse un contenu M3U simple
+   * Parse un contenu M3U simple - CORRECTION pour parser toutes les 10824 chaînes
    */
   parseM3U(content: string): Channel[] {
     console.log('🔄 Parsing M3U basique...');
@@ -40,26 +40,60 @@ export class M3UParserBasic {
       
       // Ligne EXTINF (métadonnées)
       if (line.startsWith('#EXTINF:')) {
-        currentChannel = this.parseExtinf(line);
-      }
-      // Ligne URL (lien de stream)
-      else if (line && !line.startsWith('#') && currentChannel.name) {
-        currentChannel.url = line;
-        currentChannel.id = `channel_${channels.length + 1}`;
-        
-        // Ajouter la chaîne complète
+        // 🔧 CORRECTION: Finaliser le channel précédent s'il existe
         if (currentChannel.name && currentChannel.url) {
           channels.push(currentChannel as Channel);
         }
-        
-        currentChannel = {};
+        currentChannel = this.parseExtinf(line);
       }
+      // 🔧 CORRECTION CRITIQUE: Ignorer EXTVLCOPT et autres balises SANS perdre currentChannel
+      else if (line.startsWith('#EXTVLCOPT:') || line.startsWith('#EXTGRP:') || 
+               (line.startsWith('#EXT') && !line.startsWith('#EXTINF:'))) {
+        // Les lignes #EXTVLCOPT, #EXTGRP etc. sont ignorées mais currentChannel reste valide
+        continue;
+      }
+      // Ligne URL (lien de stream) - CORRECTION: condition plus robuste
+      else if (line && !line.startsWith('#') && this.isValidUrl(line) && currentChannel.name) {
+        currentChannel.url = line;
+        currentChannel.id = `channel_${channels.length + 1}`;
+        
+        // 🔧 CORRECTION: Ajouter immédiatement la chaîne complète
+        if (currentChannel.name && currentChannel.url) {
+          channels.push(currentChannel as Channel);
+          currentChannel = {}; // Reset pour prochaine chaîne
+        }
+      }
+    }
+    
+    // 🔧 CORRECTION: Finaliser le dernier channel si nécessaire
+    if (currentChannel.name && currentChannel.url) {
+      channels.push(currentChannel as Channel);
     }
     
     this.channels = channels;
     console.log(`✅ Parser M3U terminé: ${channels.length} chaînes`);
     
     return channels;
+  }
+
+  /**
+   * Validation URL améliorée pour tous les formats IPTV
+   */
+  private isValidUrl(url: string): boolean {
+    if (!url || url.length < 4) return false;
+    
+    // Protocoles IPTV courants
+    return url.startsWith('http://') || 
+           url.startsWith('https://') || 
+           url.startsWith('hhttps://') || // URLs mal formées courantes
+           url.startsWith('rtmp://') ||
+           url.startsWith('rtsp://') ||
+           url.startsWith('rtp://') ||
+           url.startsWith('udp://') ||
+           url.startsWith('mmsh://') ||
+           url.startsWith('mms://') ||
+           url.startsWith('ftp://') ||
+           url.includes('://'); // Fallback pour autres protocoles
   }
   
   /**

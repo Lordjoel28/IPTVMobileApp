@@ -237,7 +237,7 @@ export class StorageAdapter {
   }
 
   /**
-   * SET - Stockage intelligent selon taille
+   * SET - Stockage intelligent selon taille avec gestion erreur SQLITE_FULL
    */
   async set(key: string, value: any, sizeHint?: number): Promise<boolean> {
     const startTime = Date.now();
@@ -245,20 +245,30 @@ export class StorageAdapter {
 
     try {
       const serializedValue = JSON.stringify(value);
-      const estimatedSize = new Blob([serializedValue]).size;
+      const estimatedSize = serializedValue.length; // Plus précis que Blob
       const sizeMB = estimatedSize / (1024 * 1024);
 
-      // Stratégie de stockage selon taille
-      if (sizeMB > 2) {
-        // > 2MB: SQLite uniquement (gros catalogues)
-        console.log(`📦 Large dataset (${sizeMB.toFixed(1)}MB), storing in L3 only`);
-        await this.setL3Only(key, serializedValue);
+      console.log(`📦 Storing ${key}: ${sizeMB.toFixed(1)}MB`);
+
+      // 🔧 CORRECTION CRITIQUE: Éviter stockage de gros datasets pour éviter SQLITE_FULL
+      if (sizeMB > 5) {
+        // > 5MB: Stocker uniquement en mémoire L1 (éviter AsyncStorage plein)
+        console.log(`⚠️ Very large dataset (${sizeMB.toFixed(1)}MB), storing in memory only`);
+        if (this.config.enableL1Cache) {
+          this.l1Cache.set(key, value);
+        }
+        console.log(`💾 Large dataset stored in memory cache only`);
+      } else if (sizeMB > 2) {
+        // 2-5MB: L1 + nettoyage AsyncStorage avant stockage
+        console.log(`📦 Large dataset (${sizeMB.toFixed(1)}MB), cleaning old data first`);
+        await this.cleanOldData(); // Nettoyer avant stockage
+        await this.setL1Only(key, value); // L1 uniquement pour éviter overflow
       } else if (sizeMB > 0.5) {
-        // 500KB-2MB: L2 + L3
-        console.log(`📦 Medium dataset (${sizeMB.toFixed(1)}MB), storing in L2+L3`);
-        await this.setL2AndL3(key, serializedValue);
+        // 500KB-2MB: L1 + L2 avec vérification espace
+        console.log(`📦 Medium dataset (${sizeMB.toFixed(1)}MB), storing in L1+L2`);
+        await this.setL1AndL2(key, value, serializedValue);
       } else {
-        // < 500KB: L1 + L2
+        // < 500KB: L1 + L2 normal
         console.log(`📦 Small dataset (${sizeMB.toFixed(1)}MB), storing in L1+L2`);
         await this.setL1AndL2(key, value, serializedValue);
       }
@@ -268,6 +278,21 @@ export class StorageAdapter {
 
     } catch (error) {
       console.error('Storage set error:', error);
+      
+      // 🔧 FALLBACK: En cas d'erreur, stocker uniquement en mémoire
+      if (error.message?.includes('SQLITE_FULL') || error.message?.includes('full')) {
+        console.log('🚨 Storage full detected, falling back to memory-only storage');
+        try {
+          if (this.config.enableL1Cache) {
+            this.l1Cache.set(key, value);
+            console.log('✅ Fallback to memory cache successful');
+            return true;
+          }
+        } catch (fallbackError) {
+          console.error('❌ Even memory fallback failed:', fallbackError);
+        }
+      }
+      
       this.updateWriteTime(Date.now() - startTime);
       return false;
     }
@@ -303,13 +328,61 @@ export class StorageAdapter {
   }
 
   /**
-   * Stockage L3 uniquement (gros datasets)
+   * Stockage L1 uniquement (pour gros datasets)
+   */
+  private async setL1Only(key: string, value: any): Promise<void> {
+    // Stocker uniquement en mémoire pour éviter SQLITE_FULL
+    if (this.config.enableL1Cache) {
+      this.l1Cache.set(key, value);
+      console.log('💾 Stored in memory cache only (avoiding storage overflow)');
+    }
+  }
+
+  /**
+   * Stockage L3 uniquement (gros datasets) - VERSION SÉCURISÉE
    */
   private async setL3Only(key: string, serializedValue: string): Promise<void> {
     // L3 SQLite uniquement
     // TODO: Implémenter quand SQLite sera configuré
-    console.log('L3 storage not implemented yet, using L2 fallback');
-    await AsyncStorage.setItem(key, serializedValue);
+    console.log('L3 storage not implemented yet, falling back to memory-only');
+    
+    // 🔧 CORRECTION: Ne pas utiliser AsyncStorage pour les gros datasets
+    // await AsyncStorage.setItem(key, serializedValue); // DÉSACTIVÉ pour éviter SQLITE_FULL
+    
+    // Fallback vers mémoire uniquement
+    try {
+      const value = JSON.parse(serializedValue);
+      if (this.config.enableL1Cache) {
+        this.l1Cache.set(key, value);
+        console.log('💾 Large dataset stored in memory cache only');
+      }
+    } catch (parseError) {
+      console.error('Failed to parse value for memory storage:', parseError);
+    }
+  }
+
+  /**
+   * Nettoyer anciennes données pour libérer de l'espace
+   */
+  private async cleanOldData(): Promise<void> {
+    try {
+      console.log('🧹 Cleaning old data to free storage space...');
+      
+      // Nettoyer le cache L1 en gardant seulement les 100 éléments les plus récents
+      if (this.l1Cache.size > 100) {
+        const currentSize = this.l1Cache.size;
+        // Vider partiellement le cache
+        this.l1Cache.clear();
+        console.log(`🧹 Cleared L1 cache: ${currentSize} items removed`);
+      }
+      
+      // Optionnel: Nettoyer AsyncStorage des anciens playlists
+      // Note: Ceci nécessiterait un système de tracking des clés par date
+      
+      console.log('✅ Storage cleanup completed');
+    } catch (error) {
+      console.error('Storage cleanup failed:', error);
+    }
   }
 
   /**

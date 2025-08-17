@@ -230,7 +230,7 @@ const App: React.FC = () => {
         {
           validateUrls: false, // Skip validation pour test rapide
           chunkSize: 500,
-          maxChannels: 2000,
+          maxChannels: 25000,
           enableCache: true,
           parserMode: 'ultra'
         }
@@ -298,6 +298,12 @@ const App: React.FC = () => {
       );
       
       console.log('🎬 Import terminé - playlist disponible dans Profils');
+      
+      // 📋 Ouvrir le ProfilesModal après import réussi
+      setTimeout(() => {
+        console.log('📋 Ouverture automatique du ProfilesModal');
+        setShowProfilesModal(true);
+      }, 1000); // Petit délai pour laisser la notification s'afficher
       
     } catch (error) {
       console.error('❌ TEST SERVICES IPTV FAILED:', error);

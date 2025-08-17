@@ -377,7 +377,6 @@ const ProfilesModal: React.FC<ProfilesModalProps> = ({
         <TouchableOpacity
           style={[
             styles.playlistCard,
-            isSelected && styles.selectedPlaylistCard,
           ]}
         onPress={() => handlePlaylistSelect(item)}
         onLongPress={(event) => {

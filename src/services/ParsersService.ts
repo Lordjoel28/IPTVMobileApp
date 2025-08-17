@@ -27,7 +27,7 @@ export interface ParseResult {
 export class ParsersService {
   // Pool d'objets pour éviter les allocations
   private channelPool: Partial<Channel>[] = [];
-  private poolMaxSize = 2000;
+  private poolMaxSize = 25000;
   private poolUsed = 0;
 
   // Cache de strings internées (LRU)
@@ -103,7 +103,7 @@ export class ParsersService {
    * Migration directe de UltraOptimizedM3UParser.js
    */
   private async parseUltraOptimized(content: string, options: ParseOptions): Promise<Channel[]> {
-    const chunkSize = options.chunkSize || 2000;
+    const chunkSize = options.chunkSize || 25000;
     const lines = content.split('\n');
     const channels: Channel[] = [];
     

@@ -37,7 +37,7 @@ export class PlaylistService {
       // Parser M3U avec sélection automatique du parser optimal
       const parseResult = await parsersService.parseM3U(content, {
         useUltraOptimized: true,
-        chunkSize: 2000,
+        chunkSize: 25000,
         yieldControl: true
       });
 
