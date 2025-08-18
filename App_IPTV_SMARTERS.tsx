@@ -132,7 +132,7 @@ const App: React.FC = () => {
 
   // Animations supprimées pour assurer clics fonctionnels
 
-  const handleTVCardPress = () => {
+  const handleTVCardPress = async () => {
     console.log('📺 TV Card Pressed - Vérification playlist active');
     
     // Vérifier s'il y a une playlist sélectionnée
@@ -147,11 +147,66 @@ const App: React.FC = () => {
     }
     
     console.log('✅ Playlist active détectée:', selectedPlaylistId);
-    Alert.alert(
-      '📺 TV En Direct',
-      'Navigation vers les chaînes TV en direct à implémenter.',
-      [{ text: 'OK' }]
-    );
+    
+    try {
+      // Récupérer les chaînes depuis les services IPTV
+      const iptvService = iptvServiceRef.current;
+      if (!iptvService) {
+        throw new Error('Service IPTV non disponible');
+      }
+      
+      // Récupérer les chaînes de la playlist active
+      console.log('🔄 Récupération des chaînes...');
+      let playlist = await iptvService.getPlaylist(selectedPlaylistId);
+      
+      if (!playlist) {
+        console.log('⚠️ Playlist non trouvée dans le service, tentative de récupération directe...');
+        
+        // Fallback: Récupérer directement depuis AsyncStorage pour les grosses playlists
+        try {
+          const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+          const playlistData = await AsyncStorage.getItem(`playlist_${selectedPlaylistId}`);
+          
+          if (playlistData) {
+            playlist = JSON.parse(playlistData);
+            console.log('✅ Grosse playlist récupérée depuis AsyncStorage:', playlist?.channels?.length, 'chaînes');
+          }
+        } catch (storageError) {
+          console.error('❌ Erreur récupération AsyncStorage:', storageError);
+        }
+        
+        if (!playlist) {
+          throw new Error('Playlist introuvable dans le service et le storage');
+        }
+      }
+      
+      const channels = playlist.channels;
+      
+      console.log('📺 Chaînes récupérées:', channels.length);
+      
+      if (channels.length === 0) {
+        Alert.alert(
+          '📺 Aucune chaîne',
+          'La playlist sélectionnée ne contient aucune chaîne.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+      
+      // Navigation vers ChannelsScreen avec seulement l'ID (éviter les données volumineuses)
+      navigation.navigate('ChannelsScreen', {
+        playlistId: selectedPlaylistId,
+        channelsCount: channels.length
+      });
+      
+    } catch (error) {
+      console.error('❌ Erreur récupération chaînes:', error);
+      Alert.alert(
+        '❌ Erreur',
+        'Impossible de charger les chaînes de la playlist.',
+        [{ text: 'OK' }]
+      );
+    }
   };
 
   const handleClosePlayer = () => {
