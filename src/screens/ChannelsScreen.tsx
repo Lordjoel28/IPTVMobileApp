@@ -98,6 +98,26 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
       .replace(/^\w/, c => c.toUpperCase()); // Première lettre majuscule
   };
 
+  // NOUVEAU : Charger favoris et historique depuis AsyncStorage
+  const loadFavoritesAndHistory = async () => {
+    try {
+      const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+      
+      // Charger favoris
+      const favoritesData = await AsyncStorage.getItem('favorites_channels');
+      const favoritesCount = favoritesData ? JSON.parse(favoritesData).length : 0;
+      
+      // Charger historique
+      const historyData = await AsyncStorage.getItem('channels_history');
+      const historyCount = historyData ? JSON.parse(historyData).length : 0;
+      
+      return { favoritesCount, historyCount };
+    } catch (error) {
+      console.log('⚠️ Erreur chargement favoris/historique:', error);
+      return { favoritesCount: 0, historyCount: 0 };
+    }
+  };
+
   // Chargement des chaînes depuis l'ID de playlist
   useEffect(() => {
     const loadChannels = async () => {
@@ -215,6 +235,9 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
       
       const categoriesStartTime = Date.now();
       
+      // Charger favoris et historique
+      const { favoritesCount, historyCount } = await loadFavoritesAndHistory();
+      
       // Récupérer les VRAIES catégories Xtream stockées dans WatermelonDB
       const xtreamCategories = result.categories || [];
       console.log('📂 Vraies catégories Xtream trouvées:', xtreamCategories.length);
@@ -226,6 +249,19 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
           name: 'TOUT',
           count: result.totalChannels || result.playlist.channelsCount || 0,
           channels: [] // Sera chargé dynamiquement
+        },
+        // NOUVEAU : Catégories spéciales avec icônes modernes et vrais compteurs
+        {
+          id: 'favorites',
+          name: '💙 FAVORIS',
+          count: favoritesCount,
+          channels: [] // Sera chargé depuis AsyncStorage
+        },
+        {
+          id: 'history',
+          name: '📺 RÉCENTS',
+          count: historyCount,
+          channels: [] // Sera chargé depuis AsyncStorage
         }
       ];
       
@@ -440,12 +476,27 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
       // Créer la liste des catégories avec compteurs et tri intelligent
       const categoriesList: Category[] = [];
       
-      // Ajouter "TOUT" en premier
+      // Ajouter "TOUT" en premier + catégories spéciales
       categoriesList.push({
         id: 'all',
         name: 'TOUT',
         count: channels.length,
         channels: channels
+      });
+      
+      // NOUVEAU : Catégories spéciales pour système legacy avec icônes modernes
+      categoriesList.push({
+        id: 'favorites',
+        name: '💙 FAVORIS',
+        count: 0, // TODO: Compter favoris depuis AsyncStorage
+        channels: [] // Sera chargé depuis AsyncStorage
+      });
+      
+      categoriesList.push({
+        id: 'history',
+        name: '📺 RÉCENTS',
+        count: 0, // TODO: Compter historique depuis AsyncStorage
+        channels: [] // Sera chargé depuis AsyncStorage
       });
 
       // Convertir Map en array et trier par popularité puis alphabétiquement
@@ -519,6 +570,9 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
   const handleCategorySelect = async (category: Category) => {
     console.log('📂 Catégorie sélectionnée:', category.name);
     
+    // Déclencher l'animation de transition
+    animateCategoryTransition();
+    
     if (!useWatermelonDB) {
       // Ancien système - utiliser les chaînes déjà chargées
       setSelectedCategory(category);
@@ -526,20 +580,6 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
       loadChannelsPage(category.channels, 1);
       return;
     }
-    
-    // Animation fade out puis fade in
-    Animated.sequence([
-      Animated.timing(fadeAnim, {
-        toValue: 0.3,
-        duration: 150,
-        useNativeDriver: true,
-      }),
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]).start();
     
     setSelectedCategory(category);
     setCurrentPage(0);
@@ -658,53 +698,39 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
     }
   };
 
-  // Rendu d'un item de catégorie dans le sidebar - Optimisé
+  // NOUVEAU : Rendu avec animation pour compteurs
   const renderCategoryItem = ({ item: category }: { item: Category }) => {
     const isSelected = selectedCategory?.id === category.id;
     
     return (
       <TouchableOpacity
-        style={styles.categoryItem}
+        style={[
+          styles.categoryItem,
+          isSelected && styles.categoryItemSelected
+        ]}
         onPress={() => handleCategorySelect(category)}
         activeOpacity={0.7}
       >
-        <View style={[styles.categoryItemContent, isSelected && styles.categoryItemSelected]}>
-          {/* Nom de la catégorie */}
-          <Text 
-            style={[
-              styles.categoryName,
-              isSelected && styles.categoryNameSelected
-            ]}
-            numberOfLines={1}
-          >
-            {category.name}
-          </Text>
-          
-          {/* Compteur de chaînes avec dégradé */}
-          <View style={[
-            styles.categoryBadge,
-            isSelected && styles.categoryBadgeSelected
-          ]}>
-            <LinearGradient
-              colors={isSelected ? ['rgba(30, 70, 120, 0.9)', 'rgba(20, 50, 90, 0.8)'] : ['rgba(40, 40, 40, 0.7)', 'rgba(30, 30, 30, 0.6)']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.categoryBadgeGradient}
-            >
-              <Text style={[
-                styles.categoryCount,
-                isSelected && styles.categoryCountSelected
-              ]}>
-                {category.count}
-              </Text>
-            </LinearGradient>
-          </View>
-        </View>
+        {/* Layout horizontal simple */}
+        <Text 
+          style={[
+            styles.categoryName,
+            isSelected && styles.categoryNameSelected
+          ]}
+          numberOfLines={1}
+        >
+          {category.name}
+        </Text>
         
-        {/* Indicateur de sélection */}
-        {isSelected && (
-          <View style={styles.selectedIndicator} />
-        )}
+        {/* NOUVEAU : Compteur avec animation et container */}
+        <Animated.View style={styles.categoryCountContainer}>
+          <Animated.Text style={[
+            styles.categoryCount,
+            isSelected && styles.categoryCountSelected
+          ]}>
+            {category.count.toLocaleString()} {/* Format avec séparateurs de milliers */}
+          </Animated.Text>
+        </Animated.View>
       </TouchableOpacity>
     );
   };
@@ -739,8 +765,48 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
   // Simplified state management
   // const [failedLogos, setFailedLogos] = useState<Set<string>>(new Set()); // Désactivé temporairement
 
-  // Rendu d'un item de chaîne dans la grille - Optimisé avec fallbacks logo
-  const renderChannelItem = ({ item: channel, index }: { item: Channel; index: number }) => {
+  // NOUVEAU : Animations pour apparition des cartes et transitions
+  const cardFadeAnim = useRef(new Animated.Value(0)).current;
+  const categoryTransitionAnim = useRef(new Animated.Value(1)).current;
+  
+  // Animation subtile au chargement
+  useEffect(() => {
+    if (displayedChannels.length > 0) {
+      // Reset l'animation
+      cardFadeAnim.setValue(0.7); // Commence plus opaque pour effet subtil
+      
+      // Animation très douce et discrète
+      Animated.timing(cardFadeAnim, {
+        toValue: 1,
+        duration: 300, // Plus court pour subtilité
+        useNativeDriver: true,
+        isInteraction: false,
+      }).start();
+    }
+  }, [displayedChannels]);
+  
+  // Animation de transition entre catégories optimisée
+  const animateCategoryTransition = () => {
+    Animated.sequence([
+      // Fade out rapide et fluide
+      Animated.timing(categoryTransitionAnim, {
+        toValue: 0.3,
+        duration: 120, // Plus rapide pour réactivité
+        useNativeDriver: true,
+        isInteraction: false,
+      }),
+      // Fade in avec courbe naturelle
+      Animated.timing(categoryTransitionAnim, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+        isInteraction: false,
+      }),
+    ]).start();
+  };
+
+  // Rendu d'un item de chaîne avec animation - Optimisé React.memo
+  const renderChannelItem = React.useCallback(({ item: channel, index }: { item: Channel; index: number }) => {
     // 🔧 DEBUG: Log des logos pour diagnostic (premières chaînes seulement)
     if (index < 3) {
       console.log(`📺 Channel ${index}: "${channel.name}" - Logo brut: "${channel.logo || 'MANQUANT'}"`);
@@ -760,15 +826,23 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
     }
     
     return (
-      <TouchableOpacity
+      <Animated.View
         style={[
-          styles.channelCard,
-          { width: getChannelCardWidth() }
+          {
+            opacity: cardFadeAnim // Simple fade in, pas d'animation complexe
+          }
         ]}
-        onPress={() => handleChannelPress(channel)}
-        activeOpacity={0.8}
       >
-        {/* Logo simple et direct - PERFORMANCE OPTIMISÉE */}
+        <TouchableOpacity
+          style={[
+            styles.channelCard,
+            { width: getChannelCardWidth() }
+          ]}
+          onPress={() => handleChannelPress(channel)}
+          activeOpacity={0.8}
+        >
+        {/* NOUVEAU : Layout vertical centré avec hiérarchie claire */}
+        {/* Logo principal */}
         {hasLogo ? (
           <Image 
             source={{ 
@@ -781,7 +855,7 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
             }} 
             style={styles.channelLogoFullscreen}
             resizeMode="contain"
-            fadeDuration={100} // Réduire pour performance
+            fadeDuration={100}
             onError={() => {
               if (index < 5) {
                 console.log(`❌ Logo échoué: "${channel.name}" -> ${logoUrl}`);
@@ -796,28 +870,28 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
           />
         ) : (
           <View style={styles.channelLogoPlaceholderFullscreen}>
-            {/* Afficher nom de chaîne au lieu d'icône générique */}
-            <Text style={styles.channelNameFallback} numberOfLines={3}>
-              {channel.name.replace(/\s*\(\d+p\)$/, '').replace(/\|/g, '\n').split(' ').slice(0, 4).join(' ')}
+            <Text style={styles.channelNameFallback} numberOfLines={2}>
+              📺
             </Text>
           </View>
         )}
 
-        {/* Nom de la chaîne en overlay avec dégradé d'ombre RENFORCÉ */}
+        {/* NOUVEAU : Superposition avec dégradé sombre pour lisibilité */}
         <LinearGradient
-          colors={['transparent', 'rgba(0, 0, 0, 0.4)', 'rgba(0, 0, 0, 0.95)']}
-          locations={[0, 0.3, 1]}
+          colors={['transparent', 'rgba(0, 0, 0, 0.3)', 'rgba(0, 0, 0, 0.85)']}
+          locations={[0, 0.4, 1]}
           style={styles.channelNameOverlay}
         >
-          <Text style={styles.channelCardName} numberOfLines={2}>
+          <Text style={styles.channelCardName} numberOfLines={2} ellipsizeMode="tail">
             {channel.name?.replace(/\s*\(\d+p\)$/, '') || 'Sans nom'}
           </Text>
         </LinearGradient>
       </TouchableOpacity>
+      </Animated.View>
     );
-  };
+  }, [cardFadeAnim, serverUrl]); // Dépendances optimisées
 
-  // CALCUL DYNAMIQUE : Largeur adaptée selon le nombre de colonnes optimal
+  // CORRIGÉ : Calcul largeur avec nouvelles valeurs margin/padding
   const getChannelCardWidth = (): number => {
     // Calcul précis de l'espace disponible
     const sidebarWidth = sidebarVisible ? (width * 0.32) : 0;
@@ -825,9 +899,9 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
     
     const columns = getOptimalColumns(); // DYNAMIQUE : selon mode sidebar/plein écran
     const containerPadding = 4 * 2; // Padding du container (4px gauche + 4px droite)
-    const cardMargin = 2; // Margin par côté de chaque carte
+    const cardMargin = 6; // CORRIGÉ : Nouveau margin par côté (6px pour léger espacement)
     
-    // Espace occupé par les marges : 2px * 2 (gauche+droite) * N cartes
+    // Espace occupé par les marges : 6px * 2 (gauche+droite) * N cartes
     const totalMargins = cardMargin * 2 * columns;
     
     // Largeur réellement disponible pour les cartes
@@ -836,8 +910,8 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
     // Largeur par carte (utilise tout l'espace disponible)
     const cardWidth = Math.floor(netWidth / columns);
     
-    // Largeur minimum adaptée au nombre de colonnes
-    const minWidth = sidebarVisible ? 70 : 60; // Plus petit en mode plein écran
+    // CORRIGÉ : Largeur minimum optimisée pour logo 70px + padding 12px*2 = 94px minimum
+    const minWidth = sidebarVisible ? 85 : 75; // Adapté pour contenir logo 70px + padding 24px + margin
     
     return Math.max(cardWidth, minWidth);
   };
@@ -905,7 +979,7 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
         </TouchableOpacity>
         
         <Text style={styles.headerTitle}>
-          {selectedCategory?.name || 'TOUTES LES CHAÎNES'} ({selectedCategory?.id === 'all' ? totalChannels : displayedChannels.length}{hasMoreChannels ? '+' : ''})
+          {selectedCategory?.name || 'TOUTES LES CHAÎNES'} <Text style={styles.headerTitleCount}>({selectedCategory?.id === 'all' ? totalChannels : displayedChannels.length}{hasMoreChannels ? '+' : ''})</Text>
         </Text>
         
         <View style={styles.headerActions}>
@@ -914,7 +988,7 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
             <Icon name="search" size={20} color="rgba(255, 255, 255, 0.6)" style={styles.searchIcon} />
             <TextInput
               style={styles.searchInputHeader}
-              placeholder="Rechercher"
+              placeholder="Rechercher chaînes..."
               placeholderTextColor="rgba(255, 255, 255, 0.5)"
               value={searchQuery}
               onChangeText={setSearchQuery}
@@ -930,21 +1004,12 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
       {/* Contenu principal - Layout horizontal */}
       <View style={styles.mainContent}>
         
-        {/* ÉTAPE 3: Sidebar moderne avec dégradé */}
+        {/* NOUVEAU : Sidebar épuré style liste */}
         {sidebarVisible && (
         <View style={styles.sidebar}>
-          {/* Header recherche par catégories */}
+          {/* Header simplifié - seulement bouton fermer */}
           <View style={styles.sidebarHeader}>
-            <View style={styles.categorySearchContainer}>
-              <Icon name="search" size={18} color="rgba(255, 255, 255, 0.6)" style={styles.categorySearchIcon} />
-              <TextInput
-                style={styles.categorySearchInput}
-                placeholder="Rechercher une catégorie"
-                placeholderTextColor="rgba(255, 255, 255, 0.5)"
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-              />
-            </View>
+            <Text style={styles.sidebarTitle}>Catégories</Text>
             <TouchableOpacity 
               onPress={() => setSidebarVisible(false)}
               style={styles.sidebarCloseButton}
@@ -965,7 +1030,7 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
         )}
 
         {/* ÉTAPE 4: Grille principale des chaînes */}
-        <Animated.View style={[styles.channelsGrid, !sidebarVisible && styles.channelsGridFullWidth, { opacity: fadeAnim }]}>
+        <Animated.View style={[styles.channelsGrid, !sidebarVisible && styles.channelsGridFullWidth, { opacity: categoryTransitionAnim }]}>
           {/* Bouton pour rouvrir sidebar avec dégradé */}
           {!sidebarVisible && (
             <TouchableOpacity 
@@ -1047,10 +1112,15 @@ const styles = StyleSheet.create({
   headerTitle: {
     color: '#FFFFFF',
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: '700', // BOLD : Maintenu pour les titres importants
     textAlign: 'center',
     flex: 1,
     marginHorizontal: 16,
+  },
+  headerTitleCount: {
+    color: 'rgba(255, 255, 255, 0.7)', // OPACITÉ 70% : Compteur moins proéminent
+    fontSize: 16,
+    fontWeight: '400', // REGULAR : Poids normal pour le compteur
   },
   headerActions: {
     flexDirection: 'row',
@@ -1095,7 +1165,7 @@ const styles = StyleSheet.create({
   sidebarTitle: {
     color: '#FFFFFF',
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: '700', // BOLD : Pour section importante comme suggéré
     letterSpacing: 0.5,
   },
   sidebarCloseButton: {
@@ -1139,10 +1209,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 20,
     paddingHorizontal: 12,
-    paddingVertical: 4,
+    paddingVertical: 8, // AUGMENTÉ : Plus de hauteur pour éviter rognage
     marginRight: 8,
-    minWidth: 140,
-    maxWidth: 180,
+    minWidth: 160, // AUGMENTÉ : Plus large pour le texte
+    maxWidth: 220, // AUGMENTÉ : Largeur maximum plus généreuse
   },
   searchIcon: {
     marginRight: 8,
@@ -1150,9 +1220,10 @@ const styles = StyleSheet.create({
   searchInputHeader: {
     flex: 1,
     color: '#FFFFFF',
-    fontSize: 13,
+    fontSize: 14, // AUGMENTÉ : Plus lisible
     fontWeight: '500',
-    paddingVertical: 0,
+    paddingVertical: 2, // AJUSTÉ : Léger padding pour éviter rognage
+    lineHeight: 16, // NOUVEAU : Hauteur de ligne pour éviter coupure
   },
   categoriesList: {
     flex: 1,
@@ -1161,40 +1232,21 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   categoryItem: {
-    marginBottom: 6,
-    borderRadius: 10,
-    overflow: 'hidden',
-    position: 'relative',
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.05)',
-  },
-  categoryItemSelected: {
-    backgroundColor: '#2a2a2a',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.15)',
-    elevation: 8,
-    shadowColor: '#000000',
-    shadowOffset: {
-      width: 0,
-      height: 6,
-    },
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
-  },
-  categoryItemContent: {
+    // NOUVEAU : Style liste standard simple
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 10,
-    minHeight: 36,
-    borderRadius: 10,
-    backgroundColor: '#1a1a1a',
-    // Ombres identiques aux cartes
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    elevation: 4,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 2, // Espacement minimal entre items
+    backgroundColor: 'transparent',
+  },
+  categoryItemSelected: {
+    // NOUVEAU : Sélection évidente avec fond + barre colorée
+    backgroundColor: '#2a2a2a', // Gris plus clair comme suggéré
+    borderRadius: 8,
+    borderLeftWidth: 4, // NOUVEAU : Barre de couleur vive à gauche
+    borderLeftColor: '#4FACFE', // Couleur d'accentuation bleue
   },
   categoryIcon: {
     marginRight: 12,
@@ -1203,50 +1255,33 @@ const styles = StyleSheet.create({
   categoryName: {
     flex: 1,
     color: 'rgba(255, 255, 255, 0.9)',
-    fontSize: 13,
-    fontWeight: '600',
-    lineHeight: 16,
+    fontSize: 15, // AUGMENTÉ : Plus lisible
+    fontWeight: '400', // REGULAR : Poids normal
+    lineHeight: 18,
   },
   categoryNameSelected: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-  },
-  categoryBadge: {
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    minWidth: 28,
-    alignItems: 'center',
-    overflow: 'hidden',
-  },
-  categoryBadgeSelected: {
-    overflow: 'hidden',
-  },
-  categoryBadgeGradient: {
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    minWidth: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
+    color: '#4FACFE', // NOUVEAU : Couleur d'accentuation pour texte sélectionné
+    fontWeight: '700', // BOLD : Comme suggéré pour items sélectionnés
   },
   categoryCount: {
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontSize: 11,
-    fontWeight: '700',
+    color: 'rgba(255, 255, 255, 0.6)', // OPACITÉ 60% : Moins proéminent comme suggéré
+    fontSize: 14, // RÉDUIT : Taille normale pour items non sélectionnés
+    fontWeight: '500',
+    marginLeft: 8,
+    minWidth: 40, // Largeur minimum pour éviter déplacement lors animation
+    textAlign: 'right',
   },
   categoryCountSelected: {
-    color: '#FFFFFF',
+    color: 'rgba(79, 172, 254, 0.9)', // NOUVEAU : Accent coloré plus vif pour compteur sélectionné
+    fontWeight: '700', // BOLD pour sélection
+    fontSize: 18, // PLUS GRAND : Seulement pour l'item sélectionné
+    transform: [{ scale: 1.1 }], // ANIMATION : Agrandissement plus visible pour sélection
   },
-  selectedIndicator: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 4,
-    backgroundColor: '#4FACFE',
-    borderTopRightRadius: 2,
-    borderBottomRightRadius: 2,
+  categoryCountContainer: {
+    // NOUVEAU : Container pour animation fluide
+    justifyContent: 'center',
+    alignItems: 'center',
+    minWidth: 45,
   },
   channelsGrid: {
     flex: 1,
@@ -1264,72 +1299,71 @@ const styles = StyleSheet.create({
     backgroundColor: '#1a1a1a',
     borderRadius: 16,
     marginBottom: 12,
-    margin: 2, // RÉDUIT : de 4px à 2px pour cartes plus larges
+    margin: 6, // AUGMENTÉ : Léger espacement entre cartes comme demandé
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: 'rgba(255, 255, 255, 0.12)',
     overflow: 'hidden',
-    height: 110,
+    height: 120,
     position: 'relative',
-    // Ombres ultra-modernes avec plusieurs couches
+    // NOUVEAU : Ombres subtiles pour effet "flottant" 
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.5,
-    shadowRadius: 16,
-    elevation: 12,
-    // Effet de profondeur supplémentaire
-    transform: [{ translateY: 0 }],
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 6,
+    // NOUVEAU : Plus de padding pour superposition de texte
+    padding: 0, // Supprimé pour permettre superposition complète
   },
   channelLogoFullscreen: {
+    // NOUVEAU : Logo occupe toute la carte pour superposition
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    width: '100%',
-    height: '100%',
+    top: 8,
+    left: 8,
+    right: 8,
+    bottom: 30, // Laisse place pour le texte en bas
+    width: undefined,
+    height: undefined,
     resizeMode: 'contain',
     borderRadius: 12,
-    opacity: 0.7,
+    opacity: 0.8, // Légèrement réduit pour contraste avec texte
   },
   channelLogoPlaceholderFullscreen: {
+    // NOUVEAU : Placeholder occupe aussi toute la carte
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    top: 8,
+    left: 8,
+    right: 8,
+    bottom: 30,
     backgroundColor: '#2a2a2a',
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 12,
   },
   channelNameOverlay: {
+    // NOUVEAU : Superposition en bas avec dégradé sombre
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
     paddingVertical: 8,
     paddingHorizontal: 8,
-    borderBottomLeftRadius: 12,
-    borderBottomRightRadius: 12,
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
+    minHeight: 30,
     justifyContent: 'center',
-    alignItems: 'center',
   },
   channelCardName: {
     color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '700',
-    lineHeight: 14,
+    fontSize: 13, // NOUVEAU : Taille medium pour hiérarchie
+    fontWeight: '500', // MEDIUM : Hiérarchie typographique
+    lineHeight: 15,
     textAlign: 'center',
-    // OMBRES RENFORCÉES pour meilleure lisibilité - TEST TEMPS RÉEL
-    textShadowColor: 'rgba(0, 0, 0, 1.0)', // Ombre noire pure
-    textShadowOffset: { width: 3, height: 3 }, // Décalage encore plus marqué
-    textShadowRadius: 10, // Rayon d'ombre encore plus large
-    // Effet de contour noir pour contraste maximum
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 1.0,
-    shadowRadius: 12,
-    elevation: 16, // Ombre Android renforcée
+    // NOUVEAU : Gestion texte long - 2 lignes max
+    flexWrap: 'wrap',
+    // Ombre pour lisibilité sur fond logo
+    textShadowColor: 'rgba(0, 0, 0, 0.9)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 4,
   },
   channelCardOverlay: {
     position: 'absolute',
@@ -1360,29 +1394,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
     lineHeight: 16,
   },
-  categorySearchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginBottom: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    flex: 1,
-    marginRight: 8,
-  },
-  categorySearchIcon: {
-    marginRight: 8,
-  },
-  categorySearchInput: {
-    flex: 1,
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '500',
-    paddingVertical: 0,
-  },
+  // SUPPRIMÉ : Styles obsolètes de la recherche de catégorie
+  // categorySearchContainer, categorySearchIcon, categorySearchInput
   channelNameFallback: {
     color: 'rgba(255, 255, 255, 0.8)',
     fontSize: 10,
