@@ -306,8 +306,62 @@ export class PlaylistManager {
     try {
       console.log('🔐 Importing from Xtream Codes API');
       
-      // TODO: Implémenter support complet Xtream Codes
-      throw new Error('Xtream Codes import not implemented yet');
+      // Import dynamique du XtreamExtremeManager
+      const { XtreamExtremeManager } = await import('../../modules/xtream/XtreamExtremeManager.js');
+      const xtreamManager = new XtreamExtremeManager();
+      
+      // Configuration et authentification
+      await xtreamManager.loadConfig();
+      xtreamManager.setCredentials(credentials.url || credentials.server, credentials.username, credentials.password);
+      
+      // Authentification
+      await xtreamManager.authenticate();
+      
+      // Récupération des chaînes
+      const channels = await xtreamManager.fetchChannelsExtreme();
+      
+      if (!channels || channels.length === 0) {
+        throw new Error('Aucune chaîne trouvée dans cette playlist Xtream');
+      }
+      
+      // Conversion au format standard de playlist
+      const playlistData = xtreamManager.exportToPlaylistFormat();
+      
+      // Création de la playlist
+      const playlistId = `xtream_${Date.now()}`;
+      const playlist: Playlist = {
+        id: playlistId,
+        name: name,
+        type: 'xtream',
+        channels: playlistData,
+        totalChannels: playlistData.length,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        source: credentials.url || credentials.server,
+        metadata: {
+          username: credentials.username,
+          server: credentials.url || credentials.server,
+          accountInfo: xtreamManager.accountInfo
+        }
+      };
+      
+      // Sauvegarder la playlist
+      await this.savePlaylist(playlist);
+      
+      console.log(`✅ Playlist Xtream importée: ${playlist.totalChannels} chaînes`);
+      
+      return {
+        success: true,
+        playlist: playlist,
+        stats: {
+          totalChannels: playlist.totalChannels,
+          validChannels: playlist.totalChannels,
+          invalidChannels: 0,
+          duplicates: 0,
+          categories: new Set(playlist.channels.map(c => c.group)).size,
+          duration: 0 // TODO: calculer temps de traitement
+        }
+      };
       
     } catch (error) {
       console.error('❌ Xtream import failed:', error);

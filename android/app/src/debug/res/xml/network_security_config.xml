@@ -6,5 +6,23 @@
         <domain includeSubdomains="true">10.0.2.2</domain>
         <domain includeSubdomains="true">10.0.3.2</domain>
         <domain includeSubdomains="true">172.17.253.76</domain>
+        <!-- Allow HTTP for IPTV servers -->
+        <domain includeSubdomains="true">rhxupbfj.mlyan.xyz</domain>
+        <!-- Allow HTTP for CORS proxies -->
+        <domain includeSubdomains="true">corsproxy.io</domain>
+        <domain includeSubdomains="true">cors-anywhere.herokuapp.com</domain>
+        <domain includeSubdomains="true">api.corsfix.com</domain>
+        <domain includeSubdomains="true">test.cors.workers.dev</domain>
+        <!-- Allow common IPTV domains -->
+        <domain includeSubdomains="true">iptv-org.github.io</domain>
+        <domain includeSubdomains="true">m3u8files.com</domain>
     </domain-config>
+    
+    <!-- Allow cleartext traffic globally for IPTV streams -->
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system"/>
+            <certificates src="user"/>
+        </trust-anchors>
+    </base-config>
 </network-security-config>

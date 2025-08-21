@@ -343,9 +343,16 @@ export class XtreamExtremeManager {
             categoryMap.set(0, 'Non classé');
         }
         
-        console.log(`📂 Mapping catégories créé:`);
+        console.log(`📂 Mapping catégories créé (${categoryMap.size} catégories):`);
+        let displayCount = 0;
         for (const [id, name] of categoryMap) {
-            console.log(`  ${id}: ${name}`);
+            if (displayCount < 10) { // Limiter l'affichage pour ne pas spam les logs
+                console.log(`  ${id}: "${name}"`);
+                displayCount++;
+            }
+        }
+        if (categoryMap.size > 10) {
+            console.log(`  ... et ${categoryMap.size - 10} autres catégories`);
         }
         
         return categoryMap;
@@ -464,14 +471,23 @@ export class XtreamExtremeManager {
             const name = this.sanitizeString(channel.name || channel.stream_display_name || `Canal ${streamId}`);
             const logo = this.normalizeLogoURL(channel.stream_icon || channel.logo || '');
             
-            // CORRECTION CRITIQUE: Mapping correct category_id → category_name
+            // CORRECTION CRITIQUE: Mapping correct category_id → category_name  
             // Convertir category_id en number pour correspondre avec la Map
             const categoryId = parseInt(channel.category_id) || 0;
-            const categoryName = categoryMap.get(categoryId) || channel.category_name || 'Non classé';
+            let categoryName = categoryMap.get(categoryId) || channel.category_name || 'Non classé';
+            
+            // SÉCURITÉ: Ne jamais laisser de catégorie vide
+            if (!categoryName || categoryName.trim() === '') {
+                categoryName = categoryId === 0 ? 'Non classé' : `Catégorie ${categoryId}`;
+            }
             
             // Debug: vérifier le mapping pour les premières chaînes
-            if (index < 5) {
-                console.log(`🔍 Debug channel ${index}: category_id="${channel.category_id}" -> ${categoryId} -> "${categoryName}"`);
+            if (index < 10) {
+                console.log(`🔍 DEBUG CATÉGORIE - Channel ${index}: "${channel.name}"`);
+                console.log(`    category_id brut: "${channel.category_id}" (type: ${typeof channel.category_id})`);
+                console.log(`    category_id parsé: ${categoryId}`);
+                console.log(`    categoryName trouvé: "${categoryName}"`);
+                console.log(`    categoryMap contient ${categoryId}?: ${categoryMap.has(categoryId)}`);
             }
             
             return {
@@ -508,11 +524,56 @@ export class XtreamExtremeManager {
     normalizeLogoURL(url) {
         if (!url || typeof url !== 'string') return '';
         
-        // React Native: validation simple sans new URL()
-        if (url.startsWith('http://') || url.startsWith('https://')) {
-            return url.trim();
+        // Nettoyer l'URL d'entrée
+        let cleanUrl = url.trim();
+        if (cleanUrl === '' || cleanUrl === 'null' || cleanUrl === 'undefined') return '';
+        
+        // ✅ CAS 1: URL complète (http/https) - direct
+        if (cleanUrl.startsWith('http://') || cleanUrl.startsWith('https://')) {
+            return cleanUrl;
         }
         
+        // ✅ CAS 2: URL relative - construire avec serveur XTREAM
+        if (cleanUrl.startsWith('/')) {
+            // URL relative type: /images/logos/canal_plus.png
+            const serverBase = this.config.server.replace(/\/$/, ''); // Enlever slash final
+            return `${serverBase}${cleanUrl}`;
+        }
+        
+        // ✅ CAS SPÉCIAL XTREAM: logo path sans slash (très fréquent)
+        if (!cleanUrl.startsWith('http') && !cleanUrl.includes('://')) {
+            // Cas fréquent Xtream: "logo.png" ou "images/logo.png"
+            const serverBase = this.config.server.replace(/\/$/, '');
+            // Ajouter le chemin standard Xtream pour les logos
+            if (!cleanUrl.startsWith('images/')) {
+                return `${serverBase}/images/${cleanUrl}`;
+            } else {
+                return `${serverBase}/${cleanUrl}`;
+            }
+        }
+        
+        // ✅ CAS 3: URL malformée - tentative de correction
+        if (cleanUrl.includes('://')) {
+            // Corriger protocole cassé
+            if (cleanUrl.startsWith('htp://') || cleanUrl.startsWith('htps://')) {
+                cleanUrl = `http://${cleanUrl.split('://')[1]}`;
+                return cleanUrl;
+            }
+            // Autres protocoles malformés
+            if (cleanUrl.match(/^[a-z]+:\/\//)) {
+                cleanUrl = `http://${cleanUrl.split('://')[1]}`;
+                return cleanUrl;
+            }
+        }
+        
+        // ✅ CAS 4: Dernière tentative - ajouter https par défaut
+        if (cleanUrl.includes('.') && (cleanUrl.includes('.png') || cleanUrl.includes('.jpg') || cleanUrl.includes('.jpeg') || cleanUrl.includes('.gif') || cleanUrl.includes('.webp'))) {
+            return `https://${cleanUrl}`;
+        }
+        
+        // Debug pour voir les URLs non traitées
+        console.log(`🔍 DEBUG LOGO - URL originale: "${url}" -> nettoyée: "${cleanUrl}"`);
+        console.log(`🔍 DEBUG LOGO - Serveur config: "${this.config.server}"`);
         return '';
     }
     
@@ -556,26 +617,22 @@ export class XtreamExtremeManager {
     }
     
     buildURL(action, params = {}) {
-        // React Native: construire URL manuellement sans URLSearchParams
         const baseUrl = `${this.config.server}/player_api.php`;
-        const searchParams = new Map();
-        
-        searchParams.set('username', this.config.username);
-        searchParams.set('password', this.config.password);
-        searchParams.set('action', action);
-        
-        Object.entries(params).forEach(([key, value]) => {
-            if (value !== undefined && value !== null) {
-                searchParams.set(key, value);
-            }
-        });
-        
-        // Construire la query string manuellement
-        const queryString = Array.from(searchParams.entries())
-            .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+        const finalParams = {
+            username: this.config.username,
+            password: this.config.password,
+            action: action,
+            ...params
+        };
+
+        const queryString = Object.entries(finalParams)
+            .filter(([, value]) => value !== undefined && value !== null)
+            .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
             .join('&');
-        
-        return `${baseUrl}?${queryString}`;
+
+        const fullUrl = `${baseUrl}?${queryString}`;
+        console.log(`🔧 Built URL: ${fullUrl}`); // Debug pour vérifier URLs générées
+        return fullUrl;
     }
     
     // Utilitaires
@@ -742,34 +799,41 @@ class XtreamCORSProxy {
             }
         }
         
+        console.log(`🔄 Tentative avec ${this.methods.length} proxies disponibles`);
+        console.log(`❌ Proxies échoués précédemment: [${Array.from(this.failedProxies).join(', ')}]`);
+        console.log(`✅ Proxies fonctionnels: [${Array.from(this.workingProxies).join(', ')}]`);
+        
+        const errors = [];
+        
         // Essayer toutes les méthodes disponibles
         for (let i = 0; i < this.methods.length; i++) {
             const method = this.methods[i];
             
-            if (this.failedProxies.has(method)) {
-                console.log(`⏭️ Skipping failed proxy: ${method}`);
-                continue;
-            }
+            console.log(`🔸 Essai proxy ${i+1}/${this.methods.length}: ${method}`);
             
             try {
                 const result = await this.tryMethod(method, url, options);
                 console.log(`✅ Succès avec: ${method}`);
                 this.workingProxies.add(method);
+                this.failedProxies.delete(method); // Enlever des échecs si ça marche maintenant
                 this.currentMethod = i;
                 return result;
             } catch (error) {
-                // Log silencieux pour éviter les messages d'erreur inutiles
-                // console.warn(`❌ Échec ${method}:`, error.message);
+                console.warn(`❌ Échec ${method}: ${error.message}`);
                 this.failedProxies.add(method);
+                errors.push(`${method}: ${error.message}`);
                 
                 // Attendre un peu avant le prochain essai
                 if (i < this.methods.length - 1) {
-                    await this.wait(500);
+                    await this.wait(1000); // Augmenté à 1s pour éviter rate limiting
                 }
             }
         }
         
-        throw new Error('Tous les proxies CORS ont échoué');
+        // Message d'erreur détaillé avec toutes les tentatives
+        const errorMessage = `Tous les proxies CORS ont échoué:\n${errors.join('\n')}`;
+        console.error('🚨', errorMessage);
+        throw new Error(errorMessage);
     }
     
     async trySpecificProxy(method, url, options) {
@@ -805,7 +869,10 @@ class XtreamCORSProxy {
                 method: 'GET',
                 headers: {
                     'Accept': 'application/json, text/plain, */*',
-                    'User-Agent': 'IPTV-Player/2.0'
+                    'Content-Type': 'application/json',
+                    'User-Agent': 'IPTV-Player/2.0 (Android; Mobile)',
+                    'Cache-Control': 'no-cache',
+                    'X-Requested-With': 'XMLHttpRequest'
                 },
                 signal: controller.signal
             });
@@ -813,7 +880,23 @@ class XtreamCORSProxy {
             clearTimeout(timeoutId);
             
             if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            return response.json();
+            
+            const text = await response.text();
+            console.log('🔍 Réponse brute directe:', text.substring(0, 500) + (text.length > 500 ? '...' : ''));
+            
+            try {
+                const parsed = JSON.parse(text);
+                return parsed;
+            } catch (e) {
+                console.error('❌ Erreur parsing JSON direct:', e.message);
+                console.error('❌ Texte brut (première partie):', text.substring(0, 200));
+                
+                if (text.toLowerCase().includes('<html') || text.toLowerCase().includes('<!doctype')) {
+                    throw new Error('Requête directe: Le serveur a retourné du HTML - Vérifiez vos identifiants Xtream');
+                }
+                
+                throw new Error(`Requête directe: Réponse invalide - Format non-JSON (${text.length} caractères)`);
+            }
         } catch (error) {
             clearTimeout(timeoutId);
             throw error;
@@ -852,8 +935,19 @@ class XtreamCORSProxy {
                 return parsed;
             } catch (e) {
                 console.error('❌ Erreur parsing JSON:', e.message);
-                console.error('❌ Texte brut:', text);
-                throw new Error('Réponse proxy invalide');
+                console.error('❌ Texte brut (première partie):', text.substring(0, 200));
+                
+                // Détection si c'est du HTML
+                if (text.toLowerCase().includes('<html') || text.toLowerCase().includes('<!doctype')) {
+                    throw new Error('Le serveur a retourné du HTML au lieu de JSON - Vérifiez vos identifiants Xtream');
+                }
+                
+                // Détection si c'est une page d'erreur 
+                if (text.toLowerCase().includes('error') || text.toLowerCase().includes('not found')) {
+                    throw new Error('Erreur serveur Xtream - URL ou identifiants incorrects');
+                }
+                
+                throw new Error(`Réponse proxy invalide - Format non-JSON reçu (${text.length} caractères)`);
             }
         } catch (error) {
             clearTimeout(timeoutId);
@@ -872,13 +966,35 @@ class XtreamCORSProxy {
         try {
             const response = await fetch(proxiedURL, {
                 method: 'GET',
+                headers: {
+                    'Accept': 'application/json, text/plain, */*',
+                    'Content-Type': 'application/json',
+                    'User-Agent': 'IPTV-Player/2.0 (Android; Mobile)',
+                    'Cache-Control': 'no-cache'
+                },
                 signal: controller.signal
             });
             
             clearTimeout(timeoutId);
             
             if (!response.ok) throw new Error(`CORS Proxy IO failed: ${response.status}`);
-            return response.json();
+            
+            const text = await response.text();
+            console.log('🔍 Réponse brute CORS Proxy IO:', text.substring(0, 500) + (text.length > 500 ? '...' : ''));
+            
+            try {
+                const parsed = JSON.parse(text);
+                return parsed;
+            } catch (e) {
+                console.error('❌ Erreur parsing JSON CORS Proxy IO:', e.message);
+                console.error('❌ Texte brut (première partie):', text.substring(0, 200));
+                
+                if (text.toLowerCase().includes('<html') || text.toLowerCase().includes('<!doctype')) {
+                    throw new Error('CORS Proxy IO: Le serveur a retourné du HTML au lieu de JSON');
+                }
+                
+                throw new Error(`CORS Proxy IO: Réponse invalide - Format non-JSON (${text.length} caractères)`);
+            }
         } catch (error) {
             clearTimeout(timeoutId);
             throw error;
@@ -905,7 +1021,23 @@ class XtreamCORSProxy {
             clearTimeout(timeoutId);
             
             if (!response.ok) throw new Error(`Corsfix failed: ${response.status}`);
-            return response.json();
+            
+            const text = await response.text();
+            console.log('🔍 Réponse brute Corsfix:', text.substring(0, 500) + (text.length > 500 ? '...' : ''));
+            
+            try {
+                const parsed = JSON.parse(text);
+                return parsed;
+            } catch (e) {
+                console.error('❌ Erreur parsing JSON Corsfix:', e.message);
+                console.error('❌ Texte brut (première partie):', text.substring(0, 200));
+                
+                if (text.toLowerCase().includes('<html') || text.toLowerCase().includes('<!doctype')) {
+                    throw new Error('Corsfix: Le serveur a retourné du HTML au lieu de JSON');
+                }
+                
+                throw new Error(`Corsfix: Réponse invalide - Format non-JSON (${text.length} caractères)`);
+            }
         } catch (error) {
             clearTimeout(timeoutId);
             throw error;
@@ -929,7 +1061,23 @@ class XtreamCORSProxy {
             clearTimeout(timeoutId);
             
             if (!response.ok) throw new Error(`Cloudflare Worker failed: ${response.status}`);
-            return response.json();
+            
+            const text = await response.text();
+            console.log('🔍 Réponse brute Cloudflare Worker:', text.substring(0, 500) + (text.length > 500 ? '...' : ''));
+            
+            try {
+                const parsed = JSON.parse(text);
+                return parsed;
+            } catch (e) {
+                console.error('❌ Erreur parsing JSON Cloudflare Worker:', e.message);
+                console.error('❌ Texte brut (première partie):', text.substring(0, 200));
+                
+                if (text.toLowerCase().includes('<html') || text.toLowerCase().includes('<!doctype')) {
+                    throw new Error('Cloudflare Worker: Le serveur a retourné du HTML au lieu de JSON');
+                }
+                
+                throw new Error(`Cloudflare Worker: Réponse invalide - Format non-JSON (${text.length} caractères)`);
+            }
         } catch (error) {
             clearTimeout(timeoutId);
             throw error;

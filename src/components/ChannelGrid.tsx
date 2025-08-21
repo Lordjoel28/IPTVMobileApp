@@ -1,14 +1,34 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, FlatList, StyleSheet, Image, TouchableOpacity } from 'react-native';
 import { usePlaylist } from '../context/PlaylistContext';
 import { Channel } from '../types';
 
-const ChannelCard: React.FC<{ item: Channel }> = ({ item }) => (
-  <TouchableOpacity style={styles.card}>
-    <Image source={{ uri: item.tvgLogo || item.logo || '' }} style={styles.logo} resizeMode="contain" />
-    <Text style={styles.channelName} numberOfLines={1}>{item.name}</Text>
-  </TouchableOpacity>
-);
+const ChannelCard: React.FC<{ item: Channel }> = ({ item }) => {
+  const logoUrl = item.logoUrl || item.streamIcon || '';
+  const [showFallback, setShowFallback] = useState(false);
+  
+  return (
+    <TouchableOpacity style={styles.card}>
+      {logoUrl && !showFallback ? (
+        <Image 
+          source={{ uri: logoUrl }} 
+          style={styles.logo} 
+          resizeMode="contain"
+          onError={() => {
+            console.log('❌ Logo échoué pour', item.name + ':', logoUrl);
+            setShowFallback(true);
+          }}
+          onLoad={() => console.log('✅ Logo chargé pour', item.name)}
+        />
+      ) : (
+        <View style={[styles.logo, styles.logoFallback]}>
+          <Text style={styles.logoText}>📺</Text>
+        </View>
+      )}
+      <Text style={styles.channelName} numberOfLines={1}>{item.name}</Text>
+    </TouchableOpacity>
+  );
+};
 
 const ChannelGrid: React.FC = () => {
   const { channels } = usePlaylist();
@@ -71,6 +91,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
     numberOfLines: 2,
+  },
+  logoFallback: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  logoText: {
+    fontSize: 32,
+    color: '#FFFFFF',
   },
 });
 

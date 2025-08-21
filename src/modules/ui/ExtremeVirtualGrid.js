@@ -720,8 +720,8 @@ export class ExtremeVirtualGrid {
         }
     }
     
-    // API de recherche avec Web Worker
-    search(query, limit = 500) {
+    // API de recherche avec Web Worker - LIMITE SUPPRIMÉE POUR 25K+ CHAÎNES
+    search(query, limit = 25000) {
         if (!this.searchWorker) {
             console.warn('⚠️ Web Worker non disponible pour recherche');
             return;

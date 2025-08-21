@@ -147,30 +147,288 @@ const App: React.FC = () => {
     }
     
     console.log('✅ Playlist active détectée:', selectedPlaylistId);
+    console.log('🍉🍉🍉 DEBUT LOGIQUE WATERMELONDB - handleTVCardPress');
     
     try {
-      // Récupérer les chaînes depuis les services IPTV
+      console.log('🍉 ÉTAPE 1: Récupération chaînes avec WatermelonDB...');
+      
+      // Vérifier si c'est une playlist WatermelonDB (Xtream Codes)
+      try {
+        const database = await import('./src/database');
+        const { Playlist } = await import('./src/database/models');
+        
+        // Tentative de récupération depuis WatermelonDB
+        const playlist = await database.default.get<typeof Playlist>('playlists').find(selectedPlaylistId);
+        
+        if (playlist) {
+          console.log(`🍉 Playlist WatermelonDB trouvée: ${playlist.name} (${playlist.channelsCount} chaînes)`);
+          
+          // Navigation directe vers ChannelsScreen - WatermelonDB gère le lazy loading
+          navigation.navigate('ChannelsScreen', {
+            playlistId: selectedPlaylistId,
+            channelsCount: playlist.channelsCount,
+            useWatermelonDB: true // Flag pour indiquer l'usage de WatermelonDB
+          });
+          return;
+        }
+      } catch (watermelonError) {
+        console.log('⚠️ Playlist non trouvée dans WatermelonDB, tentative avec ancien système...');
+        console.log('🔧 Erreur WatermelonDB:', watermelonError.message);
+      }
+      
+      // Fallback vers l'ancien système pour les playlists M3U
       const iptvService = iptvServiceRef.current;
       if (!iptvService) {
         throw new Error('Service IPTV non disponible');
       }
       
-      // Récupérer les chaînes de la playlist active
-      console.log('🔄 Récupération des chaînes...');
+      console.log('🔄 Récupération avec ancien système IPTV...');
       let playlist = await iptvService.getPlaylist(selectedPlaylistId);
       
       if (!playlist) {
         console.log('⚠️ Playlist non trouvée dans le service, tentative de récupération directe...');
         
-        // Fallback: Récupérer directement depuis AsyncStorage pour les grosses playlists
+        // Fallback: Récupérer directement depuis AsyncStorage avec plusieurs clés possibles
         try {
           const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
-          const playlistData = await AsyncStorage.getItem(`playlist_${selectedPlaylistId}`);
           
-          if (playlistData) {
-            playlist = JSON.parse(playlistData);
-            console.log('✅ Grosse playlist récupérée depuis AsyncStorage:', playlist?.channels?.length, 'chaînes');
+          // D'ABORD: Vérifier si c'est une playlist Xtream Codes
+          if (selectedPlaylistId.startsWith('xtream_')) {
+            console.log('🔍 Détection playlist Xtream Codes, recherche spécialisée...');
+            
+            try {
+              // Récupérer la liste des playlists Xtream sauvegardées
+              const xtreamPlaylists = await AsyncStorage.getItem('saved_xtream_playlists');
+              if (xtreamPlaylists) {
+                const xtreamList = JSON.parse(xtreamPlaylists);
+                console.log('📋 Playlists Xtream trouvées:', xtreamList.length);
+                
+                // Chercher la playlist correspondante par ID
+                const targetPlaylist = xtreamList.find((p: any) => p.id === selectedPlaylistId);
+                if (targetPlaylist) {
+                  console.log('✅ Playlist Xtream trouvée:', targetPlaylist.name, '(' + targetPlaylist.channelsCount + ' chaînes)');
+                  
+                  // Pour Xtream Codes, il faut reconstruire la playlist depuis les credentials
+                  try {
+                    console.log('🔄 Reconstruction playlist Xtream avec credentials...');
+                    const { XtreamExtremeManager } = await import('./src/modules/xtream/XtreamExtremeManager.js');
+                    const xtreamManager = new XtreamExtremeManager();
+                    
+                    // Charger config et credentials
+                    await xtreamManager.loadConfig();
+                    xtreamManager.setCredentials(targetPlaylist.server, targetPlaylist.username, targetPlaylist.password);
+                    
+                    // Timeout pour éviter blocage infini
+                    const timeoutPromise = new Promise((_, reject) => {
+                      setTimeout(() => reject(new Error('Timeout reconstruction Xtream (30s)')), 30000);
+                    });
+                    
+                    // Course entre le processus Xtream et le timeout
+                    const xtreamProcess = async () => {
+                      console.log('🔐 Authentification Xtream...');
+                      await xtreamManager.authenticate();
+                      console.log('📺 Récupération chaînes Xtream...');
+                      const channels = await xtreamManager.fetchChannelsExtreme();
+                      return channels;
+                    };
+                    
+                    const channels = await Promise.race([xtreamProcess(), timeoutPromise]);
+                    
+                    // Créer l'objet playlist au format attendu
+                    playlist = {
+                      id: targetPlaylist.id,
+                      name: targetPlaylist.name,
+                      channels: channels,
+                      totalChannels: channels.length,
+                      type: 'xtream',
+                      metadata: {
+                        username: targetPlaylist.username,
+                        server: targetPlaylist.server,
+                        password: targetPlaylist.password
+                      },
+                      createdAt: new Date().toISOString(),
+                      updatedAt: new Date().toISOString()
+                    };
+                    
+                    // CRITIQUE: Sauvegarder avec chunking pour playlists volumineuses (25K+ chaînes)
+                    const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+                    
+                    if (playlist.channels.length > 4000) {
+                      console.log(`📦 Playlist volumineuse (${playlist.channels.length} chaînes), chunking activé...`);
+                      
+                      // Chunking des chaînes par paquets de 500 (optimisé espace disque)
+                      const chunkSize = 500;
+                      const chunks = [];
+                      
+                      for (let i = 0; i < playlist.channels.length; i += chunkSize) {
+                        chunks.push(playlist.channels.slice(i, i + chunkSize));
+                      }
+                      
+                      // Supprimer les anciens chunks au cas où
+                      const allKeys = await AsyncStorage.getAllKeys();
+                      const oldChunks = allKeys.filter(key => key.includes(targetPlaylist.id) && key.includes('_chunk_'));
+                      if (oldChunks.length > 0) {
+                        await AsyncStorage.multiRemove(oldChunks);
+                        console.log(`🗑️ ${oldChunks.length} anciens chunks supprimés`);
+                      }
+                      
+                      // Sauvegarder les nouveaux chunks
+                      for (let i = 0; i < chunks.length; i++) {
+                        const chunkKey = `playlist_${targetPlaylist.id}_chunk_${String(i).padStart(3, '0')}`;
+                        await AsyncStorage.setItem(chunkKey, JSON.stringify(chunks[i]));
+                      }
+                      
+                      // Sauvegarder les métadonnées (sans les chaînes)
+                      const playlistMeta = { ...playlist };
+                      delete playlistMeta.channels;
+                      playlistMeta.chunked = true;
+                      playlistMeta.chunkCount = chunks.length;
+                      playlistMeta.chunkSize = chunkSize;
+                      
+                      await AsyncStorage.setItem(`playlist_${targetPlaylist.id}`, JSON.stringify(playlistMeta));
+                      console.log(`💾 Playlist Xtream sauvée: ${chunks.length} chunks de ${chunkSize} chaînes`);
+                      
+                    } else {
+                      // Sauvegarde normale pour petites playlists
+                      await AsyncStorage.setItem(`playlist_${targetPlaylist.id}`, JSON.stringify(playlist));
+                      console.log('💾 Playlist Xtream sauvée dans AsyncStorage');
+                    }
+                    
+                    console.log('✅ Playlist Xtream reconstruite:', channels.length, 'chaînes');
+                  } catch (xtreamError: any) {
+                    console.error('❌ Erreur reconstruction Xtream:', xtreamError.message);
+                    
+                    // Alternative: Proposer un rechargement différé
+                    Alert.alert(
+                      '⏳ Chargement Xtream en cours',
+                      `La playlist "${targetPlaylist.name}" est en cours de reconstruction depuis le serveur. Cela peut prendre jusqu'à 30 secondes.\n\nVoulez-vous réessayer ?`,
+                      [
+                        {
+                          text: 'Annuler',
+                          style: 'cancel',
+                          onPress: () => {
+                            // Créer playlist vide pour éviter crash
+                            playlist = {
+                              id: targetPlaylist.id,
+                              name: targetPlaylist.name,
+                              channels: [],
+                              type: 'XTREAM',
+                              error: 'Chargement annulé'
+                            };
+                          }
+                        },
+                        {
+                          text: 'Réessayer',
+                          onPress: () => {
+                            // Relancer le processus (récursion simple)
+                            setTimeout(() => {
+                              handleTVCardPress();
+                            }, 1000);
+                          }
+                        }
+                      ]
+                    );
+                    
+                    // En cas d'erreur, retourner directement pour éviter la navigation
+                    return;
+                  }
+                } else {
+                  console.error('❌ Playlist Xtream non trouvée dans saved_xtream_playlists');
+                }
+              } else {
+                console.error('❌ Aucune playlist Xtream sauvegardée trouvée');
+              }
+            } catch (xtreamError: any) {
+              console.error('❌ Erreur accès playlists Xtream:', xtreamError.message);
+            }
+          } else {
+            // Playlist M3U classique - essayer différentes clés de stockage
+            const possibleKeys = [
+              `playlist_${selectedPlaylistId}`,
+              selectedPlaylistId,
+              `playlist_meta_${selectedPlaylistId}`,
+              `playlist_url_${selectedPlaylistId}`
+            ];
+            
+            for (const key of possibleKeys) {
+              console.log(`🔍 Tentative récupération M3U avec clé: ${key}`);
+              const playlistData = await AsyncStorage.getItem(key);
+              
+              if (playlistData) {
+                try {
+                  const parsedData = JSON.parse(playlistData);
+                  if (parsedData && parsedData.channels && Array.isArray(parsedData.channels) && parsedData.channels.length > 0) {
+                    playlist = parsedData;
+                    console.log(`✅ Playlist M3U récupérée avec clé "${key}":`, playlist.channels.length, 'chaînes');
+                    break;
+                  } else {
+                    console.log(`⚠️ Playlist trouvée avec clé "${key}" mais sans chaînes valides (${parsedData?.channels?.length || 0} chaînes)`);
+                  }
+                } catch (parseError: any) {
+                  console.log(`⚠️ Erreur parsing avec clé "${key}":`, parseError.message);
+                }
+              }
+            }
           }
+          
+          
+          // Si toujours pas trouvé, recherche générale dans toutes les clés
+          if (!playlist) {
+            console.log('🔍 Recherche dans toutes les clés AsyncStorage...');
+            const allKeys = await AsyncStorage.getAllKeys();
+            console.log('📋 Clés disponibles:', allKeys.filter(k => k.includes('playlist') || k.includes('xtream')));
+            
+            // Chercher d'abord les playlists chunkées (grosses playlists)
+            const chunkedKeys = allKeys.filter(k => k.includes(selectedPlaylistId) && k.includes('_chunk_'));
+            if (chunkedKeys.length > 0) {
+              console.log(`🧩 Playlist chunked détectée: ${chunkedKeys.length} chunks`);
+              try {
+                const chunks = [];
+                for (const chunkKey of chunkedKeys.sort()) {
+                  const chunkData = await AsyncStorage.getItem(chunkKey);
+                  if (chunkData) {
+                    chunks.push(JSON.parse(chunkData));
+                  }
+                }
+                
+                // Reconstituer la playlist from chunks
+                if (chunks.length > 0) {
+                  const allChannels = chunks.flat();
+                  playlist = {
+                    id: selectedPlaylistId,
+                    name: 'Playlist reconstituée',
+                    channels: allChannels,
+                    totalChannels: allChannels.length
+                  };
+                  console.log(`✅ Playlist chunked reconstituée: ${allChannels.length} chaînes from ${chunks.length} chunks`);
+                }
+              } catch (chunkError) {
+                console.error('❌ Erreur reconstitution chunks:', chunkError);
+              }
+            }
+            
+            // Fallback: chercher playlist normale
+            if (!playlist) {
+              for (const key of allKeys) {
+                if (key.includes(selectedPlaylistId) || key.includes('playlist')) {
+                  const data = await AsyncStorage.getItem(key);
+                  if (data) {
+                    try {
+                      const parsed = JSON.parse(data);
+                      if (parsed && parsed.channels && parsed.channels.length > 0) {
+                        playlist = parsed;
+                        console.log(`✅ Playlist de secours trouvée "${key}":`, playlist.channels.length, 'chaînes');
+                        break;
+                      }
+                    } catch (e) {
+                      console.log(`⚠️ Erreur parsing playlist de secours "${key}"`);
+                    }
+                  }
+                }
+              }
+            }
+          }
+          
         } catch (storageError) {
           console.error('❌ Erreur récupération AsyncStorage:', storageError);
         }
@@ -178,6 +436,11 @@ const App: React.FC = () => {
         if (!playlist) {
           throw new Error('Playlist introuvable dans le service et le storage');
         }
+      }
+      
+      // Validation finale de la playlist
+      if (!playlist || !playlist.channels || !Array.isArray(playlist.channels)) {
+        throw new Error('Playlist invalide: structure des chaînes manquante ou corrompue');
       }
       
       const channels = playlist.channels;
@@ -201,11 +464,68 @@ const App: React.FC = () => {
       
     } catch (error) {
       console.error('❌ Erreur récupération chaînes:', error);
-      Alert.alert(
-        '❌ Erreur',
-        'Impossible de charger les chaînes de la playlist.',
-        [{ text: 'OK' }]
-      );
+      
+      // 🔧 CORRECTION: Si erreur structure corrompue, forcer reimport
+      if (error.message && error.message.includes('structure des chaînes manquante ou corrompue')) {
+        console.log('🔄 Tentative de réparation automatique de la playlist...');
+        
+        Alert.alert(
+          '🔄 Reconstruction',
+          'La playlist doit être reconstruite. Cela peut prendre quelques secondes.',
+          [
+            {
+              text: 'Annuler',
+              style: 'cancel'
+            },
+            {
+              text: 'Reconstruire',
+              onPress: async () => {
+                try {
+                  console.log('🚧 Nettoyage des chunks corrompus...');
+                  
+                  // Nettoyer AsyncStorage des chunks orphelins
+                  const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+                  const allKeys = await AsyncStorage.getAllKeys();
+                  const chunkKeys = allKeys.filter(key => key.includes('_chunk_'));
+                  
+                  if (chunkKeys.length > 0) {
+                    console.log(`🗑️ Suppression de ${chunkKeys.length} chunks orphelins...`);
+                    await AsyncStorage.multiRemove(chunkKeys);
+                  }
+                  
+                  // Supprimer aussi l'ancienne playlist corrompue
+                  await AsyncStorage.removeItem(`playlist_${selectedPlaylistId}`);
+                  
+                  // Forcer reload de l'app pour recréer la playlist
+                  console.log('🔄 Rechargement automatique...');
+                  // Navigation vers écran d'accueil puis retour pour forcer refresh
+                  handleClosePlayer();
+                  
+                  // Petit délai puis relancer
+                  setTimeout(() => {
+                    handleTVCardPress();
+                  }, 1000);
+                  
+                } catch (repairError) {
+                  console.error('❌ Erreur lors de la réparation:', repairError);
+                  Alert.alert(
+                    '❌ Erreur',
+                    'Impossible de réparer la playlist. Veuillez la supprimer et la recréer.',
+                    [{ text: 'OK' }]
+                  );
+                }
+              }
+            }
+          ]
+        );
+      } else {
+        // Erreur normale
+        Alert.alert(
+          '❌ Erreur',
+          'Impossible de charger les chaînes de la playlist.',
+          [{ text: 'OK' }]
+        );
+      }
     }
   };
 
@@ -250,87 +570,71 @@ const App: React.FC = () => {
     showLoading('Connexion Xtream...', `Authentification ${credentials.username}...`, 0);
     
     try {
-      console.log('🚀 Initialisation XtreamExtremeManager...');
+      console.log('🍉 Utilisation de WatermelonDB pour Xtream...');
       
-      // Importer dynamiquement le XtreamExtremeManager
-      const { XtreamExtremeManager } = await import('./src/modules/xtream/XtreamExtremeManager.js');
-      const xtreamManager = new XtreamExtremeManager();
+      // Importer le nouveau service WatermelonDB
+      const WatermelonXtreamService = await import('./src/services/WatermelonXtreamService');
+      const xtreamService = WatermelonXtreamService.default;
       
-      // Charger config existante puis définir credentials
-      await xtreamManager.loadConfig();
-      xtreamManager.setCredentials(credentials.url, credentials.username, credentials.password);
-      
-      // Étape 1: Authentification
-      updateLoading({ progress: 10, subtitle: '🔐 Authentification serveur...' });
-      await xtreamManager.authenticate();
-      
-      // Étape 2: Récupération des chaînes avec progression
-      updateLoading({ progress: 30, subtitle: '📡 Récupération chaînes...' });
-      
-      // Écouter les événements de progression
-      xtreamManager.addEventListener('syncProgress', (event) => {
-        const { progress, step } = event.detail;
-        const stepLabels = {
-          'categories': '📂 Chargement catégories...',
-          'channels': '📺 Récupération chaînes...',
-          'processing': '⚙️ Traitement données...',
-          'parsing': '🔄 Parsing chaînes...',
-          'complete': '✅ Import terminé !'
-        };
-        updateLoading({ 
-          progress: Math.min(95, progress), 
-          subtitle: stepLabels[step] || 'Traitement...' 
-        });
-      });
-      
-      const channels = await xtreamManager.fetchChannelsExtreme();
-      
-      // Étape 3: Conversion au format standard
-      updateLoading({ progress: 90, subtitle: '🔄 Conversion format...' });
-      const playlistData = xtreamManager.exportToPlaylistFormat();
-      
-      // Étape 4: Sauvegarde avec AsyncStorage (format compatible ProfilesModal)
-      updateLoading({ progress: 95, subtitle: '💾 Sauvegarde playlist...' });
+      // Fonction de callback pour la progression
+      const onProgress = (progress: number, message: string) => {
+        updateLoading({ progress: Math.round(progress), subtitle: message });
+      };
       
       const playlistName = `${credentials.username} (Xtream)`;
       
-      // Récupérer les informations d'authentification pour la date d'expiration
-      const accountInfo = xtreamManager.accountInfo;
-      let expirationDate = undefined;
+      // Import avec WatermelonDB - résout le problème SQLITE_FULL
+      const playlistId = await xtreamService.importXtreamPlaylist(
+        {
+          url: credentials.url,
+          username: credentials.username, 
+          password: credentials.password
+        },
+        playlistName,
+        onProgress
+      );
       
-      // Convertir le timestamp Unix en date ISO si disponible
-      if (accountInfo?.user_info?.exp_date) {
-        const expTimestamp = parseInt(accountInfo.user_info.exp_date);
-        if (!isNaN(expTimestamp)) {
-          expirationDate = new Date(expTimestamp * 1000).toISOString();
-          console.log(`📅 Date d'expiration Xtream: ${expirationDate}`);
-        }
-      }
+      console.log(`🍉 Import WatermelonDB terminé: ${playlistId}`);
       
-      // Créer la playlist au format attendu par ProfilesModal
-      const newPlaylist = {
-        id: `xtream_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        name: playlistName,
+      // Récupérer les informations de la playlist créée pour AsyncStorage
+      const database = await import('./src/database');
+      const { Playlist } = await import('./src/database/models');
+      const playlist = await database.default.get<typeof Playlist>('playlists').find(playlistId);
+      
+      // Format pour ProfilesModal (compatibilité) 
+      const playlistData = {
+        id: playlistId,
+        name: playlist.name,
         type: 'XTREAM' as const,
-        url: credentials.url,
-        server: credentials.url,
-        username: credentials.username,
-        password: credentials.password,
-        dateAdded: new Date().toISOString(),
-        expirationDate: expirationDate, // ✅ Ajouter la vraie date d'expiration
-        channelsCount: channels.length,
+        url: playlist.server,
+        server: playlist.server,
+        username: playlist.username,
+        password: playlist.password,
+        dateAdded: playlist.dateAdded.toISOString(),
+        expirationDate: playlist.expirationDate,
+        channelsCount: playlist.channelsCount,
         status: 'active' as const
       };
       
-      // Sauvegarder dans AsyncStorage pour ProfilesModal
+      // Sauvegarder dans AsyncStorage pour rétrocompatibilité avec ProfilesModal
       const AsyncStorage = await import('@react-native-async-storage/async-storage');
       const existingData = await AsyncStorage.default.getItem('saved_xtream_playlists');
       const playlists = existingData ? JSON.parse(existingData) : [];
-      playlists.push(newPlaylist);
+      
+      // Éviter les doublons
+      const existingIndex = playlists.findIndex((p: any) => 
+        p.server === credentials.url && p.username === credentials.username
+      );
+      if (existingIndex >= 0) {
+        playlists[existingIndex] = playlistData;
+      } else {
+        playlists.push(playlistData);
+      }
+      
       await AsyncStorage.default.setItem('saved_xtream_playlists', JSON.stringify(playlists));
       
       // Finalisation
-      updateLoading({ progress: 100, subtitle: `✅ ${channels.length} chaînes importées !` });
+      updateLoading({ progress: 100, subtitle: `✅ ${playlist.channelsCount} chaînes importées avec WatermelonDB !` });
       
       await new Promise(resolve => setTimeout(resolve, 1000));
       hideLoading();
@@ -339,19 +643,15 @@ const App: React.FC = () => {
       console.log('📋 Ouverture automatique du ProfilesModal');
       setShowProfilesModal(true);
       
-      console.log(`✅ Import Xtream réussi: ${channels.length} chaînes`);
+      console.log(`✅ Import Xtream WatermelonDB réussi: ${playlist.channelsCount} chaînes`);
       
     } catch (error) {
-      console.error('❌ Erreur import Xtream:', error);
+      console.error('❌ Erreur import Xtream WatermelonDB:', error);
       hideLoading();
       
       // Afficher erreur détaillée
       const errorMessage = error.message || 'Erreur inconnue';
-      Alert.alert(
-        'Erreur Xtream Codes',
-        `Impossible d'importer la playlist Xtream:\n\n${errorMessage}\n\nVérifiez vos identifiants et la connexion réseau.`,
-        [{ text: 'OK' }]
-      );
+      Alert.alert('❌ Erreur Import', `Impossible d'importer la playlist Xtream:\n\n${errorMessage}`, [{ text: 'OK' }]);
     }
   };
 
