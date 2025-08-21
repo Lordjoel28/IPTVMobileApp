@@ -20,6 +20,7 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import LinearGradient from 'react-native-linear-gradient';
+import ChannelCard from '../components/ChannelCard';
 // import SmartImage from '../components/common/SmartImage'; // Temporairement désactivé
 
 const { width, height } = Dimensions.get('window');
@@ -73,7 +74,7 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
   const CHANNELS_PER_PAGE = 100; // WatermelonDB pagination optimisée
   
   // ⚡ OPTIMISATION GROSSES PLAYLISTS - getItemLayout pour performances
-  const ITEM_HEIGHT = 118; // 110 (height) + 8 (marginBottom) = 118px
+  const ITEM_HEIGHT = 148; // 140 (height) + 8 (marginBottom) = 148px - AJUSTÉ pour 2 lignes
   const getItemLayout = React.useCallback((data: ArrayLike<Channel> | null | undefined, index: number) => ({
     length: ITEM_HEIGHT,
     offset: ITEM_HEIGHT * index,
@@ -756,34 +757,17 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
   // GRILLE DYNAMIQUE : Adaptation selon la disponibilité de l'écran
   const getOptimalColumns = (): number => {
     if (sidebarVisible) {
-      return 5; // Sidebar visible : 5 colonnes optimales
+      return 5; // Sidebar visible : 5 colonnes optimales (INCHANGÉ)
     } else {
-      return 7; // Mode plein écran : 7 colonnes pour plus de chaînes
+      return 7; // Mode plein écran : 7 colonnes avec cartes agrandies
     }
   };
 
   // Simplified state management
   // const [failedLogos, setFailedLogos] = useState<Set<string>>(new Set()); // Désactivé temporairement
 
-  // NOUVEAU : Animations pour apparition des cartes et transitions
-  const cardFadeAnim = useRef(new Animated.Value(0)).current;
+  // Animation de transition entre catégories uniquement
   const categoryTransitionAnim = useRef(new Animated.Value(1)).current;
-  
-  // Animation subtile au chargement
-  useEffect(() => {
-    if (displayedChannels.length > 0) {
-      // Reset l'animation
-      cardFadeAnim.setValue(0.7); // Commence plus opaque pour effet subtil
-      
-      // Animation très douce et discrète
-      Animated.timing(cardFadeAnim, {
-        toValue: 1,
-        duration: 300, // Plus court pour subtilité
-        useNativeDriver: true,
-        isInteraction: false,
-      }).start();
-    }
-  }, [displayedChannels]);
   
   // Animation de transition entre catégories optimisée
   const animateCategoryTransition = () => {
@@ -805,115 +789,45 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
     ]).start();
   };
 
-  // Rendu d'un item de chaîne avec animation - Optimisé React.memo
+  // Rendu d'un item de chaîne avec nouveau composant optimisé
   const renderChannelItem = React.useCallback(({ item: channel, index }: { item: Channel; index: number }) => {
-    // 🔧 DEBUG: Log des logos pour diagnostic (premières chaînes seulement)
-    if (index < 3) {
-      console.log(`📺 Channel ${index}: "${channel.name}" - Logo brut: "${channel.logo || 'MANQUANT'}"`);
-    }
-    
-    // Détecter et réparer l'URL du logo - OPTIMISÉ ET SIMPLE
-    const logoUrl = channel.logo;
-    const hasLogo = logoUrl && logoUrl.trim() !== '' && logoUrl !== 'null' && logoUrl !== 'undefined';
-    
-    // 🔧 DEBUG: Afficher les URLs brutes pour diagnostic
-    if (index < 5) {
-      console.log(`📺 Channel ${index}: "${channel.name}"`);
-      console.log(`   Logo brut: "${logoUrl || 'ABSENT'}"`);
-      if (hasLogo) {
-        console.log(`   ✅ Logo valide détecté`);
-      }
-    }
-    
     return (
-      <Animated.View
-        style={[
-          {
-            opacity: cardFadeAnim // Simple fade in, pas d'animation complexe
-          }
-        ]}
-      >
-        <TouchableOpacity
-          style={[
-            styles.channelCard,
-            { width: getChannelCardWidth() }
-          ]}
-          onPress={() => handleChannelPress(channel)}
-          activeOpacity={0.8}
-        >
-        {/* NOUVEAU : Layout vertical centré avec hiérarchie claire */}
-        {/* Logo principal */}
-        {hasLogo ? (
-          <Image 
-            source={{ 
-              uri: logoUrl,
-              headers: {
-                'User-Agent': 'IPTV-Player/1.0',
-                'Accept': 'image/*',
-                'Cache-Control': 'max-age=86400' // Cache 24h
-              }
-            }} 
-            style={styles.channelLogoFullscreen}
-            resizeMode="contain"
-            fadeDuration={100}
-            onError={() => {
-              if (index < 5) {
-                console.log(`❌ Logo échoué: "${channel.name}" -> ${logoUrl}`);
-              }
-            }}
-            onLoad={() => {
-              if (index < 5) {
-                console.log(`✅ Logo CHARGÉ: "${channel.name}"`);
-              }
-            }}
-            progressiveRenderingEnabled={true}
-          />
-        ) : (
-          <View style={styles.channelLogoPlaceholderFullscreen}>
-            <Text style={styles.channelNameFallback} numberOfLines={2}>
-              📺
-            </Text>
-          </View>
-        )}
-
-        {/* NOUVEAU : Superposition avec dégradé sombre pour lisibilité */}
-        <LinearGradient
-          colors={['transparent', 'rgba(0, 0, 0, 0.3)', 'rgba(0, 0, 0, 0.85)']}
-          locations={[0, 0.4, 1]}
-          style={styles.channelNameOverlay}
-        >
-          <Text style={styles.channelCardName} numberOfLines={2} ellipsizeMode="tail">
-            {channel.name?.replace(/\s*\(\d+p\)$/, '') || 'Sans nom'}
-          </Text>
-        </LinearGradient>
-      </TouchableOpacity>
-      </Animated.View>
+      <ChannelCard
+        channel={channel}
+        index={index}
+        width={getChannelCardWidth()}
+        onPress={handleChannelPress}
+        serverUrl={serverUrl}
+      />
     );
-  }, [cardFadeAnim, serverUrl]); // Dépendances optimisées
+  }, [serverUrl]); // Dépendances minimales
 
-  // CORRIGÉ : Calcul largeur avec nouvelles valeurs margin/padding
+  // OPTIMISÉ : Calcul largeur pour utiliser TOUT l'espace disponible
   const getChannelCardWidth = (): number => {
     // Calcul précis de l'espace disponible
     const sidebarWidth = sidebarVisible ? (width * 0.32) : 0;
     const availableScreenWidth = width - sidebarWidth;
     
-    const columns = getOptimalColumns(); // DYNAMIQUE : selon mode sidebar/plein écran
-    const containerPadding = 4 * 2; // Padding du container (4px gauche + 4px droite)
-    const cardMargin = 6; // CORRIGÉ : Nouveau margin par côté (6px pour léger espacement)
+    const columns = getOptimalColumns();
     
-    // Espace occupé par les marges : 6px * 2 (gauche+droite) * N cartes
-    const totalMargins = cardMargin * 2 * columns;
-    
-    // Largeur réellement disponible pour les cartes
-    const netWidth = availableScreenWidth - containerPadding - totalMargins;
-    
-    // Largeur par carte (utilise tout l'espace disponible)
-    const cardWidth = Math.floor(netWidth / columns);
-    
-    // CORRIGÉ : Largeur minimum optimisée pour logo 70px + padding 12px*2 = 94px minimum
-    const minWidth = sidebarVisible ? 85 : 75; // Adapté pour contenir logo 70px + padding 24px + margin
-    
-    return Math.max(cardWidth, minWidth);
+    if (sidebarVisible) {
+      // Mode sidebar : cartes légèrement plus grandes avec espacement amélioré
+      const containerPadding = 6 * 2; // AUGMENTÉ : plus d'espace aux bords
+      const cardMargin = 7; // AUGMENTÉ : plus d'espace entre cartes pour occuper l'espace
+      const totalMargins = cardMargin * 2 * columns;
+      const netWidth = availableScreenWidth - containerPadding - totalMargins;
+      const cardWidth = Math.floor(netWidth / columns);
+      const minWidth = 88; // AUGMENTÉ : cartes légèrement plus grandes
+      return Math.max(cardWidth, minWidth);
+    } else {
+      // Mode plein écran : utiliser TOUT l'espace avec espacement généreux
+      const containerPadding = 8 * 2; // Léger padding aux bords
+      const spaceBetweenCards = 6; // Espacement généreux entre cartes
+      const totalSpacing = spaceBetweenCards * (columns - 1);
+      const netWidth = availableScreenWidth - containerPadding - totalSpacing;
+      const cardWidth = Math.floor(netWidth / columns);
+      return cardWidth;
+    }
   };
 
   // Composant vide quand aucune chaîne
@@ -983,12 +897,22 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
         </Text>
         
         <View style={styles.headerActions}>
+          {/* Bouton pour ouvrir sidebar si fermé */}
+          {!sidebarVisible && (
+            <TouchableOpacity 
+              onPress={() => setSidebarVisible(true)}
+              style={styles.headerSidebarButton}
+            >
+              <Icon name="menu" size={24} color="#FFFFFF" />
+            </TouchableOpacity>
+          )}
+          
           {/* Barre de recherche intégrée */}
           <View style={styles.searchContainerHeader}>
             <Icon name="search" size={20} color="rgba(255, 255, 255, 0.6)" style={styles.searchIcon} />
             <TextInput
               style={styles.searchInputHeader}
-              placeholder="Rechercher chaînes..."
+              placeholder="Rechercher..."
               placeholderTextColor="rgba(255, 255, 255, 0.5)"
               value={searchQuery}
               onChangeText={setSearchQuery}
@@ -1031,27 +955,22 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
 
         {/* ÉTAPE 4: Grille principale des chaînes */}
         <Animated.View style={[styles.channelsGrid, !sidebarVisible && styles.channelsGridFullWidth, { opacity: categoryTransitionAnim }]}>
-          {/* Bouton pour rouvrir sidebar avec dégradé */}
-          {!sidebarVisible && (
-            <TouchableOpacity 
-              onPress={() => setSidebarVisible(true)}
-              activeOpacity={0.8}
-              style={styles.openSidebarButton}
-            >
-              <View style={styles.openSidebarButtonGradient}>
-                <Icon name="menu" size={24} color="#FFFFFF" />
-              </View>
-            </TouchableOpacity>
-          )}
           <FlatList
             data={displayedChannels}
             keyExtractor={keyExtractor}
             renderItem={renderChannelItem}
             numColumns={getOptimalColumns()}
-            key={sidebarVisible ? 'with-sidebar' : 'full-screen'} // Force re-render when columns change
+            key={`channels-grid-${sidebarVisible ? 'sidebar' : 'fullscreen'}-${getOptimalColumns()}`} // Force re-render when columns change
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.channelsGridContent}
-            columnWrapperStyle={undefined}
+            contentContainerStyle={[
+              styles.channelsGridContent,
+              { 
+                paddingHorizontal: sidebarVisible ? 6 : 8, // Correspond au containerPadding
+                paddingBottom: 20
+              }
+            ]}
+            columnWrapperStyle={sidebarVisible ? styles.rowSpacingSidebar : styles.rowSpacingFullscreen}
+            ItemSeparatorComponent={null}
             ListEmptyComponent={renderEmptyChannels}
             ListFooterComponent={renderFooter}
             removeClippedSubviews={true}
@@ -1129,6 +1048,16 @@ const styles = StyleSheet.create({
     padding: 8,
     marginLeft: 8,
   },
+  headerSidebarButton: {
+    padding: 8,
+    marginRight: 16, // ÉLOIGNÉ : 8→16 de la barre de recherche
+    borderRadius: 20, // ARRONDI : 8→20 pour forme plus ronde
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    minWidth: 40,
+    minHeight: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   mainContent: {
     flex: 1,
     flexDirection: 'row',
@@ -1169,36 +1098,15 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   sidebarCloseButton: {
-    padding: 8,
-    borderRadius: 20,
+    padding: 6, // RÉDUIT : bouton plus compact
+    borderRadius: 18, // AUGMENTÉ : plus arrondi
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    minWidth: 36,
-    minHeight: 36,
+    minWidth: 32, // RÉDUIT : plus petit
+    minHeight: 32, // RÉDUIT : plus petit
     justifyContent: 'center',
     alignItems: 'center',
   },
-  openSidebarButton: {
-    position: 'absolute',
-    top: 20,
-    left: 20,
-    zIndex: 10,
-    borderRadius: 16,
-    // Ombres identiques aux cartes
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.5,
-    shadowRadius: 16,
-    elevation: 12,
-  },
-  openSidebarButtonGradient: {
-    padding: 14,
-    borderRadius: 16,
-    backgroundColor: '#1a1a1a',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  // openSidebarButton supprimé - bouton déplacé dans header
   channelsGridFullWidth: {
     flex: 1,
     width: '100%',
@@ -1206,30 +1114,36 @@ const styles = StyleSheet.create({
   searchContainerHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center', // NOUVEAU : centrer le contenu
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 20,
+    borderRadius: 24, // AUGMENTÉ : plus arrondi
     paddingHorizontal: 12,
-    paddingVertical: 8, // AUGMENTÉ : Plus de hauteur pour éviter rognage
+    paddingVertical: 6, // RÉDUIT : hauteur plus compacte
     marginRight: 8,
-    minWidth: 160, // AUGMENTÉ : Plus large pour le texte
-    maxWidth: 220, // AUGMENTÉ : Largeur maximum plus généreuse
+    minWidth: 160,
+    maxWidth: 220,
+    height: 36, // FIXE : hauteur fixe pour cohérence
   },
   searchIcon: {
-    marginRight: 8,
+    marginRight: 6, // RÉDUIT : espacement plus compact
+    alignSelf: 'center', // NOUVEAU : centrer verticalement
   },
   searchInputHeader: {
     flex: 1,
     color: '#FFFFFF',
-    fontSize: 14, // AUGMENTÉ : Plus lisible
+    fontSize: 14,
     fontWeight: '500',
-    paddingVertical: 2, // AJUSTÉ : Léger padding pour éviter rognage
-    lineHeight: 16, // NOUVEAU : Hauteur de ligne pour éviter coupure
+    paddingVertical: 0, // SUPPRIMÉ : padding pour centrage parfait
+    lineHeight: 16,
+    textAlign: 'center', // NOUVEAU : centrer le texte
+    textAlignVertical: 'center', // NOUVEAU : centrage vertical Android
   },
   categoriesList: {
     flex: 1,
   },
   categoriesListContent: {
-    paddingBottom: 12,
+    paddingBottom: 20, // AUGMENTÉ : plus d'espace en bas
+    flexGrow: 1, // NOUVEAU : utilise tout l'espace disponible
   },
   categoryItem: {
     // NOUVEAU : Style liste standard simple
@@ -1237,8 +1151,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginBottom: 2, // Espacement minimal entre items
+    paddingVertical: 10, // RÉDUIT : plus compact
+    marginBottom: 3, // AUGMENTÉ : léger espacement entre items
     backgroundColor: 'transparent',
   },
   categoryItemSelected: {
@@ -1285,94 +1199,17 @@ const styles = StyleSheet.create({
   },
   channelsGrid: {
     flex: 1,
-    padding: 4, // RÉDUIT : de 12px à 4px pour utiliser plus d'espace
     backgroundColor: '#0a0a0a',
   },
   channelsGridContent: {
-    paddingBottom: 12,
+    paddingTop: 8, // NOUVEAU : espacement en haut
+    paddingBottom: 20, // AUGMENTÉ : plus d'espace en bas
   },
   channelsRow: {
     justifyContent: 'flex-start',
     marginBottom: 6,
   },
-  channelCard: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 16,
-    marginBottom: 12,
-    margin: 6, // AUGMENTÉ : Léger espacement entre cartes comme demandé
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    overflow: 'hidden',
-    height: 120,
-    position: 'relative',
-    // NOUVEAU : Ombres subtiles pour effet "flottant" 
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 6,
-    // NOUVEAU : Plus de padding pour superposition de texte
-    padding: 0, // Supprimé pour permettre superposition complète
-  },
-  channelLogoFullscreen: {
-    // NOUVEAU : Logo occupe toute la carte pour superposition
-    position: 'absolute',
-    top: 8,
-    left: 8,
-    right: 8,
-    bottom: 30, // Laisse place pour le texte en bas
-    width: undefined,
-    height: undefined,
-    resizeMode: 'contain',
-    borderRadius: 12,
-    opacity: 0.8, // Légèrement réduit pour contraste avec texte
-  },
-  channelLogoPlaceholderFullscreen: {
-    // NOUVEAU : Placeholder occupe aussi toute la carte
-    position: 'absolute',
-    top: 8,
-    left: 8,
-    right: 8,
-    bottom: 30,
-    backgroundColor: '#2a2a2a',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 12,
-  },
-  channelNameOverlay: {
-    // NOUVEAU : Superposition en bas avec dégradé sombre
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingVertical: 8,
-    paddingHorizontal: 8,
-    borderBottomLeftRadius: 16,
-    borderBottomRightRadius: 16,
-    minHeight: 30,
-    justifyContent: 'center',
-  },
-  channelCardName: {
-    color: '#FFFFFF',
-    fontSize: 13, // NOUVEAU : Taille medium pour hiérarchie
-    fontWeight: '500', // MEDIUM : Hiérarchie typographique
-    lineHeight: 15,
-    textAlign: 'center',
-    // NOUVEAU : Gestion texte long - 2 lignes max
-    flexWrap: 'wrap',
-    // Ombre pour lisibilité sur fond logo
-    textShadowColor: 'rgba(0, 0, 0, 0.9)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 4,
-  },
-  channelCardOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'transparent',
-  },
+  // Styles channelCard supprimés - désormais dans ChannelCard.tsx
   emptyChannels: {
     flex: 1,
     justifyContent: 'center',
@@ -1394,20 +1231,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
     lineHeight: 16,
   },
-  // SUPPRIMÉ : Styles obsolètes de la recherche de catégorie
-  // categorySearchContainer, categorySearchIcon, categorySearchInput
-  channelNameFallback: {
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontSize: 10,
-    fontWeight: '600',
-    marginTop: 6,
-    textAlign: 'center',
-    paddingHorizontal: 4,
-    lineHeight: 12,
-    textShadowColor: 'rgba(0, 0, 0, 0.8)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
-  },
+  // channelNameFallback supprimé - désormais dans ChannelCard.tsx
   loadingFooter: {
     padding: 20,
     alignItems: 'center',
@@ -1427,6 +1251,17 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.5)',
     fontSize: 12,
     fontWeight: '400',
+  },
+  // NOUVEAU : Styles pour espacement entre rangées
+  rowSpacingSidebar: {
+    justifyContent: 'space-between', // RESTAURÉ : distribution équitable
+    paddingHorizontal: 0,
+    marginBottom: 4, // Espacement vertical entre rangées
+  },
+  rowSpacingFullscreen: {
+    justifyContent: 'space-between', // Distribution équitable
+    paddingHorizontal: 0, 
+    marginBottom: 6, // Plus d'espacement en mode plein écran
   },
 });
 
