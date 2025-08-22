@@ -200,7 +200,7 @@ const ChannelListScreen: React.FC<ChannelListScreenProps> = ({ route, navigation
         <FlatList
           data={channels}
           renderItem={renderChannelItem}
-          keyExtractor={(item, index) => item.id || `channel-${index}`}
+          keyExtractor={(item, index) => `list-${item.id || 'unknown'}-${index}`}
           style={styles.channelList}
           contentContainerStyle={styles.channelListContent}
           showsVerticalScrollIndicator={false}

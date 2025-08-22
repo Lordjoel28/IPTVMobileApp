@@ -17,10 +17,12 @@ import {
   Image,
   Animated,
   Alert,
+  InteractionManager,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import LinearGradient from 'react-native-linear-gradient';
 import ChannelCard from '../components/ChannelCard';
+import type { Category } from '../types';
 // import SmartImage from '../components/common/SmartImage'; // Temporairement désactivé
 
 const { width, height } = Dimensions.get('window');
@@ -55,6 +57,15 @@ interface ChannelsScreenProps {
 const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) => {
   const { playlistId, channelsCount = 0, useWatermelonDB = false } = route.params || {};
   
+  // 🔧 CORRECTION: Respecter l'architecture originale
+  // M3U → Legacy (useWatermelonDB: false)  
+  // Xtream → WatermelonDB (useWatermelonDB: true)
+  console.log('🔧 Architecture respectée:', {
+    useWatermelonDB,
+    channelsCount,
+    type: useWatermelonDB ? 'Xtream (WatermelonDB)' : 'M3U (Legacy)'
+  });
+  
   // États
   const [channels, setChannels] = useState<Channel[]>([]);
   const [playlistName, setPlaylistName] = useState<string>('Playlist');
@@ -72,6 +83,14 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
   const [hasMoreChannels, setHasMoreChannels] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const CHANNELS_PER_PAGE = 100; // WatermelonDB pagination optimisée
+  
+  // 🛡️ SOLUTION RACE CONDITION: useRef pour capturer états actuels sans stale state
+  const currentStateRef = useRef({
+    channels: [] as Channel[],
+    displayedChannels: [] as Channel[],
+    categories: [] as Category[],
+    selectedCategory: null as Category | null
+  });
   
   // ⚡ OPTIMISATION GROSSES PLAYLISTS - getItemLayout pour performances
   const ITEM_HEIGHT = 148; // 140 (height) + 8 (marginBottom) = 148px - AJUSTÉ pour 2 lignes
@@ -119,8 +138,31 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
     }
   };
 
+  // 🔄 MISE À JOUR REF À CHAQUE CHANGEMENT D'ÉTAT - Solution GitHub Race Condition
+  useEffect(() => {
+    currentStateRef.current = {
+      channels: channels,
+      displayedChannels: displayedChannels,
+      categories: categories,
+      selectedCategory: selectedCategory
+    };
+    console.log('🔄 REF UPDATED:', {
+      channels: channels.length,
+      displayedChannels: displayedChannels.length,
+      categories: categories.length,
+      selectedCategory: selectedCategory?.name
+    });
+  }, [channels, displayedChannels, categories, selectedCategory]);
+
   // Chargement des chaînes depuis l'ID de playlist
   useEffect(() => {
+    console.log('🔄 useEffect ChannelsScreen - DÉMARRAGE');
+    console.log('🔄 playlistId:', playlistId);
+    console.log('🔄 useWatermelonDB:', useWatermelonDB);
+    
+    // Mode de chargement identifié
+    console.log(`🔄 Mode: ${useWatermelonDB ? 'Xtream (WatermelonDB)' : 'M3U (Legacy)'} - ${channelsCount} chaînes`);
+    
     const loadChannels = async () => {
       if (!playlistId) {
         console.error('❌ Aucun ID de playlist fourni');
@@ -179,6 +221,7 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
   const loadChannelsFromWatermelonDB = async () => {
     try {
       console.log('🍉 Loading from WatermelonDB - playlistId:', playlistId);
+      console.log('🍉 WatermelonDB function CALLED - début chargement');
       const startTime = Date.now();
       
       // Importer le service WatermelonDB
@@ -243,13 +286,13 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
       const xtreamCategories = result.categories || [];
       console.log('📂 Vraies catégories Xtream trouvées:', xtreamCategories.length);
       
-      // OPTIMISATION: Éviter le calcul lourd des compteurs lors du premier chargement
+      // CORRECTION: Assigner les vraies chaînes à la catégorie TOUT
       const categoriesWithCounts: Category[] = [
         {
           id: 'all',
           name: 'TOUT',
           count: result.totalChannels || result.playlist.channelsCount || 0,
-          channels: [] // Sera chargé dynamiquement
+          channels: convertedChannels // 🔧 CORRECTION: Vraies chaînes au lieu d'array vide
         },
         // NOUVEAU : Catégories spéciales avec icônes modernes et vrais compteurs
         {
@@ -286,12 +329,22 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
       // setChannels(convertedChannels); // DÉSACTIVÉ pour WatermelonDB - évite le useEffect groupChannelsByCategories
       setPlaylistName(result.playlist.name || 'Playlist WatermelonDB');
       setTotalChannels(result.totalChannels || result.playlist.channelsCount || 0);
+      console.log('🔍 DIAGNOSTIC WatermelonDB - Avant setState:');
+      console.log('   categoriesWithCounts.length:', categoriesWithCounts.length);
+      console.log('   convertedChannels.length:', convertedChannels.length);
+      console.log('   categoriesWithCounts[0].channels.length:', categoriesWithCounts[0]?.channels?.length || 0);
+      
       setCategories(categoriesWithCounts);
       setSelectedCategory(categoriesWithCounts[0]); // Sélectionner "TOUT"
+      setDisplayedChannels(convertedChannels);
       
       // Configurer la pagination
       setCurrentPage(0);
       setHasMoreChannels(convertedChannels.length === CHANNELS_PER_PAGE);
+      
+      console.log('🔍 DIAGNOSTIC WatermelonDB - Après setState:');
+      console.log('   setState appelé avec', categoriesWithCounts.length, 'catégories');
+      console.log('   Catégorie TOUT avec', categoriesWithCounts[0]?.channels?.length || 0, 'chaînes');
       
       console.log(`⏱️ React setState Time: ${Date.now() - setStateStartTime}ms`);
       console.log('🍉 ChannelsScreen - WatermelonDB channels loaded successfully');
@@ -405,20 +458,25 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
     console.log('📺 ChannelsScreen - Legacy system channels loaded successfully');
   };
   
-  // Initialisation - regroupement par catégories (DÉSACTIVÉ pour WatermelonDB)
+  // 🔧 UNIFIED LOADING: Un seul useEffect unifié (Best Practice 2024)
   useEffect(() => {
-    if (!useWatermelonDB && channels.length > 0) {
-      console.log('📺 ChannelsScreen - Regroupement avec:', channels.length, 'chaînes (Legacy mode)');
+    console.log('🔄 UNIFIED DATA LOADING - Mode:', useWatermelonDB ? 'WatermelonDB' : 'Legacy');
+    
+    if (useWatermelonDB) {
+      // WatermelonDB géré par son propre chargement initial - PAS de regroupement ici
+      console.log('📺 WatermelonDB: Chargement déjà effectué dans loadChannelsFromWatermelonDB');
+    } else if (!useWatermelonDB && channels.length > 0) {
+      // Legacy: Effectuer le regroupement SEULEMENT après chargement des données
+      console.log('📺 Legacy: Regroupement avec', channels.length, 'chaînes');
       groupChannelsByCategories();
-    } else if (useWatermelonDB) {
-      console.log('📺 ChannelsScreen - WatermelonDB mode: Regroupement ignoré, catégories déjà chargées');
     }
-  }, [channels]);
+  }, [channels, useWatermelonDB]);
 
   // Timer cleanup removed for simplicity
 
-  // Grouper les chaînes par catégories (ÉTAPE 2: utiliser vraies catégories)
+  // 🔧 UNIFIED GROUPING: Fonction unifiée qui met à jour les MÊMES états que WatermelonDB
   const groupChannelsByCategories = () => {
+    console.log('🔄 UNIFIED GROUPING - Legacy mode - Début regroupement');
     setIsLoading(true);
     
     try {
@@ -537,16 +595,22 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
         }
       });
 
+      // 🔧 UNIFIED STATE UPDATE: Même logique que WatermelonDB 
       setCategories(categoriesList);
       setSelectedCategory(categoriesList[0]); // Sélectionner "TOUT" par défaut
+      setDisplayedChannels(categoriesList[0]?.channels || []); // 🔧 NOUVEAU: Assurer cohérence displayedChannels
       
-      // Initialiser les chaînes affichées avec pagination
-      if (categoriesList[0]) {
-        loadChannelsPage(categoriesList[0].channels, 1);
-      }
+      // 🔧 CORRECTION: Configurer la pagination comme WatermelonDB
+      setCurrentPage(0);
+      setHasMoreChannels(false); // Legacy charge tout d'un coup
       
-      console.log('✅ Système de catégories créé:', categoriesList.length, 'catégories');
-      console.log('🏆 Top 5 catégories:');
+      console.log('✅ UNIFIED Legacy State Update:', {
+        categories: categoriesList.length,
+        selectedCategory: categoriesList[0]?.name,
+        displayedChannels: categoriesList[0]?.channels?.length || 0
+      });
+      
+      console.log('🏆 Top 5 catégories Legacy:');
       categoriesList.slice(1, 6).forEach(cat => {
         console.log(`   ${cat.name}: ${cat.count} chaînes`);
       });
@@ -563,9 +627,52 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
   };
 
   const handleChannelPress = (channel: Channel) => {
-    console.log('🎬 Chaîne sélectionnée:', channel.name);
-    // ÉTAPE 6: Navigation vers le lecteur vidéo
-    // navigation.navigate('VideoPlayer', { channel });
+    console.log('🛡️ RACE CONDITION FIX - GitHub/Reddit Solutions');
+    
+    // ⚡ SOLUTION 1: useRef pour éviter stale state (GitHub Issue #194)
+    const currentState = currentStateRef.current;
+    console.log('📊 REF STATE:', {
+      channels: currentState.channels?.length || 0,
+      displayedChannels: currentState.displayedChannels?.length || 0,
+      categories: currentState.categories?.length || 0,
+      selectedCategory: currentState.selectedCategory?.name || 'null'
+    });
+    
+    // ⚡ SOLUTION 2: InteractionManager pour délayer navigation (Issue #1266)
+    const performNavigation = () => {
+      const { displayedChannels: safeChannels, categories: safeCategories, selectedCategory: safeSelected } = currentState;
+      
+      if (!safeChannels || safeChannels.length === 0) {
+        console.error('❌ REF: Aucune chaîne dans useRef');
+        Alert.alert("Race Condition", "États non synchronisés. Réessayez dans un instant.");
+        return;
+      }
+      
+      const unifiedCategory: Category = {
+        id: 'ref_safe_channels',
+        name: 'CHAÎNES (REF SAFE)',
+        count: safeChannels.length,
+        channels: safeChannels
+      };
+      
+      console.log(`🎬 REF NAVIGATION: ${safeChannels.length} chaînes sécurisées (useRef)`);
+      
+      navigation.navigate('ChannelPlayer', {
+        playlistId,
+        allCategories: safeCategories || [unifiedCategory],
+        initialCategory: safeSelected || unifiedCategory,
+        initialChannels: safeChannels,
+        selectedChannel: channel,
+        playlistName,
+        useWatermelonDB,
+      });
+    };
+    
+    // ⚡ SOLUTION 3: InteractionManager.runAfterInteractions (React Router Flux Fix)
+    InteractionManager.runAfterInteractions(() => {
+      console.log('🚀 Navigation après interactions complétées');
+      performNavigation();
+    });
   };
 
   const handleCategorySelect = async (category: Category) => {
@@ -944,7 +1051,7 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
           
           <FlatList
             data={categories}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item, index) => `category-${item.id}-${index}`}
             renderItem={renderCategoryItem}
             showsVerticalScrollIndicator={false}
             style={styles.categoriesList}
