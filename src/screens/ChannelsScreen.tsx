@@ -18,6 +18,7 @@ import {
   Animated,
   Alert,
   InteractionManager,
+  Modal,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import LinearGradient from 'react-native-linear-gradient';
@@ -75,6 +76,7 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const fadeAnim = useRef(new Animated.Value(1)).current;
+  const flatListRef = useRef<FlatList>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [sidebarVisible, setSidebarVisible] = useState(true);
@@ -82,7 +84,11 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
   const [currentPage, setCurrentPage] = useState(0);
   const [hasMoreChannels, setHasMoreChannels] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const CHANNELS_PER_PAGE = 100; // WatermelonDB pagination optimisée
+  const [hideChannelNames, setHideChannelNames] = useState(false);
+  const [showOptionsMenu, setShowOptionsMenu] = useState(false);
+  const [showSortModal, setShowSortModal] = useState(false);
+  const [sortOption, setSortOption] = useState<'default' | 'newest' | 'az' | 'za'>('default');
+  const CHANNELS_PER_PAGE = 500; // WatermelonDB pagination augmentée pour afficher plus de chaînes
   
   // 🛡️ SOLUTION RACE CONDITION: useRef pour capturer états actuels sans stale state
   const currentStateRef = useRef({
@@ -682,10 +688,28 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
     animateCategoryTransition();
     
     if (!useWatermelonDB) {
-      // Ancien système - utiliser les chaînes déjà chargées
+      // 🆕 CORRECTION LEGACY: Initialiser pagination correcte
+      console.log(`📦 Legacy: Sélection catégorie "${category.name}" avec ${category.channels?.length || 0} chaînes`);
+      
       setSelectedCategory(category);
-      setCurrentPage(1);
-      loadChannelsPage(category.channels, 1);
+      setCurrentPage(0); // CORRECTION: commencer à 0 pour pagination
+      
+      // Charger seulement la première page (500 chaînes)
+      const allChannels = category.channels || [];
+      const firstPageChannels = allChannels.slice(0, CHANNELS_PER_PAGE);
+      setDisplayedChannels(firstPageChannels);
+      
+      // Configurer pagination
+      const hasMorePages = allChannels.length > CHANNELS_PER_PAGE;
+      setHasMoreChannels(hasMorePages);
+      
+      console.log(`📈 Legacy init: Affichage ${firstPageChannels.length}/${allChannels.length} chaînes (hasMore: ${hasMorePages})`);
+      
+      // Scroll vers le haut
+      setTimeout(() => {
+        flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+      }, 100);
+      
       return;
     }
     
@@ -701,10 +725,18 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
         // Charger toutes les chaînes
         result = await WatermelonXtreamService.getPlaylistWithChannels(playlistId, CHANNELS_PER_PAGE, 0);
       } else {
-        // Charger chaînes de la catégorie spécifique
+        // Charger la première page de la catégorie
         result = await WatermelonXtreamService.getChannelsByCategory(playlistId, category.id, CHANNELS_PER_PAGE, 0);
         // Convertir en format attendu
         result = { channels: result, playlist: null };
+        
+        // 🔧 CORRECTION: Désactiver chargement automatique qui interfere avec pagination normale
+        // if (result.channels && result.channels.length === CHANNELS_PER_PAGE) {
+        //   setTimeout(async () => {
+        //     await loadAllRemainingChannels(category);
+        //   }, 100);
+        // }
+        console.log('🔍 Catégorie chargée - Pagination normale activee avec hasMoreChannels:', result.channels.length === CHANNELS_PER_PAGE);
       }
       
       if (result.channels && result.channels.length > 0) {
@@ -725,6 +757,11 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
         
         setDisplayedChannels(newChannels);
         setHasMoreChannels(newChannels.length === CHANNELS_PER_PAGE);
+        
+        // 🔧 CORRECTION: Scroll vers le haut lors du changement de catégorie
+        setTimeout(() => {
+          flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+        }, 100);
         
         console.log(`✅ Catégorie "${category.name}" chargée: ${newChannels.length} chaînes`);
       }
@@ -747,68 +784,189 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
     setDisplayedChannels(newChannels);
   };
   
-  // Charger plus de chaînes depuis WatermelonDB avec pagination
+  // 🔧 CORRECTION PAGINATION : Fonction corrigée pour charger TOUTES les chaînes
   const loadMoreChannels = async () => {
-    if (!hasMoreChannels || isLoadingMore || !useWatermelonDB || !selectedCategory) return;
+    console.log('🔄 onEndReached déclenché - loadMoreChannels appelé avec:', {
+      hasMoreChannels,
+      isLoadingMore,
+      useWatermelonDB,
+      selectedCategory: selectedCategory?.name,
+      currentPage,
+      displayedCount: displayedChannels.length,
+      categoryId: selectedCategory?.id
+    });
     
+    if (!hasMoreChannels || isLoadingMore || !selectedCategory) {
+      console.log('⛔ Conditions non remplies pour loadMoreChannels:', {
+        hasMoreChannels,
+        isLoadingMore,
+        useWatermelonDB,
+        hasSelectedCategory: !!selectedCategory
+      });
+      return;
+    }
+    
+    // 🆕 CORRECTION LEGACY : Gérer pagination pour système Legacy
+    if (!useWatermelonDB) {
+      console.log('📦 Système Legacy - Chargement page suivante depuis category.channels');
+      setIsLoadingMore(true);
+      
+      try {
+        const allCategoryChannels = selectedCategory.channels || [];
+        const currentlyDisplayed = displayedChannels.length;
+        
+        // 🔧 CORRECTION: Calculer depuis les chaînes déjà affichées
+        const startIndex = currentlyDisplayed;
+        const endIndex = Math.min(startIndex + CHANNELS_PER_PAGE, allCategoryChannels.length);
+        const newChannels = allCategoryChannels.slice(startIndex, endIndex);
+        
+        console.log('📄 Legacy pagination CORRIGÉE:', {
+          totalChannelsInCategory: allCategoryChannels.length,
+          currentlyDisplayed,
+          startIndex,
+          endIndex,
+          newChannelsToAdd: newChannels.length,
+          willHaveTotal: currentlyDisplayed + newChannels.length
+        });
+        
+        if (newChannels.length > 0) {
+          // Ajouter les nouvelles chaînes à l'affichage
+          setDisplayedChannels(prev => {
+            const updated = [...prev, ...newChannels];
+            console.log(`📈 Legacy: ${prev.length} + ${newChannels.length} = ${updated.length} chaînes`);
+            
+            // 🔧 SUPPRESSION du système anti-doublons défaillant
+            // Le système supprimait des chaînes légitimes avec des IDs similaires
+            // Les vraies données M3U n'ont généralement pas de doublons réels
+            
+            return updated;
+          });
+          
+          setCurrentPage(Math.ceil((currentlyDisplayed + newChannels.length) / CHANNELS_PER_PAGE));
+          
+          // Vérifier s'il reste des chaînes
+          const totalAfterAddition = currentlyDisplayed + newChannels.length;
+          const hasMorePages = totalAfterAddition < allCategoryChannels.length;
+          setHasMoreChannels(hasMorePages);
+          
+          console.log(`✅ Legacy: +${newChannels.length} chaînes (Total: ${totalAfterAddition}/${allCategoryChannels.length}, hasMore: ${hasMorePages})`);
+        } else {
+          console.log('🔚 Legacy: Aucune nouvelle chaîne à charger');
+          setHasMoreChannels(false);
+        }
+        
+      } catch (error) {
+        console.error('❌ Erreur pagination Legacy:', error);
+        setHasMoreChannels(false);
+      } finally {
+        setIsLoadingMore(false);
+      }
+      
+      return; // Sortir pour système Legacy
+    }
+    
+    // 🍉 SYSTÈME WATERMELONDB : Logique originale
     setIsLoadingMore(true);
+    console.log('🍉 WatermelonDB - Démarrage chargement page suivante...');
+    
     try {
       const WatermelonXtreamService = (await import('../services/WatermelonXtreamService')).default;
       const nextPage = currentPage + 1;
       const offset = nextPage * CHANNELS_PER_PAGE;
       
-      console.log(`📄 Loading page ${nextPage} pour catégorie "${selectedCategory.name}" (offset: ${offset})`);
+      console.log(`📄 Chargement page ${nextPage} pour "${selectedCategory.name}" (offset: ${offset}, CHANNELS_PER_PAGE: ${CHANNELS_PER_PAGE})`);
       
       let result;
       if (selectedCategory.id === 'all') {
-        // Charger toutes les chaînes
+        // Charger toutes les chaînes avec offset
+        console.log('🌍 Chargement TOUT avec offset:', offset);
         result = await WatermelonXtreamService.getPlaylistWithChannels(playlistId, CHANNELS_PER_PAGE, offset);
       } else {
-        // Charger chaînes de la catégorie spécifique
-        result = await WatermelonXtreamService.getChannelsByCategory(playlistId, selectedCategory.id, CHANNELS_PER_PAGE, offset);
-        // Convertir en format attendu
-        result = { channels: result, playlist: null };
+        // 🔧 CORRECTION: Charger chaînes spécifiques de la catégorie
+        console.log(`📊 Chargement catégorie "${selectedCategory.name}" (ID: ${selectedCategory.id}) avec offset:`, offset);
+        const categoryChannels = await WatermelonXtreamService.getChannelsByCategory(
+          playlistId, 
+          selectedCategory.id, 
+          CHANNELS_PER_PAGE, 
+          offset
+        );
+        result = { channels: categoryChannels, playlist: null };
       }
       
+      console.log('🔍 Résultat chargement pagination:', {
+        channelsLoaded: result.channels?.length || 0,
+        expectedChannels: CHANNELS_PER_PAGE,
+        offset,
+        nextPage,
+        isLastPage: (result.channels?.length || 0) < CHANNELS_PER_PAGE
+      });
+      
       if (result.channels && result.channels.length > 0) {
-        
         const newChannels = result.channels.map((channel: any) => {
           const rawLogo = channel.logoUrl || channel.streamIcon || '';
           const normalizedLogo = normalizeXtreamLogoUrl(rawLogo, serverUrl);
           
           return {
-            id: channel.id,
-            name: channel.name || 'Sans nom',
+            id: channel.id || `channel-${channel.streamId || channel.stream_id}-${Date.now()}`,
+            name: channel.name || channel.displayName || 'Sans nom',
             logo: normalizedLogo,
-            group: channel.groupTitle || channel.categoryName || 'Non classé',
-            url: channel.streamUrl || '',
+            group: channel.groupTitle || channel.categoryName || selectedCategory.name,
+            url: channel.streamUrl || channel.url || '',
             type: 'XTREAM' as const
           };
         });
         
-        setDisplayedChannels(prev => [...prev, ...newChannels]);
+        // 🔧 CORRECTION: Éviter doublons et mise à jour robuste
+        setDisplayedChannels(prev => {
+          const existingIds = new Set(prev.map(ch => ch.id));
+          const uniqueNewChannels = newChannels.filter(ch => !existingIds.has(ch.id));
+          const updatedChannels = [...prev, ...uniqueNewChannels];
+          
+          console.log(`➕ Ajout de ${uniqueNewChannels.length} nouvelles chaînes uniques (Total: ${updatedChannels.length})`);
+          return updatedChannels;
+        });
+        
         setCurrentPage(nextPage);
         
-        // Vérifier s'il y a encore des chaînes
-        if (result.channels.length < CHANNELS_PER_PAGE) {
-          setHasMoreChannels(false);
-        }
+        // 🔧 CORRECTION: Logic plus robuste pour hasMoreChannels
+        const hasMorePages = result.channels.length === CHANNELS_PER_PAGE;
+        setHasMoreChannels(hasMorePages);
         
-        console.log(`✅ Page ${nextPage} chargée: ${newChannels.length} nouvelles chaînes pour "${selectedCategory.name}"`);
+        console.log(`✅ Page ${nextPage} chargée avec succès:`, {
+          newChannelsCount: newChannels.length,
+          categoryName: selectedCategory.name,
+          hasMorePages,
+          totalDisplayed: displayedChannels.length + newChannels.length
+        });
+        
       } else {
+        console.log('🔚 Aucune nouvelle chaîne trouvée - Fin de pagination');
         setHasMoreChannels(false);
-        console.log('🔚 Plus de chaînes à charger');
       }
+      
     } catch (error) {
-      console.error('❌ Erreur chargement page suivante:', error);
+      console.error('❌ ERREUR dans loadMoreChannels:', error);
+      setHasMoreChannels(false);
     } finally {
       setIsLoadingMore(false);
+      console.log('⚙️ loadMoreChannels terminé');
     }
   };
 
   // NOUVEAU : Rendu avec animation pour compteurs
   const renderCategoryItem = ({ item: category }: { item: Category }) => {
     const isSelected = selectedCategory?.id === category.id;
+    
+    // 🎨 Icônes uniquement pour Favoris et Récents
+    const getCategoryIcon = (name: string) => {
+      if (name.includes('FAVORIS') || name.includes('💙')) return 'favorite';
+      if (name.includes('RÉCENTS') || name.includes('📺')) return 'history';
+      return null; // Pas d'icône pour les autres catégories
+    };
+    
+    // 🎨 Couleur d'accent moderne (Cyan menthe)
+    const accentColor = '#00D4AA';
+    const iconColor = isSelected ? accentColor : 'rgba(255, 255, 255, 0.6)';
     
     return (
       <TouchableOpacity
@@ -819,7 +977,17 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
         onPress={() => handleCategorySelect(category)}
         activeOpacity={0.7}
       >
-        {/* Layout horizontal simple */}
+        {/* Icône uniquement pour Favoris et Récents */}
+        {getCategoryIcon(category.name) && (
+          <Icon 
+            name={getCategoryIcon(category.name)} 
+            size={20} 
+            color={iconColor} 
+            style={styles.categoryIcon} 
+          />
+        )}
+        
+        {/* Nom de catégorie avec hiérarchie typographique */}
         <Text 
           style={[
             styles.categoryName,
@@ -827,16 +995,16 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
           ]}
           numberOfLines={1}
         >
-          {category.name}
+          {category.name.replace(/💙|📺|[🎯📂]/g, '').trim()}
         </Text>
         
-        {/* NOUVEAU : Compteur avec animation et container */}
+        {/* Compteur avec style secondaire */}
         <Animated.View style={styles.categoryCountContainer}>
           <Animated.Text style={[
             styles.categoryCount,
             isSelected && styles.categoryCountSelected
           ]}>
-            {category.count.toLocaleString()} {/* Format avec séparateurs de milliers */}
+            {category.count.toLocaleString()}
           </Animated.Text>
         </Animated.View>
       </TouchableOpacity>
@@ -896,6 +1064,81 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
     ]).start();
   };
 
+  // Fonction pour appliquer le tri
+  const applySorting = (sortType: 'default' | 'newest' | 'az' | 'za') => {
+    let sortedChannels = [...displayedChannels];
+    
+    switch (sortType) {
+      case 'az':
+        sortedChannels.sort((a, b) => a.name.localeCompare(b.name));
+        break;
+      case 'za':
+        sortedChannels.sort((a, b) => b.name.localeCompare(a.name));
+        break;
+      case 'newest':
+        // Tri par ordre d'ajout (récent en premier) - peut utiliser l'index ou une date
+        sortedChannels.reverse();
+        break;
+      case 'default':
+      default:
+        // Ordre par défaut - peut recharger depuis la source ou garder l'ordre initial
+        break;
+    }
+    
+    setDisplayedChannels(sortedChannels);
+    console.log(`✅ Tri appliqué: ${sortType} - ${sortedChannels.length} chaînes`);
+  };
+
+  // Fonction pour charger automatiquement toutes les chaînes restantes d'une catégorie
+  const loadAllRemainingChannels = async (category: Category) => {
+    if (!useWatermelonDB || category.id === 'all') return;
+    
+    try {
+      const WatermelonXtreamService = (await import('../services/WatermelonXtreamService')).default;
+      let page = 1;
+      let allChannels = [...displayedChannels];
+      let hasMore = true;
+      
+      console.log(`🔄 Chargement automatique invisible pour "${category.name}"...`);
+      
+      while (hasMore) {
+        const offset = page * CHANNELS_PER_PAGE;
+        const result = await WatermelonXtreamService.getChannelsByCategory(playlistId, category.id, CHANNELS_PER_PAGE, offset);
+        
+        if (result && result.length > 0) {
+          const newChannels = result.map((channel: any) => ({
+            id: channel.id || `channel-${channel.stream_id}-${Date.now()}`,
+            name: channel.name || channel.displayName || 'Sans nom',
+            logo: normalizeXtreamLogoUrl(channel.displayLogo || channel.logoUrl || channel.streamIcon || '', serverUrl),
+            group: category.name,
+            url: channel.streamUrl || channel.url || '',
+            type: 'XTREAM' as const
+          }));
+          
+          allChannels = [...allChannels, ...newChannels];
+          
+          // Mise à jour silencieuse de l'affichage
+          setDisplayedChannels(allChannels);
+          
+          console.log(`📄 Page ${page + 1} chargée: +${newChannels.length} chaînes (Total: ${allChannels.length})`);
+          page++;
+          
+          if (result.length < CHANNELS_PER_PAGE) {
+            hasMore = false;
+            setHasMoreChannels(false);
+          }
+        } else {
+          hasMore = false;
+          setHasMoreChannels(false);
+        }
+      }
+      
+      console.log(`✅ Chargement automatique terminé: ${allChannels.length} chaînes pour "${category.name}"`);
+    } catch (error) {
+      console.error('❌ Erreur chargement automatique:', error);
+    }
+  };
+
   // Rendu d'un item de chaîne avec nouveau composant optimisé
   const renderChannelItem = React.useCallback(({ item: channel, index }: { item: Channel; index: number }) => {
     return (
@@ -905,9 +1148,10 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
         width={getChannelCardWidth()}
         onPress={handleChannelPress}
         serverUrl={serverUrl}
+        hideChannelNames={hideChannelNames}
       />
     );
-  }, [serverUrl]); // Dépendances minimales
+  }, [serverUrl, hideChannelNames]); // Dépendances minimales
 
   // OPTIMISÉ : Calcul largeur pour utiliser TOUT l'espace disponible
   const getChannelCardWidth = (): number => {
@@ -1000,7 +1244,7 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
         </TouchableOpacity>
         
         <Text style={styles.headerTitle}>
-          {selectedCategory?.name || 'TOUTES LES CHAÎNES'} <Text style={styles.headerTitleCount}>({selectedCategory?.id === 'all' ? totalChannels : displayedChannels.length}{hasMoreChannels ? '+' : ''})</Text>
+          {selectedCategory?.name || 'TOUTES LES CHAÎNES'} <Text style={styles.headerTitleCount}>({selectedCategory?.id === 'all' ? (selectedCategory?.count || totalChannels || displayedChannels.length) : displayedChannels.length}{hasMoreChannels && selectedCategory?.id !== 'all' ? '+' : ''})</Text>
         </Text>
         
         <View style={styles.headerActions}>
@@ -1026,11 +1270,134 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
             />
           </View>
           
-          <TouchableOpacity style={styles.headerButton}>
+          <TouchableOpacity 
+            style={styles.headerButton}
+            onPress={() => setShowOptionsMenu(true)}
+          >
             <Icon name="more-vert" size={26} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Menu d'options (3 points) - Version dropdown compacte */}
+      {showOptionsMenu && (
+        <View style={styles.dropdownOverlay}>
+          <TouchableOpacity 
+            style={styles.dropdownBackdrop}
+            activeOpacity={1}
+            onPress={() => setShowOptionsMenu(false)}
+          />
+          <View style={styles.dropdownMenu}>
+            <TouchableOpacity
+              style={styles.dropdownItem}
+              activeOpacity={0.7}
+              onPress={() => {
+                setHideChannelNames(!hideChannelNames);
+                setShowOptionsMenu(false);
+              }}
+            >
+              <Icon 
+                name={hideChannelNames ? "visibility" : "visibility-off"} 
+                size={18} 
+                color="#333333" 
+              />
+              <Text style={styles.dropdownText}>
+                {hideChannelNames ? "Afficher les noms" : "Masquer le nom de la chaîne"}
+              </Text>
+            </TouchableOpacity>
+            
+            <View style={styles.dropdownSeparator} />
+            
+            <TouchableOpacity
+              style={styles.dropdownItem}
+              activeOpacity={0.7}
+              onPress={() => {
+                setShowOptionsMenu(false);
+                setShowSortModal(true);
+              }}
+            >
+              <Icon 
+                name="sort" 
+                size={18} 
+                color="#333333" 
+              />
+              <Text style={styles.dropdownText}>
+                Trier
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {/* Modal de tri - Version sans Modal React Native */}
+      {showSortModal && (
+        <View style={styles.sortModalOverlay}>
+          <TouchableOpacity 
+            style={styles.sortModalBackdrop}
+            activeOpacity={1}
+            onPress={() => setShowSortModal(false)}
+          />
+          <View style={styles.sortModalContent}>
+            {/* Header du modal */}
+            <View style={styles.sortModalHeader}>
+              <Icon name="sort" size={24} color="#4A9EFF" />
+              <Text style={styles.sortModalTitle}>Trier selon :</Text>
+            </View>
+            
+            {/* Options de tri */}
+            <View style={styles.sortOptions}>
+              {[
+                { key: 'default', label: 'Défaut', icon: 'radio-button-unchecked' },
+                { key: 'newest', label: 'Top Ajouté', icon: 'radio-button-unchecked' },
+                { key: 'az', label: 'A-Z', icon: 'radio-button-unchecked' },
+                { key: 'za', label: 'Z-A', icon: 'radio-button-unchecked' },
+              ].map((option) => (
+                <TouchableOpacity
+                  key={option.key}
+                  style={styles.sortOption}
+                  activeOpacity={0.6}
+                  onPress={() => setSortOption(option.key as any)}
+                >
+                  <Icon 
+                    name={sortOption === option.key ? "radio-button-checked" : "radio-button-unchecked"} 
+                    size={20} 
+                    color={sortOption === option.key ? "#4A9EFF" : "#666666"} 
+                  />
+                  <Text style={[
+                    styles.sortOptionText,
+                    sortOption === option.key && styles.sortOptionTextSelected
+                  ]}>
+                    {option.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            
+            {/* Boutons d'action */}
+            <View style={styles.sortModalActions}>
+              <TouchableOpacity
+                style={styles.sortModalButtonSecondary}
+                activeOpacity={0.7}
+                onPress={() => setShowSortModal(false)}
+              >
+                <Text style={styles.sortModalButtonSecondaryText}>FERMER</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={styles.sortModalButtonPrimary}
+                activeOpacity={0.8}
+                onPress={() => {
+                  // Appliquer le tri
+                  applySorting(sortOption);
+                  setShowSortModal(false);
+                }}
+              >
+                <Text style={styles.sortModalButtonPrimaryText}>ENREGISTRER</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
 
       {/* Contenu principal - Layout horizontal */}
       <View style={styles.mainContent}>
@@ -1063,6 +1430,7 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
         {/* ÉTAPE 4: Grille principale des chaînes */}
         <Animated.View style={[styles.channelsGrid, !sidebarVisible && styles.channelsGridFullWidth, { opacity: categoryTransitionAnim }]}>
           <FlatList
+            ref={flatListRef}
             data={displayedChannels}
             keyExtractor={keyExtractor}
             renderItem={renderChannelItem}
@@ -1090,9 +1458,9 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
             getItemLayout={getItemLayout}
             keyboardShouldPersistTaps="handled"
             onEndReached={hasMoreChannels ? loadMoreChannels : undefined}
-            onEndReachedThreshold={0.5}
+            onEndReachedThreshold={0.1}
             progressViewOffset={50}
-            extraData={selectedCategory?.id}
+            extraData={`${selectedCategory?.id}-${displayedChannels.length}-${hasMoreChannels}`}
           />
         </Animated.View>
       </View>
@@ -1144,7 +1512,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
   },
   headerTitleCount: {
-    color: 'rgba(255, 255, 255, 0.7)', // OPACITÉ 70% : Compteur moins proéminent
+    color: '#FFFFFF', // BLANC : Compteur en blanc comme demandé
     fontSize: 16,
     fontWeight: '400', // REGULAR : Poids normal pour le compteur
   },
@@ -1221,15 +1589,18 @@ const styles = StyleSheet.create({
   searchContainerHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center', // NOUVEAU : centrer le contenu
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 24, // AUGMENTÉ : plus arrondi
-    paddingHorizontal: 12,
-    paddingVertical: 6, // RÉDUIT : hauteur plus compacte
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)', // 🎨 MODERNISÉ : Plus subtil
+    borderRadius: 20, // Arrondi moderne
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     marginRight: 8,
     minWidth: 160,
     maxWidth: 220,
-    height: 36, // FIXE : hauteur fixe pour cohérence
+    height: 36,
+    // Bordure subtile pour plus de définition
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   searchIcon: {
     marginRight: 6, // RÉDUIT : espacement plus compact
@@ -1263,11 +1634,17 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   categoryItemSelected: {
-    // NOUVEAU : Sélection évidente avec fond + barre colorée
-    backgroundColor: '#2a2a2a', // Gris plus clair comme suggéré
+    // 🎨 MODERNISÉ : Sélection avec couleur cyan menthe
+    backgroundColor: '#2a2a2a',
     borderRadius: 8,
-    borderLeftWidth: 4, // NOUVEAU : Barre de couleur vive à gauche
-    borderLeftColor: '#4FACFE', // Couleur d'accentuation bleue
+    borderLeftWidth: 4,
+    borderLeftColor: '#00D4AA', // Couleur cyan menthe moderne
+    // Effet subtil de shadow
+    shadowColor: '#00D4AA',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 2,
   },
   categoryIcon: {
     marginRight: 12,
@@ -1276,24 +1653,24 @@ const styles = StyleSheet.create({
   categoryName: {
     flex: 1,
     color: 'rgba(255, 255, 255, 0.9)',
-    fontSize: 15, // AUGMENTÉ : Plus lisible
-    fontWeight: '400', // REGULAR : Poids normal
+    fontSize: 15,
+    fontWeight: '500', // 🎨 MODERNISÉ : Medium pour hiérarchie
     lineHeight: 18,
   },
   categoryNameSelected: {
-    color: '#4FACFE', // NOUVEAU : Couleur d'accentuation pour texte sélectionné
-    fontWeight: '700', // BOLD : Comme suggéré pour items sélectionnés
+    color: '#00D4AA', // 🎨 MODERNISÉ : Couleur cyan menthe
+    fontWeight: '700', // Bold pour items sélectionnés
   },
   categoryCount: {
-    color: 'rgba(255, 255, 255, 0.6)', // OPACITÉ 60% : Moins proéminent comme suggéré
-    fontSize: 14, // RÉDUIT : Taille normale pour items non sélectionnés
-    fontWeight: '500',
+    color: '#FFFFFF', // BLANC : Compteur normal
+    fontSize: 13, // Taille réduite pour style secondaire
+    fontWeight: '400', // Regular pour compteurs
     marginLeft: 8,
     minWidth: 40, // Largeur minimum pour éviter déplacement lors animation
     textAlign: 'right',
   },
   categoryCountSelected: {
-    color: 'rgba(79, 172, 254, 0.9)', // NOUVEAU : Accent coloré plus vif pour compteur sélectionné
+    color: '#00D4AA', // VERT : Compteur sélectionné
     fontWeight: '700', // BOLD pour sélection
     fontSize: 18, // PLUS GRAND : Seulement pour l'item sélectionné
     transform: [{ scale: 1.1 }], // ANIMATION : Agrandissement plus visible pour sélection
@@ -1359,16 +1736,200 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '400',
   },
-  // NOUVEAU : Styles pour espacement entre rangées
+  // NOUVEAU : Styles pour espacement entre rangées - ALIGNEMENT RÉTABLI
   rowSpacingSidebar: {
-    justifyContent: 'space-between', // RESTAURÉ : distribution équitable
+    justifyContent: 'space-between', // RÉTABLI : distribution équitable
     paddingHorizontal: 0,
     marginBottom: 4, // Espacement vertical entre rangées
   },
   rowSpacingFullscreen: {
-    justifyContent: 'space-between', // Distribution équitable
+    justifyContent: 'space-between', // RÉTABLI : distribution équitable
     paddingHorizontal: 0, 
     marginBottom: 6, // Plus d'espacement en mode plein écran
+  },
+  // Styles pour dropdown menu - SANS modal fullscreen
+  dropdownOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1000,
+  },
+  dropdownBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'transparent', // Pas de film noir
+  },
+  dropdownMenu: {
+    position: 'absolute',
+    top: 55, // Position sous le header
+    right: 12, // Aligné avec le bouton 3 points
+    backgroundColor: '#FFFFFF', // Blanc pur pour maximum de contraste
+    borderRadius: 16, // Très arrondi pour effet moderne
+    paddingVertical: 8,
+    minWidth: 200,
+    maxWidth: 240,
+    borderWidth: 0, // Pas de bordure pour effet plus clean
+    // Dégradé subtil avec plusieurs ombres pour effet de profondeur
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 15,
+    // Effet de glassmorphism avec backdrop
+    backdropFilter: 'blur(10px)',
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 12, // Plus arrondi pour cohérence
+    marginHorizontal: 8, // Espacement des côtés
+    marginVertical: 2, // Espacement vertical entre items
+    backgroundColor: 'transparent',
+    // Effet de transition hover (simulé avec activeOpacity)
+  },
+  dropdownText: {
+    color: '#333333', // Texte sombre sur fond clair
+    fontSize: 14,
+    fontWeight: '400',
+    marginLeft: 12,
+    flex: 1,
+  },
+  dropdownSeparator: {
+    height: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.06)', // Ligne très subtile
+    marginVertical: 6,
+    marginHorizontal: 16, // Plus d'espacement sur les côtés
+    borderRadius: 1, // Légèrement arrondi
+  },
+  // Styles pour le modal de tri - Position absolue SANS Modal React Native
+  sortModalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 2000,
+  },
+  sortModalBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.15)', // Beaucoup moins opaque
+  },
+  sortModalContent: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)', // Blanc légèrement transparent
+    borderRadius: 20, // iOS native style - très arrondi
+    paddingVertical: 24, // Padding premium
+    paddingHorizontal: 24,
+    minWidth: 280,
+    maxWidth: 320,
+    width: '80%',
+    borderWidth: 0,
+    // ✨ iOS Native - Ombres douces multi-layered
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.15,
+    shadowRadius: 24,
+    // ✨ Material Design 3 - Surface élevée
+    elevation: 24,
+    // ✨ Premium depth effect
+    transform: [{ translateY: -2 }],
+    // ✨ Glassmorphism effect
+    backdropFilter: 'blur(20px)',
+  },
+  sortModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16, // Réduit de 20 à 16
+  },
+  sortModalTitle: {
+    fontSize: 18, // Réduit de 20 à 18
+    fontWeight: '600',
+    color: '#333333',
+    marginLeft: 10, // Réduit de 12 à 10
+  },
+  sortOptions: {
+    marginBottom: 18, // Réduit de 24 à 18
+  },
+  sortOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10, // Réduit de 14 à 10
+    paddingHorizontal: 6, // Réduit de 8 à 6
+    borderRadius: 8, // Réduit de 10 à 8
+    marginVertical: 1, // Réduit de 2 à 1
+  },
+  sortOptionText: {
+    fontSize: 15, // Réduit de 16 à 15
+    fontWeight: '400',
+    color: '#333333',
+    marginLeft: 10, // Réduit de 12 à 10
+  },
+  sortOptionTextSelected: {
+    fontWeight: '500',
+    color: '#4A9EFF',
+  },
+  sortModalActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between', // Meilleur alignement
+    alignItems: 'center',
+    marginTop: 8, // Espacement du haut
+    paddingTop: 8, // Séparation visuelle
+  },
+  sortModalButtonSecondary: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 16, // ✨ iOS Native - coins très arrondis
+    backgroundColor: '#F2F2F7', // ✨ iOS system gray
+    // ✨ Premium subtle shadow
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+    minWidth: 90, // Largeur minimale pour alignement
+  },
+  sortModalButtonSecondaryText: {
+    fontSize: 13, // Réduit de 14 à 13
+    fontWeight: '600',
+    color: '#666666',
+  },
+  sortModalButtonPrimary: {
+    paddingVertical: 12,
+    paddingHorizontal: 28,
+    borderRadius: 16, // ✨ iOS Native - coins très arrondis
+    backgroundColor: '#007AFF', // ✨ iOS system blue
+    // ✨ Premium glowing shadow effect
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
+    // ✨ Material Design 3 - Subtle gradient
+    minWidth: 120, // Largeur minimale pour alignement
+  },
+  sortModalButtonPrimaryText: {
+    fontSize: 14, // ✨ Premium - taille optimale
+    fontWeight: '600',
+    color: '#FFFFFF',
+    textAlign: 'center',
+  },
+  sortModalButtonSecondaryText: {
+    fontSize: 14, // ✨ Cohérence avec primaire
+    fontWeight: '600',
+    color: '#8E8E93', // ✨ iOS system gray
+    textAlign: 'center',
   },
 });
 

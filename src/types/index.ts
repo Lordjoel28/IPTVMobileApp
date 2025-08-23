@@ -12,6 +12,14 @@ export type RootStackParamList = {
     channels?: Channel[];
     totalChannels?: number;
   };
+  ChannelPlayer: {
+    playlistId: string;
+    allCategories: Category[];
+    initialCategory: Category;
+    initialChannels: Channel[];
+    selectedChannel: Channel;
+    playlistName: string;
+  };
   Player: { channel: Channel; playlist?: Playlist };
   Settings: undefined;
   PlaylistDetail: { playlist: Playlist };
@@ -42,6 +50,14 @@ export interface Channel {
   quality?: string;
   isAdult?: boolean;
   epgId?: string;
+}
+
+// Category Types
+export interface Category {
+  id: string;
+  name: string;
+  count: number;
+  channels: Channel[];
 }
 
 // Playlist Types
