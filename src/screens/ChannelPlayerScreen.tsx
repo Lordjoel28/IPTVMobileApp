@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+// import { WatermelonXtreamService } from '../services/WatermelonXtreamService'; // TEMPORAIRE: Désactivé (GitHub Issue #3692)
 import {
   View,
   Text,
@@ -15,12 +16,16 @@ import {
   Image,
   Dimensions,
   Pressable,
+  ScrollView,
 } from 'react-native';
+// Masquage barre navigation via StatusBar
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { List, Avatar, IconButton, Card, ProgressBar, Text as PaperText } from 'react-native-paper';
 import VideoPlayer from '../components/VideoPlayer';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import type { RootStackParamList, Channel, Category } from '../types';
+
 
 const { width, height } = Dimensions.get('window');
 
@@ -69,11 +74,130 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({ route }) => {
   const [selectedChannel, setSelectedChannel] = useState<Channel>(initialChannel);
   const [showFullscreenPlayer, setShowFullscreenPlayer] = useState(false);
   const [isPlaying, setIsPlaying] = useState(true);
+  const [shouldKeepCurrentChannel, setShouldKeepCurrentChannel] = useState(false); // Flag pour éviter changement auto
+  const [currentTime, setCurrentTime] = useState('');
+  const [currentDate, setCurrentDate] = useState('');
+  const [favoriteChannels, setFavoriteChannels] = useState<string[]>([]); // IDs des chaînes favorites
 
-  // Dimensions pour le layout 3 zones
-  const leftPanelWidth = width * 0.45; // 45% pour la liste chaînes
+  // Charger les favoris au montage
+  useEffect(() => {
+    loadFavorites();
+  }, []);
+
+  // Fonction pour charger les favoris depuis AsyncStorage
+  const loadFavorites = async () => {
+    try {
+      const AsyncStorage = await import('@react-native-async-storage/async-storage');
+      const favoritesData = await AsyncStorage.default.getItem(`favorites_${playlistId}`);
+      if (favoritesData) {
+        const favorites = JSON.parse(favoritesData);
+        setFavoriteChannels(favorites);
+        console.log(`♥️ ${favorites.length} favoris chargés`);
+      }
+    } catch (error) {
+      console.error('❌ Erreur chargement favoris:', error);
+    }
+  };
+
+  // État pour les chaînes récentes
+  const [recentChannels, setRecentChannels] = useState<Channel[]>([]);
+
+  // Charger les chaînes récentes depuis AsyncStorage
+  const loadRecentChannels = async () => {
+    try {
+      const AsyncStorage = await import('@react-native-async-storage/async-storage');
+      const recentKey = `recent_channels_${playlistId}`;
+      const recentData = await AsyncStorage.default.getItem(recentKey);
+      
+      if (recentData) {
+        const recentChannelsData = JSON.parse(recentData);
+        setRecentChannels(recentChannelsData);
+        console.log(`🕰️ ${recentChannelsData.length} chaînes récentes chargées`);
+      }
+    } catch (error) {
+      console.error('❌ Erreur chargement récents:', error);
+    }
+  };
+
+  // Charger les récents au montage
+  useEffect(() => {
+    loadRecentChannels();
+  }, [playlistId]);
+
+  // Fonction pour obtenir le nombre de chaînes pour une catégorie
+  const getCategoryChannelCount = (category: Category, currentChannels: Channel[]): number => {
+    // Si c'est la catégorie "RÉCENTS" (détection par nom)
+    if (category.name.toLowerCase().includes('tout') && category.name.includes('(')) {
+      // C'est probablement "TOUT (242)" - utiliser les vraies chaînes récentes
+      if (category.name.toLowerCase().includes('recent') || category.id.includes('recent')) {
+        return recentChannels.length;
+      }
+    }
+    
+    // Si c'est la catégorie "FAVORIS" (détection par nom)
+    if (category.name.toLowerCase().includes('favoris') || category.name.includes('💙')) {
+      return favoriteChannels.length;
+    }
+    
+    // Si c'est la catégorie active, utiliser les chaînes actuellement affichées
+    if (categories[currentCategoryIndex]?.id === category.id) {
+      return currentChannels.length;
+    }
+    
+    // Sinon, utiliser les chaînes associées à la catégorie
+    return category.channels?.length || 0;
+  };
+
+  // 🔴 Logique LIVE: afficher seulement si vraiment en direct
+  const isReallyLive = (channel: Channel) => {
+    // Vérifier si la chaîne est vraiment en live
+    // Par défaut: true pour chaînes TV classiques, false pour VOD
+    return !channel.name.toLowerCase().includes('vod') && 
+           !channel.name.toLowerCase().includes('replay') &&
+           !channel.url.includes('.mp4') &&
+           !channel.url.includes('.mkv');
+  };
+
+  // Interface plein écran simple via StatusBar
+  useEffect(() => {
+    // Pas d'action spéciale pour le moment
+    // Hot reload compatible
+  }, []);
+
+  // Mise à jour de l'heure et date temps réel
+  useEffect(() => {
+    const updateTimeAndDate = () => {
+      const now = new Date();
+      const timeString = now.toLocaleTimeString('fr-FR', {
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+      const dateString = now.toLocaleDateString('fr-FR', {
+        weekday: 'short', // Dim, Lun, Mar...
+        day: '2-digit',
+        month: 'short'    // Jan, Fév, Mar...
+      });
+      setCurrentTime(timeString);
+      setCurrentDate(dateString);
+    };
+
+    updateTimeAndDate(); // Mise à jour immédiate
+    const interval = setInterval(updateTimeAndDate, 1000); // Mise à jour chaque seconde
+
+    return () => clearInterval(interval); // Cleanup
+  }, []);
+
+  
+
+  // Dimensions COMME IPTV SMARTERS PRO REFERENCE
+  const leftPanelWidth = width * 0.43; // Largeur ajustée à 43%  
   const rightPanelWidth = width * 0.55; // 55% pour lecteur + EPG
-  const miniPlayerHeight = height * 0.45; // 45% de la hauteur pour le mini lecteur
+  // 🎯 RATIO COMME IPTV SMARTERS PRO - LECTEUR COMPACT
+  // Lecteur vraiment petit comme dans la référence (environ 180-200px)
+  const miniPlayerHeight = Math.min(
+    rightPanelWidth * (9 / 16), // Ratio 16:9
+    180  // Très compact comme référence IPTV Smarters Pro
+  );
 
   // ===== LOGIQUE DE NAVIGATION ENTRE CATÉGORIES (Spec Gemini) =====
   const handleNextCategory = () => {
@@ -100,30 +224,89 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({ route }) => {
     if (newCategory) {
       console.log(`🎬 Changement de catégorie vers : ${newCategory.name}`);
 
-      // Mettre à jour la liste des chaînes affichées
-      // NOTE : Si les chaînes ne sont pas dans newCategory.channels, il faudra les charger dynamiquement
-      const newChannels = newCategory.channels || [];
+      // 🔧 CHARGEMENT DES CHAÎNES PAR CATÉGORIE
+      let newChannels: Channel[];
+      
+      // Catégorie RÉCENTS - utiliser les vraies chaînes regardées
+      if (newCategory.name.toLowerCase().includes('recent') || newCategory.id.includes('recent')) {
+        newChannels = recentChannels;
+        console.log(`🕰️ RÉCENTS: ${newChannels.length} chaînes vraiment regardées`);
+      } 
+      // Catégorie initiale (celle d'origine)
+      else if (newCategory.id === initialCategory.id && initialChannels.length > 0) {
+        newChannels = initialChannels;
+        console.log(`🎯 XTREAM MATCHED: Utilisation des initialChannels (${newChannels.length} chaînes) pour ${newCategory.name}`);
+      } 
+      // Autres catégories
+      else {
+        newChannels = newCategory.channels || [];
+        if (newChannels.length === 0) {
+          console.log(`🔍 CHARGEMENT DYNAMIQUE: Catégorie ${newCategory.name} vide, chargement depuis WatermelonDB...`);
+          loadChannelsForCategory(newCategory.id, newCategory.name);
+          return; // Exit early, loadChannelsForCategory gérera les setState
+        }
+        console.log(`🎯 STANDARD: Utilisation des category.channels (${newChannels.length} chaînes) pour ${newCategory.name}`);
+      }
+      
       setChannels(newChannels);
 
-      // Sélectionner la première chaîne de la nouvelle catégorie, si elle existe
-      if (newChannels.length > 0) {
-        setSelectedChannel(newChannels[0]);
-        console.log(`🎬 Première chaîne sélectionnée: ${newChannels[0].name}`);
+      // JAMAIS changer automatiquement la chaîne lors de la navigation
+      // L'utilisateur garde sa chaîne actuelle peu importe la catégorie
+      console.log(`✅ Navigation vers ${newCategory.name} - Chaîne actuelle ${selectedChannel.name} conservée`);
+      
+      // Optionnel: Log si la chaîne actuelle est dans la nouvelle catégorie
+      const currentChannelInNewCategory = newChannels.find(ch => ch.id === selectedChannel.id);
+      if (currentChannelInNewCategory) {
+        console.log(`🎯 Chaîne actuelle trouvée dans ${newCategory.name}`);
       } else {
-        // Gérer le cas où la catégorie est vide
-        console.log('⚠️ Catégorie vide, pas de chaîne à sélectionner');
+        console.log(`🔄 Chaîne actuelle non présente dans ${newCategory.name}, mais conservée`);
       }
     }
-  }, [currentCategoryIndex, categories]);
+  }, [currentCategoryIndex, categories, initialChannels]);
 
   const handleBack = () => {
     navigation.goBack();
+  };
+
+  // Fonction pour ajouter une chaîne aux récents
+  const addToRecentChannels = async (channel: Channel) => {
+    try {
+      const AsyncStorage = await import('@react-native-async-storage/async-storage');
+      const recentKey = `recent_channels_${playlistId}`;
+      
+      // Charger les récents actuels
+      const recentData = await AsyncStorage.default.getItem(recentKey);
+      let recentChannels = recentData ? JSON.parse(recentData) : [];
+      
+      // Supprimer la chaîne si déjà présente
+      recentChannels = recentChannels.filter((recent: any) => recent.id !== channel.id);
+      
+      // Ajouter en tête avec timestamp
+      const recentChannel = {
+        ...channel,
+        watchedAt: new Date().toISOString()
+      };
+      recentChannels.unshift(recentChannel);
+      
+      // Limiter à 20 chaînes récentes
+      recentChannels = recentChannels.slice(0, 20);
+      
+      // Sauvegarder
+      await AsyncStorage.default.setItem(recentKey, JSON.stringify(recentChannels));
+      console.log(`✅ Chaîne ${channel.name} ajoutée aux récents`);
+      
+    } catch (error) {
+      console.error('❌ Erreur ajout récents:', error);
+    }
   };
 
   const handleChannelSelect = (channel: Channel) => {
     console.log('🎬 Sélection chaîne:', channel.name);
     setSelectedChannel(channel);
     setIsPlaying(true);
+    
+    // Ajouter aux récents SEULEMENT quand l'utilisateur sélectionne manuellement
+    addToRecentChannels(channel);
   };
 
   const handleMiniPlayerPress = () => {
@@ -136,53 +319,85 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({ route }) => {
     setShowFullscreenPlayer(false);
   };
 
-  // Rendu d'une chaîne dans la liste de gauche
+  // 🔍 CHARGEMENT DYNAMIQUE basé sur patterns GitHub/Reddit - FIX prototype error avec AsyncStorage
+  const loadChannelsForCategory = async (categoryId: string, categoryName: string) => {
+    try {
+      console.log(`🔍 Chargement chaînes pour ${categoryName} via AsyncStorage (évite conflit WatermelonDB)`);
+      
+      // Import AsyncStorage (alternative safe à WatermelonDB)
+      const AsyncStorage = await import('@react-native-async-storage/async-storage');
+      
+      // Clé pour les chaînes de cette catégorie
+      const cacheKey = `channels_${playlistId}_${categoryId}`;
+      console.log(`📦 Recherche cache: ${cacheKey}`);
+      
+      const cachedData = await AsyncStorage.default.getItem(cacheKey);
+      if (cachedData) {
+        const channelsData = JSON.parse(cachedData);
+        console.log(`✅ ${channelsData.length} chaînes chargées depuis AsyncStorage pour ${categoryName}`);
+        
+        setChannels(channelsData);
+        // JAMAIS changer la chaîne lors du chargement dynamique
+        console.log(`✅ ${channelsData.length} chaînes chargées - Lecture en cours conservée`);
+      } else {
+        console.log(`⚠️ Pas de cache AsyncStorage pour ${categoryName}`);
+        // Fallback vers category.channels
+        const fallbackChannels = categories.find(cat => cat.id === categoryId)?.channels || [];
+        if (fallbackChannels.length > 0) {
+          console.log(`🎯 FALLBACK: ${fallbackChannels.length} chaînes trouvées dans category.channels`);
+          setChannels(fallbackChannels);
+          // Ne pas changer la chaîne automatiquement en fallback non plus
+          console.log(`✅ Fallback chargé sans interrompre la lecture`);
+        } else {
+          console.log(`⚠️ Aucune chaîne pour ${categoryName} - gardons les chaînes actuelles`);
+        }
+      }
+    } catch (error) {
+      console.error(`❌ Erreur chargement AsyncStorage ${categoryName}:`, error);
+      // Fallback silencieux
+      const fallbackChannels = categories.find(cat => cat.id === categoryId)?.channels || [];
+      if (fallbackChannels.length > 0) {
+        setChannels(fallbackChannels);
+        // Même en cas d'erreur, ne pas changer automatiquement la chaîne
+      }
+    }
+  };
+
+  // Rendu d'une chaîne dans la liste de gauche - Version compacte List.Item
   const renderChannelItem = ({ item, index }: { item: Channel; index: number }) => {
     const isSelected = item.id === selectedChannel.id;
 
     return (
-      <TouchableOpacity
+      <List.Item
         style={[
-          styles.channelItem,
-          isSelected && styles.channelItemSelected,
+          styles.channelListItem,
+          isSelected && styles.channelListItemSelected,
         ]}
         onPress={() => handleChannelSelect(item)}
-        activeOpacity={0.8}
-      >
-        {/* Logo de la chaîne */}
-        <View style={styles.channelLogo}>
-          {item.logo ? (
-            <Image
+        left={(props) => (
+          item.logo ? (
+            <Image 
               source={{ uri: item.logo }}
-              style={styles.channelLogoImage}
-              resizeMode="contain"
+              style={styles.channelLogo}
+              resizeMode="contain" // Assure que le logo entier est visible sans être rogné
             />
           ) : (
-            <View style={styles.channelLogoFallback}>
-              <Text style={styles.channelLogoText}>
-                {item.name.substring(0, 2).toUpperCase()}
-              </Text>
-            </View>
-          )}
-        </View>
-
-        {/* Informations chaîne */}
-        <View style={styles.channelInfo}>
-          <Text style={styles.channelName} numberOfLines={2}>
-            {item.name}
-          </Text>
-          <Text style={styles.channelDetails}>
-            {item.quality || 'Unknown'} • {item.group || 'General'}
-          </Text>
-        </View>
-
-        {/* Indicateur de sélection */}
-        {isSelected && (
-          <View style={styles.playingIndicator}>
-            <Icon name="play-arrow" size={16} color="#4CAF50" />
-          </View>
+            <Avatar.Text
+              {...props}
+              label={item.name.substring(0, 2).toUpperCase()}
+              size={36}
+              style={styles.channelAvatarFallback}
+              labelStyle={styles.channelAvatarText}
+            />
+          )
         )}
-      </TouchableOpacity>
+        title={item.name}
+        titleStyle={[
+          styles.channelTitle,
+          isSelected && styles.channelTitleSelected
+        ]}
+        titleNumberOfLines={1}
+      />
     );
   };
 
@@ -190,20 +405,60 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({ route }) => {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#000000" hidden={true} translucent={true} />
       
-      {/* Header */}
+      {/* Header Version 2 - 3 blocs avec info chaîne courante */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-          <Icon name="arrow-back" size={24} color="#FFFFFF" />
-        </TouchableOpacity>
-        
-        <Text style={styles.headerTitle}>
-          {playlistName}
-        </Text>
-        
-        <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.headerButton}>
-            <Icon name="search" size={24} color="#FFFFFF" />
+        {/* Bloc Gauche: Retour */}
+        <View style={styles.headerLeftBlock}>
+          <TouchableOpacity onPress={handleBack} style={styles.headerIconButton}>
+            <Icon name="arrow-back" size={24} color="#EAEAEA" />
           </TouchableOpacity>
+        </View>
+
+        {/* Bloc Central: "À l'Antenne" */}
+        <View style={styles.headerCenterBlock}>
+          {selectedChannel.logo ? (
+            <Image
+              source={{ uri: selectedChannel.logo }}
+              style={styles.headerChannelLogo}
+              resizeMode="contain"
+            />
+          ) : (
+            <Avatar.Text
+              size={32}
+              label={selectedChannel.name.substring(0, 2).toUpperCase()}
+              style={styles.headerChannelLogo}
+              labelStyle={{ fontSize: 12, fontWeight: '600' }}
+            />
+          )}
+          <View style={styles.headerChannelInfo}>
+            <Text style={styles.headerChannelName} numberOfLines={1}>
+              {selectedChannel.name}
+            </Text>
+            <View style={styles.headerProgramRow}>
+              {/* Badge LIVE conditionnel */}
+              {isReallyLive(selectedChannel) && (
+                <View style={styles.liveBadge}>
+                  <Text style={styles.liveBadgeText}>LIVE</Text>
+                </View>
+              )}
+            </View>
+          </View>
+        </View>
+
+        {/* Bloc Droite: Heure + Date + Actions */}
+        <View style={styles.headerRightBlock}>
+          <View style={styles.headerTimeContainer}>
+            <Text style={styles.headerTime}>{currentTime}</Text>
+            <Text style={styles.headerDate}>{currentDate}</Text>
+          </View>
+          <View style={styles.headerIconContainer}>
+            <TouchableOpacity onPress={() => {}} style={styles.headerIconButton}>
+              <Icon name="search" size={22} color="#EAEAEA" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => {}} style={styles.headerIconButton}>
+              <Icon name="more-vert" size={20} color="#EAEAEA" />
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
@@ -212,24 +467,35 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({ route }) => {
         {/* Zone Gauche: Interface IPTV Smarters Pro avec sélecteur de catégories */}
         <View style={[styles.leftPanel, { width: leftPanelWidth }]}>
           
-          {/* Sélecteur de catégorie interactif (Spec Gemini) */}
+          {/* Sélecteur de catégorie avec IconButton et compteur intégré */}
           <View style={styles.categorySelector}>
-            <TouchableOpacity onPress={handlePreviousCategory} style={styles.arrowButton}>
-              <Icon name="keyboard-arrow-left" size={28} color="#FFF" />
+            <TouchableOpacity 
+              onPress={handlePreviousCategory} 
+              style={styles.categoryArrow}
+              disabled={currentCategoryIndex === 0}
+            >
+              <Icon 
+                name="arrow-back-ios" 
+                size={20} 
+                color={currentCategoryIndex === 0 ? '#444444' : '#EAEAEA'} 
+              />
             </TouchableOpacity>
 
             <Text style={styles.categoryTitle} numberOfLines={1}>
-              {categories[currentCategoryIndex]?.name || 'Catégories'}
+              {categories[currentCategoryIndex]?.name || 'Catégories'} ({getCategoryChannelCount(categories[currentCategoryIndex], channels)})
             </Text>
 
-            <TouchableOpacity onPress={handleNextCategory} style={styles.arrowButton}>
-              <Icon name="keyboard-arrow-right" size={28} color="#FFF" />
+            <TouchableOpacity 
+              onPress={handleNextCategory} 
+              style={styles.categoryArrow}
+              disabled={currentCategoryIndex === categories.length - 1}
+            >
+              <Icon 
+                name="arrow-forward-ios" 
+                size={20} 
+                color={currentCategoryIndex === categories.length - 1 ? '#444444' : '#EAEAEA'} 
+              />
             </TouchableOpacity>
-          </View>
-
-          {/* En-tête avec compteur */}
-          <View style={styles.channelListHeader}>
-            <Text style={styles.channelListTitle}>Chaînes ({channels.length})</Text>
           </View>
           
           {/* La liste des chaînes utilise maintenant l'état local 'channels' */}
@@ -241,96 +507,42 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({ route }) => {
             style={styles.channelsList}
             contentContainerStyle={styles.channelsListContent}
             initialScrollIndex={channels.length > 0 ? Math.max(0, channels.findIndex(ch => ch.id === selectedChannel?.id)) : undefined}
-            getItemLayout={(data, index) => ({
-              length: 80,
-              offset: 80 * index,
-              index,
-            })}
             onScrollToIndexFailed={() => {}}
           />
         </View>
 
         {/* Zone Droite: Mini lecteur + EPG future */}
         <View style={[styles.rightPanel, { width: rightPanelWidth }]}>
-          {/* Mini lecteur vidéo (droite haut) */}
-          <Pressable
-            style={[styles.miniPlayerContainer, { height: miniPlayerHeight }]}
-            onPress={handleMiniPlayerPress}
-          >
-            <VideoPlayer
-              channel={selectedChannel}
-              isVisible={true}
-              onClose={() => {}}
-              allowFullscreen={false}
-              showControls={false}
-              style={styles.miniPlayer}
-            />
-            
-            {/* Overlay d'informations sur le mini lecteur */}
-            <View style={styles.miniPlayerOverlay}>
-              <View style={styles.miniPlayerInfo}>
-                <Text style={styles.miniPlayerChannelName} numberOfLines={1}>
-                  {selectedChannel.name}
-                </Text>
-                <Text style={styles.miniPlayerStatus}>
-                  {isPlaying ? 'En lecture' : 'En pause'}
-                </Text>
-              </View>
-              
-              <TouchableOpacity style={styles.fullscreenButton}>
-                <Icon name="fullscreen" size={24} color="#FFFFFF" />
-              </TouchableOpacity>
-            </View>
-          </Pressable>
-
-          {/* Zone EPG future (droite bas) */}
-          <View style={styles.epgContainer}>
-            <View style={styles.epgHeader}>
-              <Text style={styles.epgHeaderTitle}>Guide TV - {selectedChannel.name}</Text>
-              <Icon name="schedule" size={20} color="#4CAF50" />
-            </View>
-            
-            <View style={styles.epgContent}>
-              {/* Programme actuellement en cours */}
-              <View style={styles.epgProgramCurrent}>
-                <View style={styles.epgTimeSlot}>
-                  <Text style={styles.epgTime}>21:00</Text>
-                  <View style={styles.epgLiveDot} />
-                </View>
-                <View style={styles.epgProgramInfo}>
-                  <Text style={styles.epgProgramTitle}>Programme en cours</Text>
-                  <Text style={styles.epgProgramDescription}>
-                    Contenu en direct sur {selectedChannel.name}
-                  </Text>
-                </View>
-              </View>
-
-              {/* Programmes suivants */}
-              <View style={styles.epgProgramNext}>
-                <View style={styles.epgTimeSlot}>
-                  <Text style={styles.epgTimeNext}>22:00</Text>
-                </View>
-                <View style={styles.epgProgramInfo}>
-                  <Text style={styles.epgProgramTitleNext}>Programme suivant</Text>
-                  <Text style={styles.epgProgramDescriptionNext}>
-                    Prochaine émission programmée
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.epgProgramNext}>
-                <View style={styles.epgTimeSlot}>
-                  <Text style={styles.epgTimeNext}>23:00</Text>
-                </View>
-                <View style={styles.epgProgramInfo}>
-                  <Text style={styles.epgProgramTitleNext}>Film de soirée</Text>
-                  <Text style={styles.epgProgramDescriptionNext}>
-                    Long métrage en première diffusion
-                  </Text>
-                </View>
-              </View>
-            </View>
+          
+          {/* 🎯 MINI-LECTEUR - VERSION FONCTIONNELLE */}
+          <View style={[styles.miniPlayerContainer, { height: miniPlayerHeight }]}>
+            <Pressable
+              style={styles.miniPlayerPressable}
+              onPress={handleMiniPlayerPress}
+            >
+              <VideoPlayer
+                channel={selectedChannel}
+                isVisible={true}
+                onClose={() => {}}
+                allowFullscreen={false}
+                showControls={false}
+                showInfo={false}
+                style={styles.miniPlayer}
+              />
+            </Pressable>
           </View>
+
+          {/* 🎯 ZONE EPG REDESIGNÉE avec Card flexible et Paper components */}
+          <Card style={styles.epgCard}>
+            {/* Plus de header - EPG directement */}
+            
+            <View style={styles.epgCardContent}>
+              {/* Zone EPG vide pour implémentation future */}
+              <View style={styles.epgPlaceholder}>
+                <Text style={styles.epgPlaceholderText}>EPG en cours d'implémentation</Text>
+              </View>
+            </View>
+          </Card>
         </View>
       </View>
 
@@ -351,34 +563,92 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({ route }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: '#101010', // Couleur de fond principale
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    justifyContent: 'center', // Centrer le bloc du milieu
     paddingVertical: 12,
-    backgroundColor: '#111111',
+    backgroundColor: '#1F1F1F',
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    borderBottomColor: '#222222',
+    position: 'relative', // Requis pour le positionnement absolu des enfants
   },
-  backButton: {
-    padding: 8,
+  
+  // ===== HEADER REVISITÉ - LAYOUT CENTRÉ =====
+  // Bloc Gauche
+  headerLeftBlock: {
+    position: 'absolute',
+    left: 16,
   },
-  headerTitle: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'center',
-    marginHorizontal: 16,
-  },
-  headerActions: {
+  
+  // Bloc Central
+  headerCenterBlock: {
     flexDirection: 'row',
+    alignItems: 'center',
   },
-  headerButton: {
+  headerChannelLogo: {
+    width: 36,
+    height: 36,
+    marginRight: 8,
+  },
+  headerChannelInfo: {
+    flexDirection: 'row', // Aligner les éléments horizontalement
+    alignItems: 'center',
+  },
+  headerChannelName: {
+    color: '#EAEAEA',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  headerProgramRow: {
+    // Ce conteneur reste pour le badge LIVE
+  },
+  liveBadge: {
+    backgroundColor: '#D92D20',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 100, // Forme "pilule" garantie
+    marginLeft: 8, // Espace entre le nom et le badge
+  },
+  liveBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '500', // Typographie affinée
+    letterSpacing: 0.5,
+  },
+  
+  // Bloc Droite
+  headerRightBlock: {
+    position: 'absolute',
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerTimeContainer: {
+    alignItems: 'flex-end',
+    marginRight: 12, // Décalage vers la gauche
+  },
+  headerTime: {
+    color: '#EAEAEA',
+    fontSize: 18, // Taille augmentée
+    fontWeight: '600',
+  },
+  headerDate: {
+    color: '#888888',
+    fontSize: 13, // Taille augmentée
+    fontWeight: '400',
+  },
+  headerIconButton: {
     padding: 8,
+    marginLeft: 4,
+    borderRadius: 20,
+    backgroundColor: 'transparent',
+  },
+  headerIconContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
 
   // Layout 3 zones
@@ -389,43 +659,35 @@ const styles = StyleSheet.create({
 
   // Zone Gauche: Liste chaînes
   leftPanel: {
-    backgroundColor: '#1A1A1A',
-    borderRightWidth: 1,
-    borderRightColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#1F1F1F',
+    borderRadius: 12,
+    margin: 8,
+    overflow: 'hidden',
   },
-  channelListHeader: {
-    padding: 16,
-    backgroundColor: '#222222',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  channelListTitle: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
+  // Header supprimé selon les spécifications
   
-  // ===== STYLES SÉLECTEUR DE CATÉGORIES (Spec Gemini) =====
+  // ===== STYLES SÉLECTEUR DE CATÉGORIES MODERNISÉ - FIX ESPACEMENT =====
   categorySelector: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    paddingVertical: 16,
-    backgroundColor: '#222222',
+    paddingHorizontal: 4,
+    paddingVertical: 4, // Hauteur verticale réduite
+    backgroundColor: '#1F1F1F',
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  arrowButton: {
-    padding: 4,
+    borderBottomColor: '#222222',
+    minHeight: 40, // Hauteur minimum réduite
   },
   categoryTitle: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
+    color: '#EAEAEA', // Texte primaire
+    fontSize: 14,     // Taille réduite pour moins de dominance
+    fontWeight: '500', // Poids réduit pour harmoniser
     textAlign: 'center',
     flex: 1,
-    marginHorizontal: 8,
+    marginHorizontal: 4,
+  },
+  categoryArrow: {
+    padding: 6, // Padding réduit pour un look plus fin
   },
   
   channelsList: {
@@ -434,192 +696,203 @@ const styles = StyleSheet.create({
   channelsListContent: {
     paddingVertical: 8,
   },
-  channelItem: {
+  // ===== STYLES LIST.ITEM POUR LES CHAÎNES - AMÉLIORÉS =====
+  channelListItem: {
+    backgroundColor: '#1F1F1F',
+    borderBottomWidth: 1,
+    borderBottomColor: '#222222',
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    height: 80,
+    paddingVertical: 3, // Padding vertical minimal
+    paddingHorizontal: 12,
+    marginVertical: 1,
   },
-  channelItemSelected: {
-    backgroundColor: 'rgba(76, 175, 80, 0.2)',
-    borderLeftWidth: 4,
-    borderLeftColor: '#4CAF50',
+  channelListItemSelected: {
+    backgroundColor: '#333333', // Fond de l'élément sélectionné
+    borderRadius: 12 // Coins plus arrondis
   },
-  channelLogo: {
-    width: 48,
-    height: 48,
-    marginRight: 12,
-  },
-  channelLogoImage: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 8,
-  },
-  channelLogoFallback: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#333333',
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  channelLogoText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  channelInfo: {
-    flex: 1,
-    marginRight: 8,
-  },
-  channelName: {
-    color: '#FFFFFF',
-    fontSize: 14,
+  channelTitle: {
+    color: '#EAEAEA', // Texte primaire
+    fontSize: 13, // Taille de police réduite
     fontWeight: '500',
-    marginBottom: 4,
   },
-  channelDetails: {
-    color: 'rgba(255, 255, 255, 0.7)',
+  channelTitleSelected: {
+    // La couleur du titre ne change plus, seul le fond change
+  },
+  channelDescription: {
+    color: '#888888', // Texte secondaire
     fontSize: 12,
   },
-  playingIndicator: {
-    padding: 4,
+  // Logo standardisé dans conteneur cohérent
+  channelLogo: {
+    width: 36, // Taille de logo réduite pour compacter
+    height: 36,
+    borderRadius: 8, // Arrondi standardisé
   },
+  channelAvatarFallback: {
+    backgroundColor: '#222222',
+    borderRadius: 4,
+  },
+  channelAvatarText: {
+    color: '#EAEAEA',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  // Anciens styles supprimés - remplacés par List.Item
 
-  // Zone Droite: Mini lecteur + EPG
+  // Zone Droite: Mini lecteur + EPG - FIX PROPORTIONS
   rightPanel: {
     flex: 1,
+    padding: 8, // Padding unifié pour un espacement cohérent
   },
   
-  // Mini lecteur (droite haut)
+  // 🎯 STYLES MINI-LECTEUR - VERSION FONCTIONNELLE
   miniPlayerContainer: {
     position: 'relative',
-    backgroundColor: '#000000',
+    backgroundColor: '#1F1F1F',
+    marginBottom: 8, // Espace entre le lecteur et la carte EPG
+    borderRadius: 12,
+    // Effet Card avec shadow
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    overflow: 'hidden', // Pour les coins arrondis
+  },
+  miniPlayerPressable: {
+    flex: 1,
+    position: 'relative',
   },
   miniPlayer: {
     width: '100%',
     height: '100%',
   },
-  miniPlayerOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+  
+
+  // 🎯 STYLES EPG ALIGNÉ AVEC LISTE CHAÎNES
+  epgCard: {
+    backgroundColor: '#1F1F1F',
+    // Marges gérées par le conteneur parent (rightPanel)
+    borderRadius: 12,
+    elevation: 4,
+    flex: 1, // PREND LA HAUTEUR RESTANTE pour alignement parfait
   },
-  miniPlayerInfo: {
-    flex: 1,
+  epgCardHeader: {
+    backgroundColor: 'transparent',
+    paddingBottom: 8,
   },
-  miniPlayerChannelName: {
-    color: '#FFFFFF',
+  epgCardTitle: {
+    color: '#EAEAEA',
     fontSize: 16,
     fontWeight: '600',
-    marginBottom: 4,
   },
-  miniPlayerStatus: {
-    color: 'rgba(255, 255, 255, 0.7)',
-    fontSize: 12,
+  epgCardContent: {
+    flex: 1, // S'adapte à la hauteur flexible de la card
+    paddingTop: 0,
   },
-  fullscreenButton: {
-    padding: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  currentProgramModern: {
+    paddingHorizontal: 16, // Ajouter un espacement intérieur
+    width: '100%',         // S'assurer qu'il prend toute la largeur
+  },
+  
+  // Programme Actuel avec ProgressBar
+  currentProgramSection: {
+    backgroundColor: 'rgba(0, 212, 170, 0.1)',
+    padding: 16,
     borderRadius: 8,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#00D4AA',
   },
-
-  // Zone EPG future (droite bas)
-  epgContainer: {
-    flex: 1,
-    backgroundColor: '#1A1A1A',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+  currentProgramTitle: {
+    color: '#EAEAEA',
+    fontWeight: '600',
+    marginBottom: 8,
   },
-  epgHeader: {
+  currentProgramTime: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#222222',
+    marginBottom: 8,
+  },
+  programTimeText: {
+    color: '#00D4AA',
+    fontWeight: '500',
+    marginRight: 8,
+  },
+  liveBadgeNew: {
+    backgroundColor: '#D92D20',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8, // Arrondi standardisé
+  },
+  liveBadgeTextNew: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    letterSpacing: 0.5,
+  },
+  currentProgramDescription: {
+    color: '#888888',
+    marginBottom: 12,
+    lineHeight: 18,
+  },
+  programProgressBar: {
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(0, 212, 170, 0.2)',
+  },
+  
+  // Programmes Suivants avec List.Section
+  nextProgramsSection: {
+    flex: 1,
+  },
+  nextProgramsHeader: {
+    color: '#EAEAEA',
+    fontSize: 14,
+    fontWeight: '600',
+    paddingHorizontal: 0,
+    paddingVertical: 8,
+  },
+  nextProgramItem: {
+    paddingHorizontal: 0,
+    paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255, 255, 255, 0.1)',
   },
-  epgHeaderTitle: {
-    color: '#FFFFFF',
+  nextProgramTitle: {
+    color: '#EAEAEA',
     fontSize: 14,
-    fontWeight: '600',
-    flex: 1,
-  },
-  epgContent: {
-    flex: 1,
-    paddingVertical: 8,
-  },
-  epgProgramCurrent: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: 'rgba(76, 175, 80, 0.1)',
-    borderLeftWidth: 3,
-    borderLeftColor: '#4CAF50',
-  },
-  epgProgramNext: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-  epgTimeSlot: {
-    width: 50,
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  epgTime: {
-    color: '#4CAF50',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  epgTimeNext: {
-    color: 'rgba(255, 255, 255, 0.7)',
-    fontSize: 12,
     fontWeight: '500',
   },
-  epgLiveDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#4CAF50',
-    marginTop: 4,
-  },
-  epgProgramInfo: {
-    flex: 1,
-  },
-  epgProgramTitle: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  epgProgramTitleNext: {
-    color: 'rgba(255, 255, 255, 0.9)',
-    fontSize: 13,
-    fontWeight: '500',
-    marginBottom: 2,
-  },
-  epgProgramDescription: {
-    color: 'rgba(255, 255, 255, 0.8)',
+  nextProgramDescription: {
+    color: '#888888',
     fontSize: 12,
     lineHeight: 16,
   },
-  epgProgramDescriptionNext: {
-    color: 'rgba(255, 255, 255, 0.6)',
-    fontSize: 11,
-    lineHeight: 14,
+  nextProgramTime: {
+    width: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  nextProgramTimeText: {
+    color: '#888888',
+    fontWeight: '500',
+  },
+  
+  // EPG Placeholder
+  epgPlaceholder: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
+  epgPlaceholderText: {
+    color: '#666666',
+    fontSize: 14,
+    fontStyle: 'italic',
   },
 
   // Fullscreen Player

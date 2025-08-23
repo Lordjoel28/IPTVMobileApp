@@ -14,6 +14,7 @@ import NotificationToast from './src/components/NotificationToast';
 import App_IPTV_SMARTERS from './App_IPTV_SMARTERS';
 import ChannelListScreen from './src/screens/ChannelListScreen';
 import ChannelsScreen from './src/screens/ChannelsScreen';
+import ChannelPlayerScreen from './src/screens/ChannelPlayerScreen';
 import type { Channel } from './src/types';
 
 // Types navigation simple
@@ -28,6 +29,12 @@ export type SimpleRootStackParamList = {
   ChannelsScreen: {
     playlistId?: string;
     channelsCount?: number;
+  };
+  ChannelPlayer: {
+    channels: Channel[];
+    selectedChannel: Channel;
+    playlistName: string;
+    category?: string;
   };
 };
 
@@ -69,6 +76,10 @@ const AppWithNavigation: React.FC = () => {
               <Stack.Screen 
                 name="ChannelsScreen" 
                 component={ChannelsScreen}
+              />
+              <Stack.Screen 
+                name="ChannelPlayer" 
+                component={ChannelPlayerScreen}
               />
             </Stack.Navigator>
             {/* Overlays globaux pour toute l'app */}

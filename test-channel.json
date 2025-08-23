@@ -1,0 +1,8 @@
+{
+  "id": "test-channel-1",
+  "name": "Test Channel - Big Buck Bunny",
+  "url": "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+  "group": "Test",
+  "type": "M3U",
+  "logo": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Big_buck_bunny_poster_big.jpg/320px-Big_buck_bunny_poster_big.jpg"
+}

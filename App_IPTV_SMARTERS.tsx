@@ -15,6 +15,7 @@ import {
   Modal,
   Alert,
 } from 'react-native';
+// Solution native MainActivity.java pour immersif
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { BlurView } from '@react-native-community/blur';
@@ -86,6 +87,8 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
+    // Mode immersif avec react-native-edge-to-edge (solution moderne 2025)
+    
     Animated.timing(fadeAnim, { toValue: 1, duration: 600, useNativeDriver: true }).start();
     const timeInterval = setInterval(() => setCurrentTime(new Date()), 1000);
     
@@ -127,7 +130,10 @@ const App: React.FC = () => {
     
     testServices();
     
-    return () => clearInterval(timeInterval);
+    return () => {
+      clearInterval(timeInterval);
+      // Pas de cleanup nécessaire avec SystemBars
+    };
   }, []);
 
   // Animations supprimées pour assurer clics fonctionnels
@@ -910,6 +916,7 @@ const App: React.FC = () => {
       end={{ x: 1, y: 1 }} 
       style={styles.container}
     >
+      {/* Mode immersif géré par MainActivity.java */}
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
       
       <View style={styles.header}>

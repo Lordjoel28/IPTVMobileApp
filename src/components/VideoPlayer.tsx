@@ -13,6 +13,7 @@ import { Channel } from '../types';
 interface VideoPlayerProps {
   channel: Channel | null;
   isVisible?: boolean;
+  showInfo?: boolean; // Ajout de la prop pour afficher les infos
   onError?: (error: string) => void;
   onProgress?: (data: any) => void;
 }
@@ -20,6 +21,7 @@ interface VideoPlayerProps {
 const VideoPlayer: React.FC<VideoPlayerProps> = ({
   channel,
   isVisible = true,
+  showInfo = true, // Par défaut, on affiche les infos
   onError,
   onProgress,
 }) => {
@@ -165,12 +167,14 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
         )}
 
         {/* Channel info */}
-        <View style={styles.channelInfo}>
-          <Text style={styles.channelName}>{channel.name}</Text>
-          {channel.category && (
-            <Text style={styles.channelCategory}>{channel.category}</Text>
-          )}
-        </View>
+        {showInfo && (
+          <View style={styles.channelInfo}>
+            <Text style={styles.channelName}>{channel.name}</Text>
+            {channel.category && (
+              <Text style={styles.channelCategory}>{channel.category}</Text>
+            )}
+          </View>
+        )}
 
         {/* Controls overlay */}
         {showControls && (
