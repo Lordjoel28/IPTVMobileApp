@@ -236,6 +236,9 @@ class SearchIndex {
 }
 
 export class SearchManager {
+  // 🆕 Singleton pattern instance
+  private static instance: SearchManager;
+
   private searchIndex: SearchIndex;
   private storage: StorageAdapter;
   private searchHistory: string[] = [];
@@ -247,6 +250,29 @@ export class SearchManager {
     this.storage = storageAdapter || new StorageAdapter();
     this.resetStats();
     this.loadSearchHistory();
+  }
+
+  // 🆕 Support pour injection de dépendances (DI)
+  // Cette méthode permet d'utiliser le service via DI ou singleton legacy
+  public static getInstance(storageAdapter?: StorageAdapter): SearchManager {
+    if (!SearchManager.instance) {
+      SearchManager.instance = new SearchManager(storageAdapter);
+    }
+    return SearchManager.instance;
+  }
+
+  // 🆕 Méthode statique pour compatibilité DI
+  // Sera utilisée par le ServiceRegistry
+  public static async createFromDI(): Promise<SearchManager> {
+    try {
+      // Pour le moment, retourne une nouvelle instance
+      // Plus tard, on pourra injecter des dépendances si nécessaire
+      return new SearchManager();
+    } catch (error) {
+      console.error('❌ Failed to create SearchManager from DI:', error);
+      // Fallback sur l'ancienne méthode
+      return SearchManager.getInstance();
+    }
   }
 
   /**

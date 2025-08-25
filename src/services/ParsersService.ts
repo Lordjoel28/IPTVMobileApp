@@ -43,9 +43,35 @@ export class ParsersService {
     avgChannelsPerSecond: 0
   };
 
+  // 🆕 Singleton pattern instance
+  private static instance: ParsersService;
+
   constructor() {
     this.initializePool();
     console.log('🚀 ParsersService initialized - Ultra-optimized M3U parser ready');
+  }
+
+  // 🆕 Support pour injection de dépendances (DI)
+  // Cette méthode permet d'utiliser le service via DI ou singleton legacy
+  public static getInstance(): ParsersService {
+    if (!ParsersService.instance) {
+      ParsersService.instance = new ParsersService();
+    }
+    return ParsersService.instance;
+  }
+
+  // 🆕 Méthode statique pour compatibilité DI
+  // Sera utilisée par le ServiceRegistry
+  public static async createFromDI(): Promise<ParsersService> {
+    try {
+      // Pour le moment, retourne une nouvelle instance
+      // Plus tard, on pourra injecter des dépendances si nécessaire
+      return new ParsersService();
+    } catch (error) {
+      console.error('❌ Failed to create ParsersService from DI:', error);
+      // Fallback sur l'ancienne méthode
+      return ParsersService.getInstance();
+    }
   }
 
   /**

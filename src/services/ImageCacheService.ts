@@ -38,6 +38,20 @@ export class ImageCacheService {
     return ImageCacheService.instance;
   }
 
+  // 🆕 Méthode statique pour compatibilité DI
+  // Sera utilisée par le ServiceRegistry
+  public static async createFromDI(): Promise<ImageCacheService> {
+    try {
+      // Pour le moment, retourne une nouvelle instance
+      // Plus tard, on pourra injecter des dépendances si nécessaire
+      return new ImageCacheService();
+    } catch (error) {
+      console.error('❌ Failed to create ImageCacheService from DI:', error);
+      // Fallback sur l'ancienne méthode
+      return ImageCacheService.getInstance();
+    }
+  }
+
   /**
    * Obtenir les propriétés optimisées pour react-native-fast-image
    */

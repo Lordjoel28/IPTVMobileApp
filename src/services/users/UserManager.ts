@@ -112,6 +112,9 @@ class PinHashService {
 }
 
 export class UserManager {
+  // 🆕 Singleton pattern instance
+  private static instance: UserManager;
+
   private storage: StorageAdapter;
   private users: Map<string, User> = new Map();
   private sessions: Map<string, Session> = new Map();
@@ -123,6 +126,29 @@ export class UserManager {
   constructor(storageAdapter?: StorageAdapter) {
     this.storage = storageAdapter || new StorageAdapter();
     this.resetStats();
+  }
+
+  // 🆕 Support pour injection de dépendances (DI)
+  // Cette méthode permet d'utiliser le service via DI ou singleton legacy
+  public static getInstance(storageAdapter?: StorageAdapter): UserManager {
+    if (!UserManager.instance) {
+      UserManager.instance = new UserManager(storageAdapter);
+    }
+    return UserManager.instance;
+  }
+
+  // 🆕 Méthode statique pour compatibilité DI
+  // Sera utilisée par le ServiceRegistry
+  public static async createFromDI(): Promise<UserManager> {
+    try {
+      // Pour le moment, retourne une nouvelle instance
+      // Plus tard, on pourra injecter des dépendances si nécessaire
+      return new UserManager();
+    } catch (error) {
+      console.error('❌ Failed to create UserManager from DI:', error);
+      // Fallback sur l'ancienne méthode
+      return UserManager.getInstance();
+    }
   }
 
   /**

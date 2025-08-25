@@ -306,9 +306,9 @@ export class PlaylistManager {
     try {
       console.log('🔐 Importing from Xtream Codes API');
       
-      // Import dynamique du XtreamExtremeManager
-      const { XtreamExtremeManager } = await import('../../modules/xtream/XtreamExtremeManager.js');
-      const xtreamManager = new XtreamExtremeManager();
+      // Import du service Xtream modernisé
+      const { WatermelonXtreamService } = await import('../WatermelonXtreamService');
+      const xtreamManager = new WatermelonXtreamService();
       
       // Configuration et authentification
       await xtreamManager.loadConfig();

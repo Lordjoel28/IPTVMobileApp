@@ -4,11 +4,27 @@ import { Favorite, RecentChannel, Settings, User, ParentalControl } from '../typ
 export class StorageService {
   private static instance: StorageService;
 
+  // 🆕 Support pour injection de dépendances (DI)
+  // Cette méthode permet d'utiliser le service via DI ou singleton legacy
   public static getInstance(): StorageService {
     if (!StorageService.instance) {
       StorageService.instance = new StorageService();
     }
     return StorageService.instance;
+  }
+
+  // 🆕 Méthode statique pour compatibilité DI
+  // Sera utilisée par le ServiceRegistry
+  public static async createFromDI(): Promise<StorageService> {
+    try {
+      // Pour le moment, retourne une nouvelle instance
+      // Plus tard, on pourra injecter des dépendances si nécessaire
+      return new StorageService();
+    } catch (error) {
+      console.error('❌ Failed to create StorageService from DI:', error);
+      // Fallback sur l'ancienne méthode
+      return StorageService.getInstance();
+    }
   }
 
   // Favorites

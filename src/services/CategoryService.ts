@@ -83,11 +83,29 @@ export class CategoryService {
     'uncategorized': { name: 'Uncategorized', color: '#757575', icon: 'tv', priority: 11 },
   };
 
+  constructor() {
+    console.log('🏷️ CategoryService initialized - Smart category management ready');
+  }
+
   public static getInstance(): CategoryService {
     if (!CategoryService.instance) {
       CategoryService.instance = new CategoryService();
     }
     return CategoryService.instance;
+  }
+
+  // 🆕 Méthode statique pour compatibilité DI
+  // Sera utilisée par le ServiceRegistry
+  public static async createFromDI(): Promise<CategoryService> {
+    try {
+      // Pour le moment, retourne une nouvelle instance
+      // Plus tard, on pourra injecter des dépendances si nécessaire
+      return new CategoryService();
+    } catch (error) {
+      console.error('❌ Failed to create CategoryService from DI:', error);
+      // Fallback sur l'ancienne méthode
+      return CategoryService.getInstance();
+    }
   }
 
   /**

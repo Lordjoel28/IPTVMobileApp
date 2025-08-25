@@ -38,8 +38,34 @@ export class CacheService {
     L3: { hits: 0, misses: 0, sets: 0, evictions: 0 }
   };
 
+  // 🆕 Singleton pattern instance
+  private static instance: CacheService;
+
   constructor() {
     console.log('💾 CacheService initialized - 3-level cache system');
+  }
+
+  // 🆕 Support pour injection de dépendances (DI)
+  // Cette méthode permet d'utiliser le service via DI ou singleton legacy
+  public static getInstance(): CacheService {
+    if (!CacheService.instance) {
+      CacheService.instance = new CacheService();
+    }
+    return CacheService.instance;
+  }
+
+  // 🆕 Méthode statique pour compatibilité DI
+  // Sera utilisée par le ServiceRegistry
+  public static async createFromDI(): Promise<CacheService> {
+    try {
+      // Pour le moment, retourne une nouvelle instance
+      // Plus tard, on pourra injecter des dépendances si nécessaire
+      return new CacheService();
+    } catch (error) {
+      console.error('❌ Failed to create CacheService from DI:', error);
+      // Fallback sur l'ancienne méthode
+      return CacheService.getInstance();
+    }
   }
 
   /**

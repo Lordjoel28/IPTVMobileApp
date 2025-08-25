@@ -23,8 +23,34 @@ export class PlaylistService {
   private loadingCallback?: (title: string, subtitle?: string, progress?: number) => void;
   private hideLoadingCallback?: () => void;
 
+  // 🆕 Singleton pattern instance
+  private static instance: PlaylistService;
+
   constructor() {
     console.log('📋 PlaylistService initialized with modular architecture');
+  }
+
+  // 🆕 Support pour injection de dépendances (DI)
+  // Cette méthode permet d'utiliser le service via DI ou singleton legacy
+  public static getInstance(): PlaylistService {
+    if (!PlaylistService.instance) {
+      PlaylistService.instance = new PlaylistService();
+    }
+    return PlaylistService.instance;
+  }
+
+  // 🆕 Méthode statique pour compatibilité DI
+  // Sera utilisée par le ServiceRegistry
+  public static async createFromDI(): Promise<PlaylistService> {
+    try {
+      // Pour le moment, retourne une nouvelle instance
+      // Plus tard, on pourra injecter des dépendances si nécessaire
+      return new PlaylistService();
+    } catch (error) {
+      console.error('❌ Failed to create PlaylistService from DI:', error);
+      // Fallback sur l'ancienne méthode
+      return PlaylistService.getInstance();
+    }
   }
 
   /**

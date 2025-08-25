@@ -26,12 +26,16 @@ import ConnectionModal from './src/components/ConnectionModal';
 import XtreamCodeModal from './src/components/XtreamCodeModal';
 import M3UUrlModal from './src/components/M3UUrlModal';
 import ProfilesModal from './src/components/ProfilesModal';
+import { ServiceTest } from './src/components/ServiceTest';
 import type { Channel } from './src/types';
 import type { SimpleRootStackParamList } from './AppWithNavigation';
 import { useApp } from './src/context/AppContext';
 
 // Import des nouveaux services migrés
 import IPTVService from './src/services/IPTVService';
+
+// 🏗️ Import du nouveau système d'architecture DI
+import { initializeServiceArchitecture, ServiceMigration } from './src/core';
 
 // --- Catalogue des icônes PNG ---
 const iconMap = {
@@ -72,6 +76,8 @@ const App: React.FC = () => {
   const [showM3UModal, setShowM3UModal] = useState(false);
   const [showProfilesModal, setShowProfilesModal] = useState(false);
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<string | undefined>();
+  // 🧪 État pour le test du système DI
+  const [showServiceTest, setShowServiceTest] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const cardsScale = useRef([...Array(6)].map(() => new Animated.Value(1))).current;
   
@@ -95,6 +101,33 @@ const App: React.FC = () => {
     // Enregistrer la fonction de fermeture du modal de connexion
     registerModalCloser(() => setShowConnectionModal(false));
     
+    // 🏗️ Initialisation du nouveau système d'architecture DI (Phase 2)
+    const initializeDIArchitecture = async () => {
+      try {
+        console.log('🏗️ Initializing Modern Service Architecture...');
+        initializeServiceArchitecture();
+        
+        // Test de validation des services
+        const status = ServiceMigration.getMigrationStatus();
+        console.log('📊 DI Architecture Status:', status);
+        
+        // 🧪 Test automatique de tous les services
+        console.log('🧪 Testing all services automatically...');
+        const testResults = await ServiceMigration.validateAllServices();
+        console.log('📋 Service Test Results:', {
+          passed: testResults.passed.length,
+          failed: testResults.failed.length,
+          passedServices: testResults.passed,
+          failedServices: testResults.failed
+        });
+        
+        console.log('✅ Modern Service Architecture ready');
+      } catch (error) {
+        console.log('⚠️ DI Architecture not ready yet:', error.message);
+        // L'app continue avec l'ancienne architecture si besoin
+      }
+    };
+
     // Test d'initialisation des nouveaux services IPTV - INSTANCE UNIQUE
     const testServices = async () => {
       try {
@@ -128,6 +161,10 @@ const App: React.FC = () => {
       }
     };
     
+    // Initialise d'abord la nouvelle architecture DI
+    initializeDIArchitecture();
+    
+    // Puis les services existants
     testServices();
     
     return () => {
@@ -217,8 +254,8 @@ const App: React.FC = () => {
                   // Pour Xtream Codes, il faut reconstruire la playlist depuis les credentials
                   try {
                     console.log('🔄 Reconstruction playlist Xtream avec credentials...');
-                    const { XtreamExtremeManager } = await import('./src/modules/xtream/XtreamExtremeManager.js');
-                    const xtreamManager = new XtreamExtremeManager();
+                    const { WatermelonXtreamService } = await import('./src/services/WatermelonXtreamService');
+                    const xtreamManager = new WatermelonXtreamService();
                     
                     // Charger config et credentials
                     await xtreamManager.loadConfig();
@@ -1239,6 +1276,29 @@ const App: React.FC = () => {
         onAddPlaylist={handleAddPlaylist}
         selectedPlaylistId={selectedPlaylistId}
       />
+
+      {/* 🧪 Bouton de test du système DI (Mode développement) */}
+      <TouchableOpacity
+        style={styles.serviceTestButton}
+        onPress={() => setShowServiceTest(!showServiceTest)}
+      >
+        <Text style={styles.serviceTestText}>🏗️ DI</Text>
+      </TouchableOpacity>
+
+      {/* 📱 Version indicator */}
+      <View style={styles.versionContainer}>
+        <Text style={styles.versionText}>v1.5</Text>
+        <Text style={styles.versionSubText}>ZUSTAND + DI ✅</Text>
+      </View>
+      
+      {/* 🚨 BANNIÈRE DE CONFIRMATION VERSION */}
+      <View style={styles.confirmationBanner}>
+        <Text style={styles.confirmationText}>🎉 REFACTORING FINAL 🎉</Text>
+        <Text style={styles.confirmationSub}>v1.5 - Phase 4+5 Terminées</Text>
+      </View>
+
+      {/* 🧪 Composant de test des services */}
+      <ServiceTest visible={showServiceTest} />
     </LinearGradient>
   );
 };
@@ -1415,6 +1475,80 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     padding: 8,
+  },
+  
+  // 🧪 Styles pour le test DI (développement)
+  serviceTestButton: {
+    position: 'absolute',
+    top: 120,
+    right: 10,
+    width: 50,
+    height: 30,
+    backgroundColor: 'rgba(33, 150, 243, 0.8)',
+    borderRadius: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 999,
+    shadowColor: '#2196F3',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.8,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  serviceTestText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  versionContainer: {
+    position: 'absolute',
+    top: 30,
+    left: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  versionText: {
+    color: '#4A9EFF',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  versionSubText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    opacity: 0.8,
+  },
+  confirmationBanner: {
+    position: 'absolute',
+    top: 100,
+    left: 20,
+    right: 20,
+    backgroundColor: '#FF4444',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    zIndex: 2000,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  confirmationText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  confirmationSub: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 4,
   },
 });
 

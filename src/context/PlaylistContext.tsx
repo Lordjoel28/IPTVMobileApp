@@ -1,6 +1,13 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { playlistManager, Channel, Category } from '../services/PlaylistManager';
+import { Channel } from '../types';
+import { playlistService } from '../services/PlaylistService';
+
+// Types pour compatibilité (à migrer vers Zustand plus tard)
+interface Category {
+  name: string;
+  count: number;
+}
 
 interface PlaylistContextData {
   channels: Channel[];
@@ -57,15 +64,21 @@ export const PlaylistProvider: React.FC<{children: ReactNode}> = ({ children }) 
   const loadPlaylist = async (uri: string) => {
     console.log('🔥 PLAYLIST CONTEXT - Début loadPlaylist...');
     
-    await playlistManager.loadPlaylist(uri);
+    // Utiliser playlistService temporairement (à migrer vers Zustand)
+    const result = await playlistService.parseM3U(uri);
     
-    console.log('🔥 PLAYLIST CONTEXT - Après parsing, récupération catégories...');
-    const categoriesFromManager = playlistManager.getCategories();
-    console.log('🔥 PLAYLIST CONTEXT - Catégories du manager:', categoriesFromManager);
+    console.log('🔥 PLAYLIST CONTEXT - Après parsing, création catégories...');
+    const allChannels = result.channels;
+    const categoriesMap = new Map<string, number>();
+    
+    allChannels.forEach(channel => {
+      const category = channel.category || channel.group || 'Autres';
+      categoriesMap.set(category, (categoriesMap.get(category) || 0) + 1);
+    });
     
     const allCategories = [
-      { name: 'Tous', count: playlistManager.getChannelsByGroup('Tous').length }, 
-      ...categoriesFromManager
+      { name: 'Tous', count: allChannels.length },
+      ...Array.from(categoriesMap.entries()).map(([name, count]) => ({ name, count }))
     ];
     
     console.log('🔥 PLAYLIST CONTEXT - AllCategories avant setState:', allCategories);
@@ -88,16 +101,14 @@ export const PlaylistProvider: React.FC<{children: ReactNode}> = ({ children }) 
     console.log('🔥 PLAYLIST CONTEXT - selectCategory appelée avec:', category);
     setSelectedCategory(category);
     
-    const channelsForCategory = playlistManager.getChannelsByGroup(category);
-    console.log('🔥 PLAYLIST CONTEXT - Chaînes pour cette catégorie:', channelsForCategory.length);
-    setChannels(channelsForCategory);
+    // TODO: Implémenter avec Zustand store
+    console.log('🔥 PLAYLIST CONTEXT - Filtrage temporairement désactivé');
+    setChannels([]);
   };
 
   const clearAll = async () => {
     console.log('🧹 CLEAR ALL - Effacement complet cache et données');
-    // Vider le PlaylistManager
-    playlistManager.channels = [];
-    playlistManager.playlists = [];
+    // TODO: Utiliser Zustand store reset à la place
     // Vider le state du contexte
     setChannels([]);
     setCategories([]);

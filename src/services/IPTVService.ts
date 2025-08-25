@@ -192,6 +192,25 @@ export class IPTVService {
     return IPTVService.instance;
   }
 
+  // 🆕 Méthode statique pour compatibilité DI
+  // Sera utilisée par le ServiceRegistry
+  public static async createFromDI(): Promise<IPTVService> {
+    try {
+      // Pour le moment, retourne une nouvelle instance avec config par défaut
+      // Plus tard, on pourra injecter des dépendances si nécessaire
+      return new IPTVService({
+        enableParentalControl: true,
+        enableUserManagement: true,
+        enableAdvancedSearch: true,
+        enablePerformanceMonitoring: true
+      });
+    } catch (error) {
+      console.error('❌ Failed to create IPTVService from DI:', error);
+      // Fallback sur l'ancienne méthode
+      return IPTVService.getInstance();
+    }
+  }
+
   /**
    * Initialisation complète du service
    */

@@ -24,8 +24,34 @@ export class SearchService {
   private languages: Set<string> = new Set();
   private countries: Set<string> = new Set();
 
+  // 🆕 Singleton pattern instance
+  private static instance: SearchService;
+
   constructor() {
     console.log('🔍 SearchService initialized - Advanced search engine ready');
+  }
+
+  // 🆕 Support pour injection de dépendances (DI)
+  // Cette méthode permet d'utiliser le service via DI ou singleton legacy
+  public static getInstance(): SearchService {
+    if (!SearchService.instance) {
+      SearchService.instance = new SearchService();
+    }
+    return SearchService.instance;
+  }
+
+  // 🆕 Méthode statique pour compatibilité DI
+  // Sera utilisée par le ServiceRegistry
+  public static async createFromDI(): Promise<SearchService> {
+    try {
+      // Pour le moment, retourne une nouvelle instance
+      // Plus tard, on pourra injecter des dépendances si nécessaire
+      return new SearchService();
+    } catch (error) {
+      console.error('❌ Failed to create SearchService from DI:', error);
+      // Fallback sur l'ancienne méthode
+      return SearchService.getInstance();
+    }
   }
 
   /**
