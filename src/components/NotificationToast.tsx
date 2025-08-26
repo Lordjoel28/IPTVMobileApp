@@ -15,12 +15,14 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import { BlurView } from '@react-native-community/blur';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { useApp } from '../context/AppContext';
+// AppContext removed - using UIStore instead
+import { useUIStore } from '../stores/UIStore';
 
 const { width, height } = Dimensions.get('window');
 
 const NotificationToast: React.FC = () => {
-  const { notification } = useApp();
+  // Replaced AppContext with UIStore
+  const { notification } = useUIStore();
   const { visible, message, type } = notification;
   
   const opacity = useRef(new Animated.Value(0)).current;

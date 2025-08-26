@@ -6,6 +6,7 @@
 
 import UltraOptimizedM3UParser, { Channel, ParseResult, ParseStats } from '../parsers/UltraOptimizedM3UParser';
 import StorageAdapter from '../../storage/StorageAdapter';
+import { networkService, NetworkError } from '../NetworkService';
 
 export interface Playlist {
   id: string;
@@ -189,21 +190,20 @@ export class PlaylistManager {
         this.stats.cacheHitRate = this.updateHitRate(this.stats.cacheHitRate, false);
       }
 
-      // Fetch contenu M3U
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'User-Agent': 'IPTV-Player/1.0',
-          'Accept': 'application/vnd.apple.mpegurl,application/x-mpegurl,text/plain,*/*'
-        },
-        timeout: 30000
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      // 🚀 Fetch robuste avec NetworkService
+      let content: string;
+      try {
+        content = await networkService.fetchText(url, {
+          timeout: options.largePlaylist ? 60000 : 30000,
+          retryAttempts: 3
+        });
+      } catch (error) {
+        if (error instanceof NetworkError) {
+          console.error(`❌ Network error: ${error.type} - ${error.getUserMessage()}`);
+          throw new Error(error.getUserMessage());
+        }
+        throw error;
       }
-
-      const content = await response.text();
       
       // Vérification du contenu téléchargé
       if (!content || typeof content !== 'string') {

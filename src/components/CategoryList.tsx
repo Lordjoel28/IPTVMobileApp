@@ -2,7 +2,8 @@ import React from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { usePlaylist } from '../context/PlaylistContext';
+// PlaylistContext remplacé par PlaylistStore
+import { usePlaylist } from '../stores/PlaylistStore';
 
 const CategoryList: React.FC = () => {
   const { categories, selectedCategory, selectCategory } = usePlaylist();

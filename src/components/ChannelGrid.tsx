@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, FlatList, StyleSheet, Image, TouchableOpacity } from 'react-native';
-import { usePlaylist } from '../context/PlaylistContext';
+// PlaylistContext remplacé par PlaylistStore
+import { usePlaylist } from '../stores/PlaylistStore';
 import { Channel } from '../types';
 
 const ChannelCard: React.FC<{ item: Channel }> = ({ item }) => {

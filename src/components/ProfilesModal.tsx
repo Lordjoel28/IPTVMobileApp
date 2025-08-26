@@ -22,7 +22,8 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import LinearGradient from 'react-native-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BlurView } from '@react-native-community/blur';
-import { useApp } from '../context/AppContext';
+// AppContext removed - using UIStore instead
+import { useUIStore } from '../stores/UIStore';
 
 const { width, height } = Dimensions.get('window');
 
@@ -55,7 +56,8 @@ const ProfilesModal: React.FC<ProfilesModalProps> = ({
   onAddPlaylist,
   selectedPlaylistId,
 }) => {
-  const { showLoading, updateLoading, hideLoading, showNotification } = useApp();
+  // Replaced AppContext with UIStore
+  const { showLoading, updateLoading, hideLoading, showNotification } = useUIStore();
   const [playlists, setPlaylists] = useState<PlaylistItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [contextMenu, setContextMenu] = useState<{

@@ -28,8 +28,10 @@ import M3UUrlModal from './src/components/M3UUrlModal';
 import ProfilesModal from './src/components/ProfilesModal';
 import { ServiceTest } from './src/components/ServiceTest';
 import type { Channel } from './src/types';
+// import { APP_VERSION } from './src/version'; // Removed for production
 import type { SimpleRootStackParamList } from './AppWithNavigation';
-import { useApp } from './src/context/AppContext';
+// AppContext removed - using UIStore instead
+import { useUIStore } from './src/stores/UIStore';
 
 // Import des nouveaux services migrés
 import IPTVService from './src/services/IPTVService';
@@ -66,7 +68,8 @@ type NavigationProp = StackNavigationProp<SimpleRootStackParamList>;
 
 const App: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
-  const { showLoading, updateLoading, hideLoading, showNotification, registerModalCloser } = useApp();
+  // Replaced AppContext with UIStore
+  const { showLoading, updateLoading, hideLoading, showNotification, registerModalCloser } = useUIStore();
   
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showVideoPlayer, setShowVideoPlayer] = useState(false);
@@ -1285,17 +1288,7 @@ const App: React.FC = () => {
         <Text style={styles.serviceTestText}>🏗️ DI</Text>
       </TouchableOpacity>
 
-      {/* 📱 Version indicator */}
-      <View style={styles.versionContainer}>
-        <Text style={styles.versionText}>v1.5</Text>
-        <Text style={styles.versionSubText}>ZUSTAND + DI ✅</Text>
-      </View>
-      
-      {/* 🚨 BANNIÈRE DE CONFIRMATION VERSION */}
-      <View style={styles.confirmationBanner}>
-        <Text style={styles.confirmationText}>🎉 REFACTORING FINAL 🎉</Text>
-        <Text style={styles.confirmationSub}>v1.5 - Phase 4+5 Terminées</Text>
-      </View>
+      {/* Bannières de version supprimées pour production */}
 
       {/* 🧪 Composant de test des services */}
       <ServiceTest visible={showServiceTest} />

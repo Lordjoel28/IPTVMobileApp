@@ -4,12 +4,14 @@
  */
 
 import { useCallback } from 'react';
-import { useApp } from '../context/AppContext';
+// AppContext removed - using UIStore instead
+import { useUIStore } from '../stores/UIStore';
 import { playlistService } from '../services/PlaylistService';
 import type { Playlist } from '../types';
 
 export const usePlaylistSelection = () => {
-  const { showLoading, hideLoading } = useApp();
+  // Replaced AppContext with UIStore
+  const { showLoading, hideLoading } = useUIStore();
 
   // Configurer les callbacks d'animation une seule fois
   const initializePlaylistService = useCallback(() => {

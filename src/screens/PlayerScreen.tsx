@@ -10,11 +10,11 @@ import {
 } from 'react-native';
 import VideoPlayer from '../components/VideoPlayer';
 import ChannelList from '../components/ChannelList';
-import { AppManager } from '../modules/app/AppManager';
+// AppManager removed - will be replaced by DI services
 import { Channel } from '../types';
 
 const PlayerScreen: React.FC = () => {
-  const [appManager] = useState(() => AppManager.getInstance());
+  // AppManager removed - state will be managed by Zustand stores
   const [currentChannel, setCurrentChannel] = useState<Channel | null>(null);
   const [allChannels, setAllChannels] = useState<Channel[]>([]);
   const [favorites, setFavorites] = useState<string[]>([]);
@@ -23,15 +23,8 @@ const PlayerScreen: React.FC = () => {
   const isDarkMode = useColorScheme() === 'dark';
 
   useEffect(() => {
-    loadData();
-    
-    // Subscribe to app state changes
-    const unsubscribe = appManager.subscribe((appState) => {
-      setCurrentChannel(appState.currentChannel);
-      setFavorites(appState.favorites);
-    });
-
-    return unsubscribe;
+    // TODO: Replace with DI services + Zustand stores
+    console.log('PlayerScreen - AppManager removed, ready for DI migration');
   }, []);
 
   const loadData = async () => {

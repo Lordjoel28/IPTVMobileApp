@@ -9,11 +9,11 @@ import {
   Alert,
   useColorScheme,
 } from 'react-native';
-import { AppManager } from '../modules/app/AppManager';
+// AppManager removed - will be replaced by DI services
 import { Settings } from '../types';
 
 const SettingsScreen: React.FC = () => {
-  const [appManager] = useState(() => AppManager.getInstance());
+  // AppManager removed - will use DI services + Zustand stores
   const [settings, setSettings] = useState<Settings | null>(null);
   const [stats, setStats] = useState<any>(null);
   const isDarkMode = useColorScheme() === 'dark';

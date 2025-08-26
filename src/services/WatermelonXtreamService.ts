@@ -6,6 +6,7 @@
 import { Q } from '@nozbe/watermelondb';
 import database from '../database';
 import { Playlist, Channel, Category } from '../database/models';
+import { networkService, NetworkError } from './NetworkService';
 
 export interface XtreamCredentials {
   url: string;
@@ -365,20 +366,38 @@ class WatermelonXtreamService {
 
   private async getXtreamAccountInfo(credentials: XtreamCredentials) {
     const url = `${credentials.url}/player_api.php?username=${credentials.username}&password=${credentials.password}`;
-    const response = await fetch(url);
-    return await response.json();
+    try {
+      return await networkService.fetchJSON(url, { timeout: 15000 });
+    } catch (error) {
+      if (error instanceof NetworkError) {
+        throw new Error(`Erreur connexion Xtream: ${error.getUserMessage()}`);
+      }
+      throw error;
+    }
   }
 
   private async getXtreamCategories(credentials: XtreamCredentials): Promise<XtreamCategory[]> {
     const url = `${credentials.url}/player_api.php?username=${credentials.username}&password=${credentials.password}&action=get_live_categories`;
-    const response = await fetch(url);
-    return await response.json();
+    try {
+      return await networkService.fetchJSON<XtreamCategory[]>(url, { timeout: 15000 });
+    } catch (error) {
+      if (error instanceof NetworkError) {
+        throw new Error(`Erreur chargement catégories Xtream: ${error.getUserMessage()}`);
+      }
+      throw error;
+    }
   }
 
   private async getXtreamLiveChannels(credentials: XtreamCredentials): Promise<XtreamChannel[]> {
     const url = `${credentials.url}/player_api.php?username=${credentials.username}&password=${credentials.password}&action=get_live_streams`;
-    const response = await fetch(url);
-    return await response.json();
+    try {
+      return await networkService.fetchJSON<XtreamChannel[]>(url, { timeout: 30000 }); // Plus long pour les chaînes
+    } catch (error) {
+      if (error instanceof NetworkError) {
+        throw new Error(`Erreur chargement chaînes Xtream: ${error.getUserMessage()}`);
+      }
+      throw error;
+    }
   }
 }
 

@@ -4,11 +4,13 @@
  */
 
 import React from 'react';
+import './src/version'; // Load version info
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { PaperProvider } from 'react-native-paper';
-import { AppProvider } from './src/context/AppContext';
-import { PlaylistProvider } from './src/context/PlaylistContext';
+// AppProvider removed - replaced by UIStore
+// PlaylistProvider retiré - remplacé par PlaylistStore Zustand
+// import { PlaylistProvider } from './src/context/PlaylistContext';
 import LoadingOverlay from './src/components/LoadingOverlay';
 import NotificationToast from './src/components/NotificationToast';
 import App_IPTV_SMARTERS from './App_IPTV_SMARTERS';
@@ -43,8 +45,8 @@ const Stack = createStackNavigator<SimpleRootStackParamList>();
 const AppWithNavigation: React.FC = () => {
   return (
     <PaperProvider>
-      <AppProvider>
-        <PlaylistProvider>
+      {/* AppProvider removed - replaced by UIStore */}
+      {/* PlaylistProvider removed - replaced by PlaylistStore Zustand */}
           <NavigationContainer>
             <Stack.Navigator
               initialRouteName="IPTVSmarters"
@@ -86,8 +88,8 @@ const AppWithNavigation: React.FC = () => {
             <LoadingOverlay />
             <NotificationToast />
           </NavigationContainer>
-        </PlaylistProvider>
-      </AppProvider>
+      {/* PlaylistProvider removed - replaced by PlaylistStore Zustand */}
+      {/* AppProvider removed */}
     </PaperProvider>
   );
 };

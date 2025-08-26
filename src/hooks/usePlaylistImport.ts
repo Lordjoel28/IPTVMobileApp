@@ -3,11 +3,14 @@
  * Intègre LoadingOverlay plein écran + NotificationToast
  */
 
-import { useApp } from '../context/AppContext';
-import { usePlaylist } from '../context/PlaylistContext';
+// AppContext removed - using UIStore instead
+import { useUIStore } from '../stores/UIStore';
+// PlaylistContext remplacé par PlaylistStore
+import { usePlaylist } from '../stores/PlaylistStore';
 
 export const usePlaylistImport = () => {
-  const { showLoading, updateLoading, hideLoading, showNotification } = useApp();
+  // Replaced AppContext with UIStore
+  const { showLoading, updateLoading, hideLoading, showNotification } = useUIStore();
   const { loadPlaylist } = usePlaylist();
 
   const importPlaylistM3U = async (uri: string, name: string = 'Playlist M3U') => {

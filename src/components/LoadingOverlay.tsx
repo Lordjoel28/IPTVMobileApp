@@ -14,12 +14,14 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { BlurView } from '@react-native-community/blur';
-import { useApp } from '../context/AppContext';
+// AppContext removed - using UIStore instead
+import { useUIStore } from '../stores/UIStore';
 
 const { width, height } = Dimensions.get('window');
 
 const LoadingOverlay: React.FC = () => {
-  const { loading } = useApp();
+  // Replaced AppContext with UIStore
+  const { loading } = useUIStore();
   const { visible, title, subtitle, progress } = loading;
   const opacity = useRef(new Animated.Value(0)).current;
   const scale = useRef(new Animated.Value(0.8)).current;

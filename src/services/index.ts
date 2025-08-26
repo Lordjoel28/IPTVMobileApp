@@ -8,6 +8,7 @@ export { playlistService, PlaylistService } from './PlaylistService';
 export { cacheService, CacheService } from './CacheService';
 export { parsersService, ParsersService } from './ParsersService';
 export { searchService, SearchService } from './SearchService';
+export { networkService, NetworkService, NetworkError } from './NetworkService';
 
 // Types et interfaces
 export type { PlaylistSource } from './PlaylistService';

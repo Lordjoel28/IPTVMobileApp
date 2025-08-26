@@ -12,13 +12,14 @@ import {
   RefreshControl,
 } from 'react-native';
 import DocumentPicker from 'react-native-document-picker';
-import { AppManager } from '../modules/app/AppManager';
+// AppManager removed - will be replaced by DI services
 import { Playlist } from '../types';
 import { usePlaylistSelection } from '../hooks/usePlaylistSelection';
-import { useApp } from '../context/AppContext';
+// AppContext removed - using UIStore instead
+import { useUIStore } from '../stores/UIStore';
 
 const PlaylistsScreen: React.FC = () => {
-  const [appManager] = useState(() => AppManager.getInstance());
+  // AppManager removed - will be replaced by DI services + Zustand
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -31,7 +32,8 @@ const PlaylistsScreen: React.FC = () => {
   const { selectPlaylistWithAnimation, initializePlaylistService } = usePlaylistSelection();
   
   // 🔄 Hook pour la gestion globale de l'app 
-  const { closeAllModals } = useApp();
+  // Replaced AppContext with UIStore
+  const { closeAllModals } = useUIStore();
 
   useEffect(() => {
     loadPlaylists();
@@ -41,7 +43,8 @@ const PlaylistsScreen: React.FC = () => {
 
   const loadPlaylists = async () => {
     try {
-      const playlistManager = appManager.getPlaylistManager();
+      // TODO: Replace with DI PlaylistService
+      // const playlistManager = appManager.getPlaylistManager();
       const loadedPlaylists = playlistManager.getPlaylists();
       setPlaylists(loadedPlaylists);
       console.log('📋 Playlists chargées:', loadedPlaylists.length);

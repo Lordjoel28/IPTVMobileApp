@@ -20,8 +20,6 @@ export interface PlaylistSource {
 export class PlaylistService {
   private playlists: Map<string, Playlist> = new Map();
   private currentPlaylistId: string | null = null;
-  private loadingCallback?: (title: string, subtitle?: string, progress?: number) => void;
-  private hideLoadingCallback?: () => void;
 
   // 🆕 Singleton pattern instance
   private static instance: PlaylistService;
@@ -53,16 +51,8 @@ export class PlaylistService {
     }
   }
 
-  /**
-   * Définir les callbacks pour l'animation de chargement
-   */
-  setLoadingCallbacks(
-    showLoading: (title: string, subtitle?: string, progress?: number) => void,
-    hideLoading: () => void
-  ) {
-    this.loadingCallback = showLoading;
-    this.hideLoadingCallback = hideLoading;
-  }
+  // ❌ REMOVED: setLoadingCallbacks - Couplage UI supprimé
+  // Le service ne gère plus l'UI - c'est le rôle du hook
 
   /**
    * Ajouter une playlist avec cache automatique - Migration directe web
@@ -112,110 +102,8 @@ export class PlaylistService {
     }
   }
 
-  /**
-   * Sélectionner une playlist active avec animation de chargement
-   */
-  async selectPlaylist(playlistId: string): Promise<Playlist | null> {
-    console.log(`📋 Sélection playlist: ${playlistId}`);
-    
-    try {
-      // Vérifier en mémoire d'abord
-      let playlist = this.playlists.get(playlistId);
-      
-      // Obtenir le nom de la playlist pour l'animation
-      let playlistName = 'Playlist';
-      if (playlist) {
-        playlistName = playlist.name;
-      } else {
-        // Essayer de trouver le nom depuis les métadonnées cache
-        const cachedPlaylist = await this.loadPlaylistFromCache(playlistId);
-        if (cachedPlaylist) {
-          playlistName = cachedPlaylist.name;
-          playlist = cachedPlaylist;
-        }
-      }
-
-      // 🎬 ANIMATION ÉTAPE 1: Chargement playlist
-      if (this.loadingCallback) {
-        this.loadingCallback(
-          `Chargement ${playlistName}...`,
-          'Chargement playlist...'
-        );
-      }
-
-      // Simuler un petit délai pour voir l'animation
-      await new Promise(resolve => setTimeout(resolve, 300));
-
-      if (!playlist) {
-        // 🎬 ANIMATION ÉTAPE 2: Lecture depuis cache
-        if (this.loadingCallback) {
-          this.loadingCallback(
-            `Chargement ${playlistName}...`,
-            'Lecture des chaînes...',
-            25
-          );
-        }
-
-        playlist = await this.loadPlaylistFromCache(playlistId);
-        if (playlist) {
-          this.playlists.set(playlistId, playlist);
-        }
-      }
-
-      if (playlist) {
-        // 🎬 ANIMATION ÉTAPE 3: Finalisation
-        if (this.loadingCallback) {
-          this.loadingCallback(
-            `Chargement ${playlist.name}...`,
-            'Finalisation...',
-            80
-          );
-        }
-
-        // Simuler traitement final
-        await new Promise(resolve => setTimeout(resolve, 400));
-
-        // 🎬 ANIMATION ÉTAPE 4: Terminé
-        if (this.loadingCallback) {
-          this.loadingCallback(
-            `${playlist.name} chargée`,
-            `${playlist.totalChannels} chaînes disponibles`,
-            100
-          );
-        }
-
-        // Petit délai pour voir le message de succès
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        this.currentPlaylistId = playlistId;
-        console.log(`✅ Playlist sélectionnée: ${playlist.name} (${playlist.totalChannels} chaînes)`);
-
-        // 🎬 MASQUER L'ANIMATION
-        if (this.hideLoadingCallback) {
-          this.hideLoadingCallback();
-        }
-
-        return playlist;
-      }
-
-      // Échec du chargement
-      if (this.hideLoadingCallback) {
-        this.hideLoadingCallback();
-      }
-
-      console.warn(`⚠️ Playlist non trouvée: ${playlistId}`);
-      return null;
-
-    } catch (error) {
-      // En cas d'erreur, masquer l'animation
-      if (this.hideLoadingCallback) {
-        this.hideLoadingCallback();
-      }
-      
-      console.error('❌ Erreur sélection playlist:', error);
-      throw error;
-    }
-  }
+  // ❌ REMOVED: selectPlaylist - Couplage UI supprimé
+  // Cette méthode contenait de la logique UI (animations) qui n'a pas sa place dans un service
 
   /**
    * Obtenir la playlist courante
