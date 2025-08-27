@@ -25,6 +25,7 @@
     "react": "18.2.0",
     "react-native": "0.73.2",
     "react-native-document-picker": "^9.3.1",
+    "react-native-fast-image": "^8.6.3",
     "react-native-fs": "^2.20.0",
     "react-native-gesture-handler": "^2.14.1",
     "react-native-immersive-mode": "^2.0.2",
@@ -35,10 +36,12 @@
     "react-native-reanimated": "^3.10.1",
     "react-native-safe-area-context": "^4.7.4",
     "react-native-screens": "^3.29.0",
+    "react-native-skeleton-placeholder": "^5.2.4",
     "react-native-svg": "^14.1.0",
     "react-native-system-navigation-bar": "^2.6.4",
     "react-native-vector-icons": "^10.3.0",
     "react-native-video": "5.2.1",
+    "stream-json": "^1.9.1",
     "zustand": "^5.0.8"
   },
   "devDependencies": {

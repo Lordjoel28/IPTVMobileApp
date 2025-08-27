@@ -149,6 +149,68 @@ export class PlaylistService {
   }
 
   /**
+   * 🚀 NOUVELLE MÉTHODE : Parser M3U avec streaming pour 100K+ chaînes
+   * Utilise le parser streaming TiviMate-level avec progress callbacks
+   */
+  async parseM3UWithStreaming(url: string, name: string, callbacks?: {
+    onProgress?: (progress: any) => void;
+    onStatusChange?: (status: string, details?: string) => void;
+  }) {
+    console.log(`🚀🚀 PlaylistService.parseM3UWithStreaming: ${name}`);
+
+    try {
+      // 1. Télécharger le contenu M3U
+      callbacks?.onStatusChange?.('Téléchargement...', `Récupération ${name}`);
+      
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const content = await response.text();
+      const contentSizeMB = Math.round(content.length / 1024 / 1024);
+      
+      console.log(`📥 Downloaded ${contentSizeMB}MB M3U content`);
+      callbacks?.onStatusChange?.('Analyse...', `${contentSizeMB}MB téléchargés`);
+
+      // 2. Estimer nombre de chaînes pour sélection parser
+      const estimatedChannels = (content.match(/#EXTINF:/g) || []).length;
+      console.log(`📊 Estimated ${estimatedChannels} channels`);
+
+      // 🎯 STRATÉGIE ULTRA-AGGRESSIVE : Streaming dès 1K chaînes pour fluidité maximale
+      const useStreaming = estimatedChannels >= 1000; // ⬇️ Seuil ultra-bas pour vos playlists moyennes
+      
+      if (useStreaming) {
+        callbacks?.onStatusChange?.('Parser streaming...', `${estimatedChannels} chaînes détectées`);
+        console.log('🚀🚀 Using STREAMING parser for large playlist');
+      }
+
+      // 4. Parser avec options optimales
+      const parseResult = await parsersService.parseM3U(content, {
+        useStreamingParser: useStreaming,
+        useUltraOptimized: !useStreaming,
+        chunkSize: useStreaming ? 20000 : 5000,
+        yieldControl: true,
+        enableProgressCallbacks: true,
+        onProgress: callbacks?.onProgress,
+        onStatusChange: callbacks?.onStatusChange,
+        streamingOptions: {
+          maxMemoryMB: 200,
+          yieldInterval: 8000,
+          enableSQLiteStream: false // Pour l'instant
+        }
+      });
+
+      console.log(`🎉 parseM3UWithStreaming completed: ${parseResult.channels.length} channels`);
+      return parseResult;
+
+    } catch (error) {
+      console.error('❌ parseM3UWithStreaming error:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Cache intelligent selon taille - Migration logique web
    */
   private async cachePlaylist(playlistId: string, playlist: Playlist): Promise<void> {

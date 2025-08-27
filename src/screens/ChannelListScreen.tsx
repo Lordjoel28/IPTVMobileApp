@@ -9,14 +9,12 @@ import {
   View,
   Text,
   StyleSheet,
-  FlatList,
-  TouchableOpacity,
   ActivityIndicator,
   Alert,
   StatusBar,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+import { VirtualizedChannelList } from '../components/VirtualizedChannelList';
 import type { Channel } from '../types';
 
 interface ChannelListScreenProps {
@@ -72,6 +70,8 @@ const ChannelListScreen: React.FC<ChannelListScreenProps> = ({ route, navigation
   const [channels, setChannels] = useState<Channel[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const [currentChannel, setCurrentChannel] = useState<Channel | null>(null);
 
   const playlistName = route?.params?.playlistName || 'Playlist IPTV';
   const totalChannels = route?.params?.totalChannels || 0;
@@ -105,12 +105,25 @@ const ChannelListScreen: React.FC<ChannelListScreenProps> = ({ route, navigation
 
   const handleChannelPress = (channel: Channel) => {
     console.log('🎬 Ouverture chaîne:', channel.name);
+    setCurrentChannel(channel);
     
     // TODO: Navigation vers VideoPlayer
     Alert.alert(
       '📺 Chaîne sélectionnée',
       `Nom: ${channel.name}\nURL: ${channel.url}\nCatégorie: ${channel.category || 'N/A'}`
     );
+  };
+
+  const handleToggleFavorite = (channelId: string) => {
+    setFavorites(prev => {
+      const isCurrentlyFavorite = prev.includes(channelId);
+      if (isCurrentlyFavorite) {
+        return prev.filter(id => id !== channelId);
+      } else {
+        return [...prev, channelId];
+      }
+    });
+    console.log(`⭐ Favoris toggled pour channel ${channelId}`);
   };
 
   const handleBack = () => {
@@ -127,25 +140,7 @@ const ChannelListScreen: React.FC<ChannelListScreenProps> = ({ route, navigation
     setRefreshing(false);
   };
 
-  const renderChannelItem = ({ item }: { item: Channel }) => (
-    <ChannelItem
-      channel={item}
-      onPress={handleChannelPress}
-    />
-  );
-
-  const renderEmptyState = () => (
-    <View style={styles.emptyContainer}>
-      <Icon name="tv-off" size={64} color="#666" />
-      <Text style={styles.emptyTitle}>Aucune chaîne trouvée</Text>
-      <Text style={styles.emptyText}>
-        La playlist semble vide ou n'a pas pu être chargée correctement.
-      </Text>
-      <TouchableOpacity style={styles.retryButton} onPress={loadChannels}>
-        <Text style={styles.retryButtonText}>🔄 Réessayer</Text>
-      </TouchableOpacity>
-    </View>
-  );
+  // Render functions moved to VirtualizedChannelList component
 
   const renderLoadingState = () => (
     <View style={styles.loadingContainer}>
@@ -193,30 +188,16 @@ const ChannelListScreen: React.FC<ChannelListScreenProps> = ({ route, navigation
         </TouchableOpacity>
       </View>
 
-      {/* Channel List */}
-      {channels.length === 0 ? (
-        renderEmptyState()
-      ) : (
-        <FlatList
-          data={channels}
-          renderItem={renderChannelItem}
-          keyExtractor={(item, index) => `list-${item.id || 'unknown'}-${index}`}
-          style={styles.channelList}
-          contentContainerStyle={styles.channelListContent}
-          showsVerticalScrollIndicator={false}
-          onRefresh={onRefresh}
-          refreshing={refreshing}
-          initialNumToRender={20}
-          maxToRenderPerBatch={50}
-          windowSize={10}
-          removeClippedSubviews={true}
-          getItemLayout={(_, index) => ({
-            length: 80,
-            offset: 80 * index,
-            index,
-          })}
+      {/* 🚀 ULTRA-OPTIMIZED CHANNEL LIST - 100K+ Channels Support */}
+      <View style={styles.channelListContainer}>
+        <VirtualizedChannelList
+          channels={channels}
+          onChannelSelect={handleChannelPress}
+          currentChannel={currentChannel}
+          favorites={favorites}
+          onToggleFavorite={handleToggleFavorite}
         />
-      )}
+      </View>
     </LinearGradient>
   );
 };
@@ -255,7 +236,7 @@ const styles = StyleSheet.create({
   searchButton: {
     padding: 8,
   },
-  channelList: {
+  channelListContainer: {
     flex: 1,
   },
   channelListContent: {

@@ -1,15 +1,70 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
 import {
   View,
   Text,
-  FlatList,
   TouchableOpacity,
   StyleSheet,
-  Image,
   TextInput,
   useColorScheme,
+  Dimensions,
 } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
+import FastImage from 'react-native-fast-image';
+import FastScrollIndicator from './FastScrollIndicator';
+import SkeletonPlaceholder from 'react-native-skeleton-placeholder';
+
+// 🚀 CONSTANTES PERFORMANCE IPTV SMARTERS PRO LEVEL
+const ITEM_HEIGHT = 80; // Hauteur pour FlashList estimatedItemSize
+const SCREEN_HEIGHT = Dimensions.get('window').height;
 import { Channel } from '../types';
+
+// 🚀 SKELETON COMPONENT pour FlashList
+const SkeletonChannelCard: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) => {
+  return (
+    <View style={[
+      styles.channelItem,
+      isDarkMode && styles.channelItemDark,
+    ]}>
+      <SkeletonPlaceholder
+        backgroundColor={isDarkMode ? '#2a2a2a' : '#f0f0f0'}
+        highlightColor={isDarkMode ? '#404040' : '#ffffff'}
+        speed={1200}
+      >
+        <View style={styles.channelContent}>
+          {/* Logo skeleton */}
+          <View style={{
+            width: 50,
+            height: 50,
+            borderRadius: 8,
+            marginRight: 15,
+          }} />
+          
+          {/* Info skeleton */}
+          <View style={{ flex: 1 }}>
+            <View style={{
+              height: 18,
+              borderRadius: 4,
+              marginBottom: 6,
+              width: '75%',
+            }} />
+            <View style={{
+              height: 12,
+              borderRadius: 3,
+              width: '50%',
+            }} />
+          </View>
+          
+          {/* Favorite button skeleton */}
+          <View style={{
+            width: 24,
+            height: 24,
+            borderRadius: 12,
+          }} />
+        </View>
+      </SkeletonPlaceholder>
+    </View>
+  );
+};
 
 interface ChannelListProps {
   channels: Channel[];
@@ -28,31 +83,61 @@ const ChannelList: React.FC<ChannelListProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [showFastScroll, setShowFastScroll] = useState(false);
+  const [currentScrollIndex, setCurrentScrollIndex] = useState(0);
   const isDarkMode = useColorScheme() === 'dark';
+  const flashListRef = useRef<FlashList<Channel>>(null);
 
-  const categories = useMemo(() => {
-    const cats = new Set(['all']);
+
+  // 🚀 CACHE CATÉGORIES - Pre-compute pour éviter recalculs
+  const categoriesWithCounts = useMemo(() => {
+    const categoryCounts = new Map<string, number>();
+    categoryCounts.set('all', channels.length);
+    categoryCounts.set('favorites', favorites.length);
+    
     channels.forEach(channel => {
       if (channel.category) {
-        cats.add(channel.category);
+        const count = categoryCounts.get(channel.category) || 0;
+        categoryCounts.set(channel.category, count + 1);
       }
     });
-    return Array.from(cats);
-  }, [channels]);
+    
+    return Array.from(categoryCounts.entries()).sort((a, b) => b[1] - a[1]);
+  }, [channels, favorites]);
 
-  const filteredChannels = useMemo(() => {
-    let filtered = channels;
-
-    // Filter by category
-    if (selectedCategory !== 'all') {
-      if (selectedCategory === 'favorites') {
-        filtered = filtered.filter(channel => favorites.includes(channel.id));
-      } else {
-        filtered = filtered.filter(channel => channel.category === selectedCategory);
+  // 🚀 CACHE FILTRES PAR CATÉGORIE - Pre-compute pour changement instantané
+  const channelsByCategory = useMemo(() => {
+    const cache = new Map<string, Channel[]>();
+    
+    // All channels
+    cache.set('all', channels);
+    
+    // Favorites
+    cache.set('favorites', channels.filter(channel => favorites.includes(channel.id)));
+    
+    // By category
+    const categoryGroups = new Map<string, Channel[]>();
+    channels.forEach(channel => {
+      if (channel.category) {
+        const existing = categoryGroups.get(channel.category) || [];
+        existing.push(channel);
+        categoryGroups.set(channel.category, existing);
       }
-    }
+    });
+    
+    categoryGroups.forEach((channels, category) => {
+      cache.set(category, channels);
+    });
+    
+    return cache;
+  }, [channels, favorites]);
 
-    // Filter by search query
+  // 🚀 FILTERED CHANNELS - Ultra-rapide avec cache pre-computed
+  const filteredChannels = useMemo(() => {
+    // Get cached channels for selected category (instant!)
+    let filtered = channelsByCategory.get(selectedCategory) || [];
+
+    // Filter by search query only if needed
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
       filtered = filtered.filter(channel =>
@@ -62,12 +147,14 @@ const ChannelList: React.FC<ChannelListProps> = ({
     }
 
     return filtered;
-  }, [channels, selectedCategory, searchQuery, favorites]);
+  }, [channelsByCategory, selectedCategory, searchQuery]);
 
-  const renderChannelItem = ({ item }: { item: Channel }) => {
+
+  // 🚀 RENDER ITEM SIMPLIFIÉ - FlashList gère les skeletons nativement
+  const renderChannelItem = useCallback(({ item }: { item: Channel }) => {
     const isSelected = currentChannel?.id === item.id;
     const isFavorite = favorites.includes(item.id);
-
+    
     return (
       <TouchableOpacity
         style={[
@@ -78,10 +165,16 @@ const ChannelList: React.FC<ChannelListProps> = ({
         onPress={() => onChannelSelect(item)}
       >
         <View style={styles.channelContent}>
+          {/* 🖼️ LOGO */}
           {item.logo ? (
-            <Image
-              source={{ uri: item.logo }}
+            <FastImage
+              source={{ 
+                uri: item.logo,
+                priority: FastImage.priority.normal,
+                cache: FastImage.cacheControl.web
+              }}
               style={styles.channelLogo}
+              resizeMode={FastImage.resizeMode.cover}
             />
           ) : (
             <View style={[styles.channelLogo, styles.channelLogoPlaceholder]}>
@@ -89,6 +182,7 @@ const ChannelList: React.FC<ChannelListProps> = ({
             </View>
           )}
 
+          {/* 📝 INFO */}
           <View style={styles.channelInfo}>
             <Text
               style={[
@@ -107,6 +201,7 @@ const ChannelList: React.FC<ChannelListProps> = ({
             )}
           </View>
 
+          {/* ⭐ FAVORITE BUTTON */}
           <TouchableOpacity
             style={styles.favoriteButton}
             onPress={() => onToggleFavorite(item.id)}
@@ -118,9 +213,21 @@ const ChannelList: React.FC<ChannelListProps> = ({
         </View>
       </TouchableOpacity>
     );
-  };
+  }, [currentChannel?.id, favorites, isDarkMode, onChannelSelect, onToggleFavorite]);
 
-  const renderCategoryButton = (category: string) => {
+  // 🚀 CHANGEMENT CATÉGORIE RAPIDE
+  const handleCategoryChange = useCallback((category: string) => {
+    setSelectedCategory(category);
+    
+    // Reset position scroll
+    flashListRef.current?.scrollToOffset({ 
+      offset: 0, 
+      animated: true
+    });
+  }, []);
+
+  // 🚀 RENDER CATEGORY OPTIMISÉ - Animation instantanée
+  const renderCategoryButton = useCallback(([category, count]: [string, number]) => {
     const isSelected = selectedCategory === category;
     const displayName = category === 'all' ? 'Toutes' : 
                        category === 'favorites' ? 'Favoris' : category;
@@ -133,7 +240,8 @@ const ChannelList: React.FC<ChannelListProps> = ({
           isDarkMode && styles.categoryButtonDark,
           isSelected && styles.categoryButtonSelected,
         ]}
-        onPress={() => setSelectedCategory(category)}
+        onPress={() => handleCategoryChange(category)}
+        activeOpacity={0.7}
       >
         <Text
           style={[
@@ -142,11 +250,37 @@ const ChannelList: React.FC<ChannelListProps> = ({
             isSelected && styles.categoryButtonTextSelected,
           ]}
         >
-          {displayName}
+          {displayName} ({count})
         </Text>
       </TouchableOpacity>
     );
-  };
+  }, [selectedCategory, isDarkMode, handleCategoryChange]);
+
+
+  // 🚀 KEY EXTRACTOR optimisé
+  const keyExtractor = useCallback((item: Channel) => item.id, []);
+
+  // 🚀 FAST SCROLL HANDLERS
+  const handleScrollToIndex = useCallback((index: number) => {
+    flashListRef.current?.scrollToIndex({ 
+      index: Math.max(0, Math.min(index, filteredChannels.length - 1)),
+      animated: true 
+    });
+  }, [filteredChannels.length]);
+
+
+  const onScroll = useCallback((event: any) => {
+    const { contentOffset } = event.nativeEvent;
+    const currentIndex = Math.floor(contentOffset.y / ITEM_HEIGHT);
+    setCurrentScrollIndex(currentIndex);
+    
+    // Show fast scroll indicator for large lists during scroll
+    if (filteredChannels.length > 50) {
+      setShowFastScroll(true);
+      // Hide after 2 seconds of no scrolling
+      setTimeout(() => setShowFastScroll(false), 2000);
+    }
+  }, [filteredChannels.length]);
 
   return (
     <View style={[styles.container, isDarkMode && styles.containerDark]}>
@@ -161,23 +295,27 @@ const ChannelList: React.FC<ChannelListProps> = ({
         />
       </View>
 
-      {/* Categories */}
+      {/* 🚀 Categories avec compteurs */}
       <View style={styles.categoriesContainer}>
-        <FlatList
+        <FlashList
           horizontal
           showsHorizontalScrollIndicator={false}
-          data={['all', 'favorites', ...categories.filter(c => c !== 'all')]}
+          data={categoriesWithCounts}
           renderItem={({ item }) => renderCategoryButton(item)}
-          keyExtractor={(item) => item}
+          keyExtractor={(item) => item[0]}
+          estimatedItemSize={100}
         />
       </View>
 
-      {/* Channels list */}
-      <FlatList
+      {/* 🚀 CHANNELS LIST ULTRA-OPTIMISÉE avec FlashList */}
+      <FlashList
+        ref={flashListRef}
         data={filteredChannels}
         renderItem={renderChannelItem}
-        keyExtractor={(item) => item.id}
+        keyExtractor={keyExtractor}
+        estimatedItemSize={ITEM_HEIGHT}
         showsVerticalScrollIndicator={false}
+        onScroll={onScroll}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={[styles.emptyText, isDarkMode && styles.emptyTextDark]}>
@@ -185,6 +323,17 @@ const ChannelList: React.FC<ChannelListProps> = ({
             </Text>
           </View>
         }
+        PlaceholderComponent={
+          <SkeletonChannelCard isDarkMode={isDarkMode} />
+        }
+      />
+
+      {/* 🚀 FAST SCROLL INDICATOR - Comme IPTV Smarters Pro */}
+      <FastScrollIndicator
+        channels={filteredChannels}
+        onScrollToIndex={handleScrollToIndex}
+        visible={showFastScroll && filteredChannels.length > 50}
+        currentIndex={currentScrollIndex}
       />
 
       {/* Channel count */}
@@ -264,6 +413,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.2,
     shadowRadius: 2,
+    height: ITEM_HEIGHT, // 🚀 HAUTEUR FIXE pour getItemLayout
   },
   channelItemDark: {
     backgroundColor: '#2a2a2a',
@@ -276,7 +426,8 @@ const styles = StyleSheet.create({
   channelContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 15,
+    padding: 12, // 🚀 Padding réduit pour tenir dans hauteur fixe
+    height: ITEM_HEIGHT - 10, // 🚀 Hauteur exacte pour contenu
   },
   channelLogo: {
     width: 50,

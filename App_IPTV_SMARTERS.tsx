@@ -26,7 +26,7 @@ import ConnectionModal from './src/components/ConnectionModal';
 import XtreamCodeModal from './src/components/XtreamCodeModal';
 import M3UUrlModal from './src/components/M3UUrlModal';
 import ProfilesModal from './src/components/ProfilesModal';
-import { ServiceTest } from './src/components/ServiceTest';
+// import { ServiceTest } from './src/components/ServiceTest'; // Removed for production
 import type { Channel } from './src/types';
 // import { APP_VERSION } from './src/version'; // Removed for production
 import type { SimpleRootStackParamList } from './AppWithNavigation';
@@ -80,7 +80,7 @@ const App: React.FC = () => {
   const [showProfilesModal, setShowProfilesModal] = useState(false);
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<string | undefined>();
   // 🧪 État pour le test du système DI
-  const [showServiceTest, setShowServiceTest] = useState(false);
+  // const [showServiceTest, setShowServiceTest] = useState(false); // Removed for production
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const cardsScale = useRef([...Array(6)].map(() => new Animated.Value(1))).current;
   
@@ -1280,18 +1280,7 @@ const App: React.FC = () => {
         selectedPlaylistId={selectedPlaylistId}
       />
 
-      {/* 🧪 Bouton de test du système DI (Mode développement) */}
-      <TouchableOpacity
-        style={styles.serviceTestButton}
-        onPress={() => setShowServiceTest(!showServiceTest)}
-      >
-        <Text style={styles.serviceTestText}>🏗️ DI</Text>
-      </TouchableOpacity>
-
-      {/* Bannières de version supprimées pour production */}
-
-      {/* 🧪 Composant de test des services */}
-      <ServiceTest visible={showServiceTest} />
+      {/* Composants de test DI supprimés pour production */}
     </LinearGradient>
   );
 };
@@ -1470,29 +1459,7 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   
-  // 🧪 Styles pour le test DI (développement)
-  serviceTestButton: {
-    position: 'absolute',
-    top: 120,
-    right: 10,
-    width: 50,
-    height: 30,
-    backgroundColor: 'rgba(33, 150, 243, 0.8)',
-    borderRadius: 15,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 999,
-    shadowColor: '#2196F3',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.8,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  serviceTestText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
+  // Styles de test DI supprimés pour production
   versionContainer: {
     position: 'absolute',
     top: 30,

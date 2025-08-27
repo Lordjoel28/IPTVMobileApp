@@ -1,12 +1,14 @@
 /**
  * 📋 Hook usePlaylistImport - Import de playlists avec animations
- * Intègre LoadingOverlay plein écran + NotificationToast
+ * Intègre LoadingOverlay plein écran + NotificationToast + StreamingXtreamService optimisé
  */
 
 // AppContext removed - using UIStore instead
 import { useUIStore } from '../stores/UIStore';
 // PlaylistContext remplacé par PlaylistStore
 import { usePlaylist } from '../stores/PlaylistStore';
+// 🚀 NEW: Service Xtream optimisé pour 100K+ chaînes
+import StreamingXtreamService from '../services/StreamingXtreamService';
 
 export const usePlaylistImport = () => {
   // Replaced AppContext with UIStore
@@ -79,62 +81,80 @@ export const usePlaylistImport = () => {
 
   const importPlaylistXtream = async (server: string, username: string, password: string, name: string = 'Playlist Xtream') => {
     try {
-      console.log('🎯 Début import playlist Xtream:', server);
+      console.log('🚀 Début import playlist Xtream OPTIMISÉ:', server);
 
-      // 1. Afficher le LoadingOverlay plein écran avec messages spécifiques Xtream
+      // 1. Afficher le LoadingOverlay plein écran
       showLoading(
-        'Téléchargement...',
-        `Import de la playlist ${name}...`,
+        'Streaming...',
+        `Import optimisé ${name} (100K+ compatible)...`,
         0
       );
 
-      // 2. Étapes spécifiques à Xtream Codes
-      const steps = [
-        { progress: 15, subtitle: 'Authentification sur le serveur...' },
-        { progress: 35, subtitle: 'Récupération des catégories...' },
-        { progress: 60, subtitle: 'Téléchargement de chaînes, films et séries...' },
-        { progress: 85, subtitle: 'Traitement des données...' },
-        { progress: 100, subtitle: 'Configuration terminée...' },
-      ];
+      // 2. Préparer credentials pour service optimisé
+      const credentials = {
+        url: server,
+        username,
+        password
+      };
 
-      for (const step of steps) {
-        updateLoading({
-          subtitle: step.subtitle,
-          progress: step.progress,
-        });
-        
-        // Temps plus long pour Xtream (plus de données)
-        await new Promise(resolve => setTimeout(resolve, 1200));
-      }
+      // 3. 🚀 UTILISER LE SERVICE STREAMING OPTIMISÉ
+      let totalChannels = 0;
+      const playlistId = await StreamingXtreamService.importXtreamPlaylistOptimized(
+        credentials,
+        name,
+        (progress: number, message: string) => {
+          // Progress callback avec messages temps réel
+          console.log(`📊 Progress: ${progress}% - ${message}`);
+          
+          updateLoading({
+            subtitle: message,
+            progress: Math.min(95, progress), // Cap à 95% pour finalisation
+          });
 
-      // 3. Ici on appellerait la vraie méthode d'import Xtream
-      // await xtreamManager.importPlaylist(server, username, password);
+          // Extract channel count from message if available
+          const countMatch = message.match(/(\d+)\s+channels?/i);
+          if (countMatch) {
+            totalChannels = parseInt(countMatch[1]);
+          }
+        }
+      );
 
-      // 4. Cacher le loading
+      // 4. Finalisation
+      updateLoading({
+        subtitle: '✅ Activation playlist...',
+        progress: 100,
+      });
+
+      // Small delay to show completion
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // 5. Cacher le loading
       hideLoading();
 
-      // 5. Notification de succès
-      const channelCount = 2547; // TODO: récupérer le vrai nombre
+      // 6. Notification de succès avec vrai nombre de chaînes
       showNotification(
-        `Playlist Xtream ajoutée ! ${channelCount} chaînes importées avec succès`,
+        `🚀 Playlist Xtream optimisée ! ${totalChannels} chaînes importées avec succès`,
         'success',
         4000
       );
 
-      console.log('✅ Import playlist Xtream terminé avec succès');
-      return true;
+      console.log(`✅ Import playlist Xtream optimisé terminé: ${totalChannels} chaînes, ID: ${playlistId}`);
+      return { success: true, playlistId, channelCount: totalChannels };
 
     } catch (error) {
-      console.error('❌ Erreur import playlist Xtream:', error);
+      console.error('❌ Erreur import playlist Xtream optimisé:', error);
       
       hideLoading();
+      
+      // Message d'erreur plus détaillé
+      const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue';
       showNotification(
-        'Erreur lors de l\'import de la playlist Xtream',
+        `Erreur import Xtream: ${errorMessage}`,
         'error',
-        5000
+        6000
       );
       
-      return false;
+      return { success: false, error: errorMessage };
     }
   };
 
