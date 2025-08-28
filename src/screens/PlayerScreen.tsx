@@ -8,7 +8,7 @@ import {
   useColorScheme,
   Dimensions,
 } from 'react-native';
-import VideoPlayer from '../components/VideoPlayer';
+import VideoPlayerModern from '../components/VideoPlayerModern';
 import ChannelList from '../components/ChannelList';
 // AppManager removed - will be replaced by DI services
 import { Channel } from '../types';
@@ -20,28 +20,40 @@ const PlayerScreen: React.FC = () => {
   const [favorites, setFavorites] = useState<string[]>([]);
   const [showChannelList, setShowChannelList] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
+  const [isInFullscreen, setIsInFullscreen] = useState(false);
   const isDarkMode = useColorScheme() === 'dark';
 
   useEffect(() => {
     // TODO: Replace with DI services + Zustand stores
     console.log('PlayerScreen - AppManager removed, ready for DI migration');
+    
+    // Temporary test channel for development
+    const testChannel: Channel = {
+      id: 'test-1',
+      name: 'Test Channel',
+      url: 'https://sample-videos.com/zip/10/mp4/SampleVideo_1280x720_1mb.mp4',
+      category: 'Test',
+    };
+    setCurrentChannel(testChannel);
+    setAllChannels([testChannel]);
   }, []);
 
   const loadData = async () => {
     try {
       setIsLoading(true);
       
+      // TODO: Replace with DI services + Zustand stores
       // Get all channels from playlists
-      const channels = appManager.getPlaylistManager().getAllChannels();
-      setAllChannels(channels);
+      // const channels = appManager.getPlaylistManager().getAllChannels();
+      // setAllChannels(channels);
       
       // Get favorites
-      const favs = appManager.getState().favorites;
-      setFavorites(favs);
+      // const favs = appManager.getState().favorites;
+      // setFavorites(favs);
       
       // Get current channel from app state
-      const currentCh = appManager.getState().currentChannel;
-      setCurrentChannel(currentCh);
+      // const currentCh = appManager.getState().currentChannel;
+      // setCurrentChannel(currentCh);
       
     } catch (error) {
       console.error('❌ Erreur chargement données player:', error);
@@ -54,7 +66,7 @@ const PlayerScreen: React.FC = () => {
   const handleChannelSelect = async (channel: Channel) => {
     try {
       setIsLoading(true);
-      await appManager.playChannel(channel);
+      // await appManager.playChannel(channel); // TODO: Replace with service
       setCurrentChannel(channel);
       console.log('▶️ Lecture démarrée:', channel.name);
     } catch (error) {
@@ -67,7 +79,8 @@ const PlayerScreen: React.FC = () => {
 
   const handleToggleFavorite = async (channelId: string) => {
     try {
-      await appManager.toggleFavorite(channelId);
+      // await appManager.toggleFavorite(channelId); // TODO: Replace with service
+      console.log('Toggle favorite for channel:', channelId);
     } catch (error) {
       console.error('❌ Erreur favori:', error);
       Alert.alert('Erreur', 'Impossible de modifier les favoris');
@@ -91,12 +104,21 @@ const PlayerScreen: React.FC = () => {
     // console.log('📊 Progress:', data);
   };
 
+  const handleFullscreenToggle = (isFullscreen: boolean) => {
+    setIsInFullscreen(isFullscreen);
+    if (isFullscreen) {
+      setShowChannelList(false); // Hide channel list in fullscreen
+    }
+  };
+
   const toggleChannelList = () => {
-    setShowChannelList(!showChannelList);
+    if (!isInFullscreen) {
+      setShowChannelList(!showChannelList);
+    }
   };
 
   const stopPlayback = () => {
-    appManager.stopChannel();
+    // appManager.stopChannel(); // Commented out for now
     setCurrentChannel(null);
   };
 
@@ -117,15 +139,17 @@ const PlayerScreen: React.FC = () => {
     <View style={[styles.container, isDarkMode && styles.containerDark]}>
       {/* Video Player Section */}
       <View style={[styles.playerSection, showChannelList && styles.playerSectionCompact]}>
-        <VideoPlayer
+        <VideoPlayerModern
           channel={currentChannel}
           isVisible={true}
           onError={handleVideoError}
           onProgress={handleVideoProgress}
+          onFullscreenToggle={handleFullscreenToggle}
         />
         
-        {/* Player Controls Overlay */}
-        <View style={styles.playerControls}>
+        {/* Player Controls Overlay - Hidden in fullscreen */}
+        {!isInFullscreen && (
+          <View style={styles.playerControls}>
           <TouchableOpacity
             style={[styles.controlButton, isDarkMode && styles.controlButtonDark]}
             onPress={toggleChannelList}
@@ -143,10 +167,11 @@ const PlayerScreen: React.FC = () => {
               <Text style={styles.controlButtonText}>⏹️</Text>
             </TouchableOpacity>
           )}
-        </View>
+          </View>
+        )}
 
-        {/* Channel Info */}
-        {currentChannel && !showChannelList && (
+        {/* Channel Info - Hidden in fullscreen */}
+        {currentChannel && !showChannelList && !isInFullscreen && (
           <View style={styles.channelInfoOverlay}>
             <Text style={styles.channelInfoName}>{currentChannel.name}</Text>
             {currentChannel.category && (

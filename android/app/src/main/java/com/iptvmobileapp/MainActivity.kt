@@ -2,7 +2,6 @@ package com.iptvmobileapp
 
 import android.os.Bundle
 import android.view.View
-import android.view.WindowManager
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnabled
@@ -25,10 +24,8 @@ class MainActivity : ReactActivity() {
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(null) // react-native-screens fix
-  }
-  
-  override fun onStart() {
-    super.onStart()
+    
+    // 🎯 FORCER masquage navigation bar (complément au thème)
     hideNavigationBar()
   }
   
@@ -39,18 +36,12 @@ class MainActivity : ReactActivity() {
     }
   }
   
+  @Suppress("DEPRECATION")
   private fun hideNavigationBar() {
     window.decorView.systemUiVisibility = (
-      View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
-      View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
-      View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
-      View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-    )
-    
-    // Alternative pour les versions Android plus récentes
-    window.setFlags(
-      WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
-      WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+        View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+        View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
+        View.SYSTEM_UI_FLAG_FULLSCREEN
     )
   }
 }

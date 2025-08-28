@@ -6,6 +6,9 @@ import {
   Text,
   TouchableOpacity,
   Alert,
+  Platform,
+  Modal,
+  StatusBar,
 } from 'react-native';
 import Video from 'react-native-video';
 import { Channel } from '../types';
@@ -16,6 +19,12 @@ interface VideoPlayerProps {
   showInfo?: boolean; // Ajout de la prop pour afficher les infos
   onError?: (error: string) => void;
   onProgress?: (data: any) => void;
+  onMiniPlayerPress?: () => void; // Callback pour clic sur mini-lecteur
+  allowFullscreen?: boolean; // Contrôle si le lecteur peut passer en plein écran
+  showControls?: boolean; // Contrôle l'affichage des contrôles
+  style?: any; // Style personnalisé pour le conteneur
+  isFullscreen?: boolean; // Mode plein écran
+  onFullscreenToggle?: (isFullscreen: boolean) => void; // Callback pour toggle fullscreen
 }
 
 const VideoPlayer: React.FC<VideoPlayerProps> = ({
@@ -24,13 +33,19 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   showInfo = true, // Par défaut, on affiche les infos
   onError,
   onProgress,
+  onMiniPlayerPress,
+  allowFullscreen = true,
+  showControls = true,
+  style,
+  isFullscreen = false,
+  onFullscreenToggle,
 }) => {
   const videoRef = useRef<Video>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
-  const [showControls, setShowControls] = useState(true);
+  const [showControlsState, setShowControlsState] = useState(true);
 
   const { width, height } = Dimensions.get('window');
   const maxRetries = 3;
@@ -44,13 +59,13 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   }, [channel]);
 
   useEffect(() => {
-    if (showControls) {
+    if (showControls && showControlsState) {
       const timer = setTimeout(() => {
-        setShowControls(false);
+        setShowControlsState(false);
       }, 3000);
       return () => clearTimeout(timer);
     }
-  }, [showControls]);
+  }, [showControls, showControlsState]);
 
   const handleError = (error: any) => {
     console.error('Video playback error:', error);
@@ -94,11 +109,25 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   const togglePlayPause = () => {
     setIsPaused(!isPaused);
-    setShowControls(true);
+    setShowControlsState(true);
   };
 
   const handleScreenTouch = () => {
-    setShowControls(!showControls);
+    console.log('🎬 VideoPlayer handleScreenTouch called, onMiniPlayerPress:', !!onMiniPlayerPress);
+    if (onMiniPlayerPress) {
+      // Si c'est un mini-lecteur, passer en mode fullscreen directement
+      console.log('🔥 Switching to fullscreen mode');
+      onFullscreenToggle?.(true);
+    } else {
+      // Sinon, basculer les contrôles
+      console.log('📱 Toggling controls');
+      setShowControlsState(!showControlsState);
+    }
+  };
+
+  const handleExitFullscreen = () => {
+    console.log('❌ Exiting fullscreen mode');
+    onFullscreenToggle?.(false);
   };
 
   if (!channel) {
@@ -115,13 +144,79 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     return <View style={styles.container} />;
   }
 
-  return (
-    <View style={styles.container}>
-      <TouchableOpacity
-        style={styles.videoContainer}
-        onPress={handleScreenTouch}
-        activeOpacity={1}
+  // Rendu plein écran
+  if (isFullscreen) {
+    return (
+      <Modal
+        visible={isFullscreen}
+        animationType="fade"
+        onRequestClose={handleExitFullscreen}
       >
+        <StatusBar hidden />
+        <View style={styles.fullscreenContainer}>
+          <View style={styles.fullscreenVideoContainer}>
+            {!hasError ? (
+              <Video
+                ref={videoRef}
+                source={{ uri: channel.url }}
+                style={styles.fullscreenVideo}
+                resizeMode="contain"
+                paused={isPaused}
+                onLoad={handleLoad}
+                onError={(error) => {
+                  Alert.alert('Erreur Video', JSON.stringify(error));
+                  handleError(error);
+                }}
+                onProgress={handleProgress}
+                onBuffer={(data) => setIsLoading(data.isBuffering)}
+                bufferConfig={{
+                  minBufferMs: 15000,
+                  maxBufferMs: 50000,
+                  bufferForPlaybackMs: 2500,
+                  bufferForPlaybackAfterRebufferMs: 5000,
+                }}
+                repeat={false}
+                playWhenInactive={false}
+                playInBackground={false}
+                ignoreSilentSwitch="ignore"
+              />
+            ) : (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>❌ Erreur de lecture</Text>
+                <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
+                  <Text style={styles.retryButtonText}>🔄 Réessayer</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Simple fullscreen controls */}
+            <TouchableOpacity
+              style={styles.fullscreenCloseButton}
+              onPress={handleExitFullscreen}
+            >
+              <Text style={styles.fullscreenCloseText}>✕</Text>
+            </TouchableOpacity>
+
+            {/* Simple play/pause control */}
+            <TouchableOpacity
+              style={styles.fullscreenPlayButton}
+              onPress={togglePlayPause}
+            >
+              <Text style={styles.fullscreenPlayText}>
+                {isPaused ? '▶️' : '⏸️'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    );
+  }
+
+  // Rendu mini-lecteur
+  return (
+    <View style={[styles.container, style]}>
+      {/* Video component without TouchableOpacity wrapper */}
+      <View style={styles.videoContainer}>
         {!hasError ? (
           <Video
             ref={videoRef}
@@ -177,7 +272,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
         )}
 
         {/* Controls overlay */}
-        {showControls && (
+        {showControls && showControlsState && (
           <View style={styles.controlsOverlay}>
             <TouchableOpacity
               style={styles.playPauseButton}
@@ -189,7 +284,18 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
             </TouchableOpacity>
           </View>
         )}
-      </TouchableOpacity>
+      </View>
+
+      {/* Separate TouchableOpacity overlay for click detection - Only for mini-player */}
+      {onMiniPlayerPress && (
+        <TouchableOpacity
+          style={styles.clickOverlay}
+          onPress={handleScreenTouch}
+          activeOpacity={Platform.OS === 'android' ? 0.8 : 1}
+        >
+          {/* Transparent overlay for clicks */}
+        </TouchableOpacity>
+      )}
 
       {/* Retry info */}
       {retryCount > 0 && !hasError && (
@@ -221,6 +327,7 @@ const styles = StyleSheet.create({
   videoContainer: {
     flex: 1,
     position: 'relative',
+    zIndex: 1,
   },
   video: {
     flex: 1,
@@ -323,6 +430,63 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     textAlign: 'center',
+  },
+  // Stack Overflow solution: separate overlay for click detection
+  clickOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 999,
+    backgroundColor: 'transparent',
+  },
+  // Fullscreen styles
+  fullscreenContainer: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  fullscreenVideoContainer: {
+    flex: 1,
+    position: 'relative',
+  },
+  fullscreenVideo: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  fullscreenCloseButton: {
+    position: 'absolute',
+    top: 40,
+    right: 20,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  fullscreenCloseText: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  fullscreenPlayButton: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    marginTop: -35,
+    marginLeft: -35,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderRadius: 35,
+    width: 70,
+    height: 70,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  fullscreenPlayText: {
+    fontSize: 30,
   },
 });
 

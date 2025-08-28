@@ -22,6 +22,7 @@ import {
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { List, Avatar, IconButton, Card, ProgressBar, Text as PaperText } from 'react-native-paper';
 import VideoPlayer from '../components/VideoPlayer';
+import VideoPlayerModern from '../components/VideoPlayerModern'; // PHASE 1: Réactivé avec nouvelles fonctionnalités
 import { useRoute, useNavigation } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import type { RootStackParamList, Channel, Category } from '../types';
@@ -309,14 +310,15 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({ route }) => {
     addToRecentChannels(channel);
   };
 
-  const handleMiniPlayerPress = () => {
-    console.log('🎬 Ouverture fullscreen player');
-    setShowFullscreenPlayer(true);
+  const handleMiniPlayerPress = (isFullscreen: boolean) => {
+    console.log('🎬 handleMiniPlayerPress called:', isFullscreen);
+    console.log('🎬 Setting showFullscreenPlayer to:', isFullscreen);
+    setShowFullscreenPlayer(isFullscreen);
   };
 
-  const handleCloseFullscreen = () => {
+  const handleCloseFullscreen = (isFullscreen: boolean = false) => {
     console.log('❌ Fermeture fullscreen player');
-    setShowFullscreenPlayer(false);
+    setShowFullscreenPlayer(isFullscreen);
   };
 
   // 🔍 CHARGEMENT DYNAMIQUE basé sur patterns GitHub/Reddit - FIX prototype error avec AsyncStorage
@@ -516,20 +518,20 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({ route }) => {
           
           {/* 🎯 MINI-LECTEUR - VERSION FONCTIONNELLE */}
           <View style={[styles.miniPlayerContainer, { height: miniPlayerHeight }]}>
-            <Pressable
-              style={styles.miniPlayerPressable}
-              onPress={handleMiniPlayerPress}
-            >
-              <VideoPlayer
-                channel={selectedChannel}
-                isVisible={true}
-                onClose={() => {}}
-                allowFullscreen={false}
-                showControls={false}
-                showInfo={false}
-                style={styles.miniPlayer}
-              />
-            </Pressable>
+            <VideoPlayer
+              channel={selectedChannel}
+              isVisible={true}
+              allowFullscreen={false}
+              showControls={false}
+              showInfo={false}
+              style={styles.miniPlayer}
+              isFullscreen={showFullscreenPlayer}
+              onMiniPlayerPress={() => {
+                console.log('🔥 MINI PLAYER CLICKED! Opening fullscreen');
+                handleMiniPlayerPress(true);
+              }}
+              onFullscreenToggle={handleCloseFullscreen}
+            />
           </View>
 
           {/* 🎯 ZONE EPG REDESIGNÉE avec Card flexible et Paper components */}
@@ -546,16 +548,14 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({ route }) => {
         </View>
       </View>
 
-      {/* Fullscreen Player Modal */}
-      {showFullscreenPlayer && (
-        <VideoPlayer
-          channel={selectedChannel}
-          isVisible={showFullscreenPlayer}
-          onClose={handleCloseFullscreen}
-          allowFullscreen={true}
-          style={styles.fullscreenPlayer}
-        />
-      )}
+      {/* 🎬 PHASE 1: VideoPlayerModern avec contrôles TiviMate */}
+      <VideoPlayerModern
+        channel={selectedChannel}
+        isVisible={showFullscreenPlayer}
+        isFullscreen={showFullscreenPlayer}
+        onError={(error) => console.log('Fullscreen error:', error)}
+        onFullscreenToggle={handleCloseFullscreen}
+      />
     </View>
   );
 };
@@ -762,10 +762,6 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
     overflow: 'hidden', // Pour les coins arrondis
-  },
-  miniPlayerPressable: {
-    flex: 1,
-    position: 'relative',
   },
   miniPlayer: {
     width: '100%',
