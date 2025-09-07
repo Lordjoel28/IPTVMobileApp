@@ -3,7 +3,7 @@
  * Design sobre, taille adaptative, style pilule moderne
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, {useEffect, useRef} from 'react';
 import {
   View,
   Text,
@@ -14,9 +14,9 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import LinearGradient from 'react-native-linear-gradient';
-import { BlurView } from '@react-native-community/blur';
+import {BlurView} from '@react-native-community/blur';
 
-const { width, height } = Dimensions.get('window');
+const {width, height} = Dimensions.get('window');
 
 interface ModernToastProps {
   visible: boolean;
@@ -75,7 +75,7 @@ const ModernToast: React.FC<ModernToastProps> = ({
             duration: 1000,
             useNativeDriver: true,
           });
-          rotateAnimation.current.start(({ finished }) => {
+          rotateAnimation.current.start(({finished}) => {
             if (finished && visible) {
               rotate();
             }
@@ -169,40 +169,30 @@ const ModernToast: React.FC<ModernToastProps> = ({
       style={[
         styles.container,
         {
-          transform: [{ translateY }, { scale }],
+          transform: [{translateY}, {scale}],
           opacity,
         },
       ]}
-      pointerEvents="none"
-    >
+      pointerEvents="none">
       <View style={styles.centeredContainer}>
         <BlurView
           style={styles.blurContainer}
           blurType="dark"
           blurAmount={25}
-          reducedTransparencyFallbackColor="rgba(0,0,0,0.85)"
-        >
+          reducedTransparencyFallbackColor="rgba(0,0,0,0.85)">
           <LinearGradient
             colors={config.colors}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.gradient}
-          >
+            start={{x: 0, y: 0}}
+            end={{x: 1, y: 1}}
+            style={styles.gradient}>
             <View style={styles.content}>
               <View style={styles.iconContainer}>
                 <Animated.View
-                  style={[
-                    type === 'loading' && { transform: [{ rotate: spin }] },
-                  ]}
-                >
-                  <Icon 
-                    name={config.icon} 
-                    size={22} 
-                    color={config.iconColor} 
-                  />
+                  style={[type === 'loading' && {transform: [{rotate: spin}]}]}>
+                  <Icon name={config.icon} size={22} color={config.iconColor} />
                 </Animated.View>
               </View>
-              
+
               <View style={styles.textContainer}>
                 <Text style={styles.title}>{title}</Text>
                 {message && <Text style={styles.message}>{message}</Text>}
@@ -212,8 +202,8 @@ const ModernToast: React.FC<ModernToastProps> = ({
             {/* Effet de brillance subtile */}
             <LinearGradient
               colors={['transparent', 'rgba(255,255,255,0.08)', 'transparent']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
+              start={{x: 0, y: 0}}
+              end={{x: 1, y: 0}}
               style={styles.shine}
             />
           </LinearGradient>
@@ -243,7 +233,7 @@ const styles = StyleSheet.create({
     minWidth: 200,
     maxWidth: width * 0.85,
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: {width: 0, height: 4},
     shadowOpacity: 0.25,
     shadowRadius: 8,
     elevation: 8,
@@ -290,7 +280,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    transform: [{ skewX: '-15deg' }],
+    transform: [{skewX: '-15deg'}],
   },
 });
 

@@ -35,8 +35,8 @@ export class ServiceContainer implements IServiceContainer {
   register<T>(name: string, definition: ServiceDefinition<T>): void {
     this.services.set(name, {
       singleton: true, // Par défaut singleton
-      lazy: true,      // Par défaut lazy loading
-      ...definition
+      lazy: true, // Par défaut lazy loading
+      ...definition,
     });
   }
 
@@ -46,7 +46,11 @@ export class ServiceContainer implements IServiceContainer {
   async get<T>(name: string): Promise<T> {
     // Vérification des dépendances circulaires
     if (this.resolutionStack.has(name)) {
-      throw new Error(`Circular dependency detected: ${Array.from(this.resolutionStack).join(' → ')} → ${name}`);
+      throw new Error(
+        `Circular dependency detected: ${Array.from(this.resolutionStack).join(
+          ' → ',
+        )} → ${name}`,
+      );
     }
 
     // Retourne l'instance existante si singleton
@@ -63,11 +67,13 @@ export class ServiceContainer implements IServiceContainer {
 
     try {
       // Résout les dépendances d'abord
-      const dependencies = await this.resolveDependencies(definition.dependencies || []);
-      
+      const dependencies = await this.resolveDependencies(
+        definition.dependencies || [],
+      );
+
       // Crée l'instance
       const instance = await definition.factory(...dependencies);
-      
+
       // Cache si singleton
       if (definition.singleton) {
         this.instances.set(name, instance);
@@ -98,12 +104,12 @@ export class ServiceContainer implements IServiceContainer {
    */
   private async resolveDependencies(dependencies: string[]): Promise<any[]> {
     const resolved = [];
-    
+
     for (const dep of dependencies) {
       const instance = await this.get(dep);
       resolved.push(instance);
     }
-    
+
     return resolved;
   }
 }
@@ -118,12 +124,12 @@ export const container = new ServiceContainer();
  * Décorateur pour l'injection automatique de dépendances
  */
 export function Injectable(name: string, dependencies: string[] = []) {
-  return function<T extends ServiceConstructor>(target: T) {
+  return function <T extends ServiceConstructor>(target: T) {
     container.register(name, {
       factory: (...deps) => new target(...deps),
       dependencies,
       singleton: true,
-      lazy: true
+      lazy: true,
     });
     return target;
   };
@@ -134,13 +140,11 @@ export function Injectable(name: string, dependencies: string[] = []) {
  */
 export function useService<T>(serviceName: string): T | null {
   const [service, setService] = React.useState<T | null>(null);
-  
+
   React.useEffect(() => {
-    container.get<T>(serviceName)
-      .then(setService)
-      .catch(console.error);
+    container.get<T>(serviceName).then(setService).catch(console.error);
   }, [serviceName]);
-  
+
   return service;
 }
 

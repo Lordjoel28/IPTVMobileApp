@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,7 @@ import {
 import VideoPlayerModern from '../components/VideoPlayerModern';
 import ChannelList from '../components/ChannelList';
 // AppManager removed - will be replaced by DI services
-import { Channel } from '../types';
+import {Channel} from '../types';
 
 const PlayerScreen: React.FC = () => {
   // AppManager removed - state will be managed by Zustand stores
@@ -26,7 +26,7 @@ const PlayerScreen: React.FC = () => {
   useEffect(() => {
     // TODO: Replace with DI services + Zustand stores
     console.log('PlayerScreen - AppManager removed, ready for DI migration');
-    
+
     // Temporary test channel for development
     const testChannel: Channel = {
       id: 'test-1',
@@ -41,20 +41,19 @@ const PlayerScreen: React.FC = () => {
   const loadData = async () => {
     try {
       setIsLoading(true);
-      
+
       // TODO: Replace with DI services + Zustand stores
       // Get all channels from playlists
       // const channels = appManager.getPlaylistManager().getAllChannels();
       // setAllChannels(channels);
-      
+
       // Get favorites
       // const favs = appManager.getState().favorites;
       // setFavorites(favs);
-      
+
       // Get current channel from app state
       // const currentCh = appManager.getState().currentChannel;
       // setCurrentChannel(currentCh);
-      
     } catch (error) {
       console.error('❌ Erreur chargement données player:', error);
       Alert.alert('Erreur', 'Impossible de charger les données');
@@ -89,14 +88,10 @@ const PlayerScreen: React.FC = () => {
 
   const handleVideoError = (error: string) => {
     console.error('🚨 Erreur vidéo:', error);
-    Alert.alert(
-      'Erreur de lecture',
-      error,
-      [
-        { text: 'OK', style: 'cancel' },
-        { text: 'Changer de chaîne', onPress: () => setShowChannelList(true) },
-      ]
-    );
+    Alert.alert('Erreur de lecture', error, [
+      {text: 'OK', style: 'cancel'},
+      {text: 'Changer de chaîne', onPress: () => setShowChannelList(true)},
+    ]);
   };
 
   const handleVideoProgress = (data: any) => {
@@ -124,12 +119,17 @@ const PlayerScreen: React.FC = () => {
 
   if (allChannels.length === 0) {
     return (
-      <View style={[styles.emptyContainer, isDarkMode && styles.emptyContainerDark]}>
+      <View
+        style={[
+          styles.emptyContainer,
+          isDarkMode && styles.emptyContainerDark,
+        ]}>
         <Text style={[styles.emptyTitle, isDarkMode && styles.emptyTitleDark]}>
           📋 Aucune playlist
         </Text>
         <Text style={[styles.emptyText, isDarkMode && styles.emptyTextDark]}>
-          Ajoutez des playlists dans l'onglet "Playlists" pour commencer à regarder des chaînes.
+          Ajoutez des playlists dans l'onglet "Playlists" pour commencer à
+          regarder des chaînes.
         </Text>
       </View>
     );
@@ -138,7 +138,11 @@ const PlayerScreen: React.FC = () => {
   return (
     <View style={[styles.container, isDarkMode && styles.containerDark]}>
       {/* Video Player Section */}
-      <View style={[styles.playerSection, showChannelList && styles.playerSectionCompact]}>
+      <View
+        style={[
+          styles.playerSection,
+          showChannelList && styles.playerSectionCompact,
+        ]}>
         <VideoPlayerModern
           channel={currentChannel}
           isVisible={true}
@@ -146,27 +150,28 @@ const PlayerScreen: React.FC = () => {
           onProgress={handleVideoProgress}
           onFullscreenToggle={handleFullscreenToggle}
         />
-        
+
         {/* Player Controls Overlay - Hidden in fullscreen */}
         {!isInFullscreen && (
           <View style={styles.playerControls}>
-          <TouchableOpacity
-            style={[styles.controlButton, isDarkMode && styles.controlButtonDark]}
-            onPress={toggleChannelList}
-          >
-            <Text style={styles.controlButtonText}>
-              {showChannelList ? '📺' : '📋'}
-            </Text>
-          </TouchableOpacity>
-          
-          {currentChannel && (
             <TouchableOpacity
-              style={[styles.controlButton, styles.stopButton]}
-              onPress={stopPlayback}
-            >
-              <Text style={styles.controlButtonText}>⏹️</Text>
+              style={[
+                styles.controlButton,
+                isDarkMode && styles.controlButtonDark,
+              ]}
+              onPress={toggleChannelList}>
+              <Text style={styles.controlButtonText}>
+                {showChannelList ? '📺' : '📋'}
+              </Text>
             </TouchableOpacity>
-          )}
+
+            {currentChannel && (
+              <TouchableOpacity
+                style={[styles.controlButton, styles.stopButton]}
+                onPress={stopPlayback}>
+                <Text style={styles.controlButtonText}>⏹️</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
@@ -175,7 +180,9 @@ const PlayerScreen: React.FC = () => {
           <View style={styles.channelInfoOverlay}>
             <Text style={styles.channelInfoName}>{currentChannel.name}</Text>
             {currentChannel.category && (
-              <Text style={styles.channelInfoCategory}>{currentChannel.category}</Text>
+              <Text style={styles.channelInfoCategory}>
+                {currentChannel.category}
+              </Text>
             )}
           </View>
         )}
@@ -185,14 +192,18 @@ const PlayerScreen: React.FC = () => {
       {showChannelList && (
         <View style={styles.channelSection}>
           <View style={styles.channelHeader}>
-            <Text style={[styles.channelHeaderTitle, isDarkMode && styles.channelHeaderTitleDark]}>
+            <Text
+              style={[
+                styles.channelHeaderTitle,
+                isDarkMode && styles.channelHeaderTitleDark,
+              ]}>
               📺 Chaînes ({allChannels.length})
             </Text>
             <TouchableOpacity onPress={() => setShowChannelList(false)}>
               <Text style={styles.hideButton}>❌</Text>
             </TouchableOpacity>
           </View>
-          
+
           <ChannelList
             channels={allChannels}
             onChannelSelect={handleChannelSelect}

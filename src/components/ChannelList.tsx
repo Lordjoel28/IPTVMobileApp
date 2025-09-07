@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useRef } from 'react';
+import React, {useState, useMemo, useCallback, useRef} from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,7 @@ import {
   useColorScheme,
   Dimensions,
 } from 'react-native';
-import { FlashList } from '@shopify/flash-list';
+import {FlashList} from '@shopify/flash-list';
 import FastImage from 'react-native-fast-image';
 import FastScrollIndicator from './FastScrollIndicator';
 import SkeletonPlaceholder from 'react-native-skeleton-placeholder';
@@ -16,50 +16,54 @@ import SkeletonPlaceholder from 'react-native-skeleton-placeholder';
 // 🚀 CONSTANTES PERFORMANCE IPTV SMARTERS PRO LEVEL
 const ITEM_HEIGHT = 80; // Hauteur pour FlashList estimatedItemSize
 const SCREEN_HEIGHT = Dimensions.get('window').height;
-import { Channel } from '../types';
+import {Channel} from '../types';
 
 // 🚀 SKELETON COMPONENT pour FlashList
-const SkeletonChannelCard: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) => {
+const SkeletonChannelCard: React.FC<{isDarkMode: boolean}> = ({isDarkMode}) => {
   return (
-    <View style={[
-      styles.channelItem,
-      isDarkMode && styles.channelItemDark,
-    ]}>
+    <View style={[styles.channelItem, isDarkMode && styles.channelItemDark]}>
       <SkeletonPlaceholder
         backgroundColor={isDarkMode ? '#2a2a2a' : '#f0f0f0'}
         highlightColor={isDarkMode ? '#404040' : '#ffffff'}
-        speed={1200}
-      >
+        speed={1200}>
         <View style={styles.channelContent}>
           {/* Logo skeleton */}
-          <View style={{
-            width: 50,
-            height: 50,
-            borderRadius: 8,
-            marginRight: 15,
-          }} />
-          
+          <View
+            style={{
+              width: 50,
+              height: 50,
+              borderRadius: 8,
+              marginRight: 15,
+            }}
+          />
+
           {/* Info skeleton */}
-          <View style={{ flex: 1 }}>
-            <View style={{
-              height: 18,
-              borderRadius: 4,
-              marginBottom: 6,
-              width: '75%',
-            }} />
-            <View style={{
-              height: 12,
-              borderRadius: 3,
-              width: '50%',
-            }} />
+          <View style={{flex: 1}}>
+            <View
+              style={{
+                height: 18,
+                borderRadius: 4,
+                marginBottom: 6,
+                width: '75%',
+              }}
+            />
+            <View
+              style={{
+                height: 12,
+                borderRadius: 3,
+                width: '50%',
+              }}
+            />
           </View>
-          
+
           {/* Favorite button skeleton */}
-          <View style={{
-            width: 24,
-            height: 24,
-            borderRadius: 12,
-          }} />
+          <View
+            style={{
+              width: 24,
+              height: 24,
+              borderRadius: 12,
+            }}
+          />
         </View>
       </SkeletonPlaceholder>
     </View>
@@ -88,33 +92,35 @@ const ChannelList: React.FC<ChannelListProps> = ({
   const isDarkMode = useColorScheme() === 'dark';
   const flashListRef = useRef<FlashList<Channel>>(null);
 
-
   // 🚀 CACHE CATÉGORIES - Pre-compute pour éviter recalculs
   const categoriesWithCounts = useMemo(() => {
     const categoryCounts = new Map<string, number>();
     categoryCounts.set('all', channels.length);
     categoryCounts.set('favorites', favorites.length);
-    
+
     channels.forEach(channel => {
       if (channel.category) {
         const count = categoryCounts.get(channel.category) || 0;
         categoryCounts.set(channel.category, count + 1);
       }
     });
-    
+
     return Array.from(categoryCounts.entries()).sort((a, b) => b[1] - a[1]);
   }, [channels, favorites]);
 
   // 🚀 CACHE FILTRES PAR CATÉGORIE - Pre-compute pour changement instantané
   const channelsByCategory = useMemo(() => {
     const cache = new Map<string, Channel[]>();
-    
+
     // All channels
     cache.set('all', channels);
-    
+
     // Favorites
-    cache.set('favorites', channels.filter(channel => favorites.includes(channel.id)));
-    
+    cache.set(
+      'favorites',
+      channels.filter(channel => favorites.includes(channel.id)),
+    );
+
     // By category
     const categoryGroups = new Map<string, Channel[]>();
     channels.forEach(channel => {
@@ -124,11 +130,11 @@ const ChannelList: React.FC<ChannelListProps> = ({
         categoryGroups.set(channel.category, existing);
       }
     });
-    
+
     categoryGroups.forEach((channels, category) => {
       cache.set(category, channels);
     });
-    
+
     return cache;
   }, [channels, favorites]);
 
@@ -140,147 +146,170 @@ const ChannelList: React.FC<ChannelListProps> = ({
     // Filter by search query only if needed
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
-      filtered = filtered.filter(channel =>
-        channel.name.toLowerCase().includes(query) ||
-        (channel.category && channel.category.toLowerCase().includes(query))
+      filtered = filtered.filter(
+        channel =>
+          channel.name.toLowerCase().includes(query) ||
+          (channel.category && channel.category.toLowerCase().includes(query)),
       );
     }
 
     return filtered;
   }, [channelsByCategory, selectedCategory, searchQuery]);
 
-
   // 🚀 RENDER ITEM SIMPLIFIÉ - FlashList gère les skeletons nativement
-  const renderChannelItem = useCallback(({ item }: { item: Channel }) => {
-    const isSelected = currentChannel?.id === item.id;
-    const isFavorite = favorites.includes(item.id);
-    
+  const renderChannelItem = useCallback(
+    ({item}: {item: Channel}) => {
+      const isSelected = currentChannel?.id === item.id;
+      const isFavorite = favorites.includes(item.id);
+
     return (
-      <TouchableOpacity
-        style={[
-          styles.channelItem,
-          isDarkMode && styles.channelItemDark,
-          isSelected && styles.channelItemSelected,
-        ]}
-        onPress={() => onChannelSelect(item)}
-      >
-        <View style={styles.channelContent}>
-          {/* 🖼️ LOGO */}
-          {item.logo ? (
-            <FastImage
-              source={{ 
-                uri: item.logo,
-                priority: FastImage.priority.normal,
-                cache: FastImage.cacheControl.web
-              }}
-              style={styles.channelLogo}
-              resizeMode={FastImage.resizeMode.cover}
-            />
-          ) : (
-            <View style={[styles.channelLogo, styles.channelLogoPlaceholder]}>
-              <Text style={styles.channelLogoText}>📺</Text>
-            </View>
-          )}
-
-          {/* 📝 INFO */}
-          <View style={styles.channelInfo}>
-            <Text
-              style={[
-                styles.channelName,
-                isDarkMode && styles.channelNameDark,
-                isSelected && styles.channelNameSelected,
-              ]}
-              numberOfLines={1}
-            >
-              {item.name}
-            </Text>
-            {item.category && (
-              <Text style={[styles.channelCategory, isDarkMode && styles.channelCategoryDark]}>
-                {item.category}
-              </Text>
+        <TouchableOpacity
+          style={[
+            styles.channelItem,
+            isDarkMode && styles.channelItemDark,
+            isSelected && styles.channelItemSelected,
+          ]}
+          onPress={() => onChannelSelect(item)}>
+          <View style={styles.channelContent}>
+            {/* 🖼️ LOGO */}
+            {item.logo ? (
+              <FastImage
+                source={{
+                  uri: item.logo,
+                  priority: FastImage.priority.normal,
+                  cache: FastImage.cacheControl.web,
+                }}
+                style={styles.channelLogo}
+                resizeMode={FastImage.resizeMode.cover}
+              />
+            ) : (
+              <View style={[styles.channelLogo, styles.channelLogoPlaceholder]}>
+                <Text style={styles.channelLogoText}>📺</Text>
+              </View>
             )}
-          </View>
 
-          {/* ⭐ FAVORITE BUTTON */}
-          <TouchableOpacity
-            style={styles.favoriteButton}
-            onPress={() => onToggleFavorite(item.id)}
-          >
-            <Text style={[styles.favoriteIcon, isFavorite && styles.favoriteIconActive]}>
-              {isFavorite ? '❤️' : '🤍'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </TouchableOpacity>
-    );
-  }, [currentChannel?.id, favorites, isDarkMode, onChannelSelect, onToggleFavorite]);
+            {/* 📝 INFO */}
+            <View style={styles.channelInfo}>
+              <Text
+                style={[
+                  styles.channelName,
+                  isDarkMode && styles.channelNameDark,
+                  isSelected && styles.channelNameSelected,
+                ]}
+                numberOfLines={1}>
+                {item.name}
+              </Text>
+              {item.category && (
+                <Text
+                  style={[
+                    styles.channelCategory,
+                    isDarkMode && styles.channelCategoryDark,
+                  ]}>
+                  {item.category}
+                </Text>
+              )}
+            </View>
+
+            {/* ⭐ FAVORITE BUTTON */}
+            <TouchableOpacity
+              style={styles.favoriteButton}
+              onPress={() => onToggleFavorite(item.id)}>
+              <Text
+                style={[
+                  styles.favoriteIcon,
+                  isFavorite && styles.favoriteIconActive,
+                ]}>
+                {isFavorite ? '❤️' : '🤍'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      );
+    },
+    [
+      currentChannel?.id,
+      favorites,
+      isDarkMode,
+      onChannelSelect,
+      onToggleFavorite,
+    ],
+  );
 
   // 🚀 CHANGEMENT CATÉGORIE RAPIDE
   const handleCategoryChange = useCallback((category: string) => {
     setSelectedCategory(category);
-    
+
     // Reset position scroll
-    flashListRef.current?.scrollToOffset({ 
-      offset: 0, 
-      animated: true
+    flashListRef.current?.scrollToOffset({
+      offset: 0,
+      animated: true,
     });
   }, []);
 
   // 🚀 RENDER CATEGORY OPTIMISÉ - Animation instantanée
-  const renderCategoryButton = useCallback(([category, count]: [string, number]) => {
-    const isSelected = selectedCategory === category;
-    const displayName = category === 'all' ? 'Toutes' : 
-                       category === 'favorites' ? 'Favoris' : category;
-    
-    return (
-      <TouchableOpacity
-        key={category}
-        style={[
-          styles.categoryButton,
-          isDarkMode && styles.categoryButtonDark,
-          isSelected && styles.categoryButtonSelected,
-        ]}
-        onPress={() => handleCategoryChange(category)}
-        activeOpacity={0.7}
-      >
-        <Text
-          style={[
-            styles.categoryButtonText,
-            isDarkMode && styles.categoryButtonTextDark,
-            isSelected && styles.categoryButtonTextSelected,
-          ]}
-        >
-          {displayName} ({count})
-        </Text>
-      </TouchableOpacity>
-    );
-  }, [selectedCategory, isDarkMode, handleCategoryChange]);
+  const renderCategoryButton = useCallback(
+    ([category, count]: [string, number]) => {
+      const isSelected = selectedCategory === category;
+      const displayName =
+        category === 'all'
+          ? 'Toutes'
+          : category === 'favorites'
+          ? 'Favoris'
+          : category;
 
+    return (
+        <TouchableOpacity
+          key={category}
+          style={[
+            styles.categoryButton,
+            isDarkMode && styles.categoryButtonDark,
+            isSelected && styles.categoryButtonSelected,
+          ]}
+          onPress={() => handleCategoryChange(category)}
+          activeOpacity={0.7}>
+          <Text
+            style={[
+              styles.categoryButtonText,
+              isDarkMode && styles.categoryButtonTextDark,
+              isSelected && styles.categoryButtonTextSelected,
+            ]}>
+            {displayName} ({count})
+          </Text>
+        </TouchableOpacity>
+      );
+    },
+    [selectedCategory, isDarkMode, handleCategoryChange],
+  );
 
   // 🚀 KEY EXTRACTOR optimisé
   const keyExtractor = useCallback((item: Channel) => item.id, []);
 
   // 🚀 FAST SCROLL HANDLERS
-  const handleScrollToIndex = useCallback((index: number) => {
-    flashListRef.current?.scrollToIndex({ 
-      index: Math.max(0, Math.min(index, filteredChannels.length - 1)),
-      animated: true 
-    });
-  }, [filteredChannels.length]);
+  const handleScrollToIndex = useCallback(
+    (index: number) => {
+      flashListRef.current?.scrollToIndex({
+        index: Math.max(0, Math.min(index, filteredChannels.length - 1)),
+        animated: true,
+      });
+    },
+    [filteredChannels.length],
+  );
 
+  const onScroll = useCallback(
+    (event: any) => {
+      const {contentOffset} = event.nativeEvent;
+      const currentIndex = Math.floor(contentOffset.y / ITEM_HEIGHT);
+      setCurrentScrollIndex(currentIndex);
 
-  const onScroll = useCallback((event: any) => {
-    const { contentOffset } = event.nativeEvent;
-    const currentIndex = Math.floor(contentOffset.y / ITEM_HEIGHT);
-    setCurrentScrollIndex(currentIndex);
-    
     // Show fast scroll indicator for large lists during scroll
-    if (filteredChannels.length > 50) {
-      setShowFastScroll(true);
-      // Hide after 2 seconds of no scrolling
-      setTimeout(() => setShowFastScroll(false), 2000);
-    }
-  }, [filteredChannels.length]);
+      if (filteredChannels.length > 50) {
+        setShowFastScroll(true);
+        // Hide after 2 seconds of no scrolling
+        setTimeout(() => setShowFastScroll(false), 2000);
+      }
+    },
+    [filteredChannels.length],
+  );
 
   return (
     <View style={[styles.container, isDarkMode && styles.containerDark]}>
@@ -301,8 +330,8 @@ const ChannelList: React.FC<ChannelListProps> = ({
           horizontal
           showsHorizontalScrollIndicator={false}
           data={categoriesWithCounts}
-          renderItem={({ item }) => renderCategoryButton(item)}
-          keyExtractor={(item) => item[0]}
+          renderItem={({item}) => renderCategoryButton(item)}
+          keyExtractor={item => item[0]}
           estimatedItemSize={100}
         />
       </View>
@@ -318,14 +347,15 @@ const ChannelList: React.FC<ChannelListProps> = ({
         onScroll={onScroll}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={[styles.emptyText, isDarkMode && styles.emptyTextDark]}>
-              {searchQuery ? 'Aucune chaîne trouvée' : 'Aucune chaîne disponible'}
+            <Text
+              style={[styles.emptyText, isDarkMode && styles.emptyTextDark]}>
+              {searchQuery
+                ? 'Aucune chaîne trouvée'
+                : 'Aucune chaîne disponible'}
             </Text>
           </View>
         }
-        PlaceholderComponent={
-          <SkeletonChannelCard isDarkMode={isDarkMode} />
-        }
+        PlaceholderComponent={<SkeletonChannelCard isDarkMode={isDarkMode} />}
       />
 
       {/* 🚀 FAST SCROLL INDICATOR - Comme IPTV Smarters Pro */}
@@ -338,8 +368,10 @@ const ChannelList: React.FC<ChannelListProps> = ({
 
       {/* Channel count */}
       <View style={styles.footerInfo}>
-        <Text style={[styles.channelCount, isDarkMode && styles.channelCountDark]}>
-          {filteredChannels.length} chaîne{filteredChannels.length !== 1 ? 's' : ''}
+        <Text
+          style={[styles.channelCount, isDarkMode && styles.channelCountDark]}>
+          {filteredChannels.length} chaîne
+          {filteredChannels.length !== 1 ? 's' : ''}
         </Text>
       </View>
     </View>
@@ -410,7 +442,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     elevation: 2,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: {width: 0, height: 1},
     shadowOpacity: 0.2,
     shadowRadius: 2,
     height: ITEM_HEIGHT, // 🚀 HAUTEUR FIXE pour getItemLayout

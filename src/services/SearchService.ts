@@ -3,7 +3,7 @@
  * Moteur de recherche avancé avec recherche fuzzy et filtres multiples
  */
 
-import type { Channel, SearchFilters, SearchResult } from '../types';
+import type {Channel, SearchFilters, SearchResult} from '../types';
 
 export interface SearchOptions {
   fuzzyTolerance?: number;
@@ -59,27 +59,27 @@ export class SearchService {
    * Migration directe de SearchManager.js
    */
   searchChannels(
-    channels: Channel[], 
-    query: string, 
+    channels: Channel[],
+    query: string,
     filters?: SearchFilters,
-    options: SearchOptions = {}
+    options: SearchOptions = {},
   ): SearchResult {
     const startTime = Date.now();
-    
+
     if (!query.trim() && !filters) {
       return {
         channels,
         totalResults: channels.length,
         query: '',
         filters: {},
-        executionTime: 0
+        executionTime: 0,
       };
     }
 
     console.log(`🔍 Recherche: "${query}" avec ${channels.length} chaînes`);
 
     let filteredChannels = [...channels];
-    
+
     // 1. Appliquer les filtres d'abord
     if (filters) {
       filteredChannels = this.applyFilters(filteredChannels, filters);
@@ -90,11 +90,15 @@ export class SearchService {
       if (options.enableOperators && this.hasOperators(query)) {
         filteredChannels = this.searchWithOperators(filteredChannels, query);
       } else if (options.enableFuzzy) {
-        filteredChannels = this.searchFuzzy(filteredChannels, query, options.fuzzyTolerance);
+        filteredChannels = this.searchFuzzy(
+          filteredChannels,
+          query,
+          options.fuzzyTolerance,
+        );
       } else {
         filteredChannels = this.searchExact(filteredChannels, query);
       }
-      
+
       // Ajouter à l'historique
       this.addToHistory(query);
     }
@@ -105,19 +109,21 @@ export class SearchService {
     }
 
     const executionTime = Date.now() - startTime;
-    
+
     // Mettre à jour cache pour auto-complétion
     this.updateAutoComplete(channels);
-    
+
     const result: SearchResult = {
       channels: filteredChannels,
       totalResults: filteredChannels.length,
       query,
       filters: filters || {},
-      executionTime
+      executionTime,
     };
 
-    console.log(`✅ Recherche terminée: ${result.totalResults} résultats en ${executionTime}ms`);
+    console.log(
+      `✅ Recherche terminée: ${result.totalResults} résultats en ${executionTime}ms`,
+    );
     this.lastQuery = query;
     this.lastResults = filteredChannels;
 
@@ -129,13 +135,15 @@ export class SearchService {
    */
   private searchExact(channels: Channel[], query: string): Channel[] {
     const lowerQuery = query.toLowerCase().trim();
-    
+
     return channels.filter(channel => {
       return (
         channel.name.toLowerCase().includes(lowerQuery) ||
         (channel.group && channel.group.toLowerCase().includes(lowerQuery)) ||
-        (channel.category && channel.category.toLowerCase().includes(lowerQuery)) ||
-        (channel.language && channel.language.toLowerCase().includes(lowerQuery)) ||
+        (channel.category &&
+          channel.category.toLowerCase().includes(lowerQuery)) ||
+        (channel.language &&
+          channel.language.toLowerCase().includes(lowerQuery)) ||
         (channel.country && channel.country.toLowerCase().includes(lowerQuery))
       );
     });
@@ -145,9 +153,13 @@ export class SearchService {
    * Recherche fuzzy avec tolérance aux fautes de frappe
    * Utilise la distance de Levenshtein
    */
-  private searchFuzzy(channels: Channel[], query: string, tolerance: number = 2): Channel[] {
+  private searchFuzzy(
+    channels: Channel[],
+    query: string,
+    tolerance: number = 2,
+  ): Channel[] {
     const lowerQuery = query.toLowerCase().trim();
-    const results: { channel: Channel; score: number }[] = [];
+    const results: {channel: Channel; score: number}[] = [];
 
     channels.forEach(channel => {
       let bestScore = Infinity;
@@ -156,13 +168,13 @@ export class SearchService {
         channel.group || '',
         channel.category || '',
         channel.language || '',
-        channel.country || ''
+        channel.country || '',
       ];
 
       searchFields.forEach(field => {
         if (field) {
           const fieldLower = field.toLowerCase();
-          
+
           // Recherche de sous-chaîne d'abord (score parfait)
           if (fieldLower.includes(lowerQuery)) {
             bestScore = 0;
@@ -178,7 +190,7 @@ export class SearchService {
       });
 
       if (bestScore <= tolerance) {
-        results.push({ channel, score: bestScore });
+        results.push({channel, score: bestScore});
       }
     });
 
@@ -194,7 +206,7 @@ export class SearchService {
    */
   private searchWithOperators(channels: Channel[], query: string): Channel[] {
     const normalizedQuery = query.trim();
-    
+
     // Parser les opérateurs booléens
     const andTerms = this.extractTerms(normalizedQuery, 'AND');
     const orTerms = this.extractTerms(normalizedQuery, 'OR');
@@ -202,22 +214,22 @@ export class SearchService {
 
     return channels.filter(channel => {
       const searchableText = this.getSearchableText(channel).toLowerCase();
-      
+
       // Vérifier termes AND (tous doivent être présents)
-      const hasAllAndTerms = andTerms.every(term => 
-        searchableText.includes(term.toLowerCase())
+      const hasAllAndTerms = andTerms.every(term =>
+        searchableText.includes(term.toLowerCase()),
       );
-      
+
       // Vérifier termes OR (au moins un doit être présent)
-      const hasAnyOrTerm = orTerms.length === 0 || orTerms.some(term =>
-        searchableText.includes(term.toLowerCase())
-      );
-      
+      const hasAnyOrTerm =
+        orTerms.length === 0 ||
+        orTerms.some(term => searchableText.includes(term.toLowerCase()));
+
       // Vérifier termes NOT (aucun ne doit être présent)
-      const hasNoNotTerms = notTerms.every(term => 
-        !searchableText.includes(term.toLowerCase())
+      const hasNoNotTerms = notTerms.every(
+        term => !searchableText.includes(term.toLowerCase()),
       );
-      
+
       return hasAllAndTerms && hasAnyOrTerm && hasNoNotTerms;
     });
   }
@@ -231,27 +243,27 @@ export class SearchService {
       if (filters.category && channel.category !== filters.category) {
         return false;
       }
-      
+
       // Filtre par langue
       if (filters.language && channel.language !== filters.language) {
         return false;
       }
-      
+
       // Filtre par pays
       if (filters.country && channel.country !== filters.country) {
         return false;
       }
-      
+
       // Filtre par qualité
       if (filters.quality && channel.quality !== filters.quality) {
         return false;
       }
-      
+
       // Filtre contenu adulte
       if (filters.adultContent === false && channel.isAdult === true) {
         return false;
       }
-      
+
       return true;
     });
   }
@@ -261,7 +273,7 @@ export class SearchService {
    */
   getSuggestions(partialQuery: string, maxSuggestions: number = 10): string[] {
     const lowerPartial = partialQuery.toLowerCase().trim();
-    
+
     if (!lowerPartial || lowerPartial.length < 2) {
       return this.searchHistory.slice(0, maxSuggestions);
     }
@@ -273,39 +285,39 @@ export class SearchService {
 
     // Générer suggestions depuis categories, langues, pays
     const suggestions: string[] = [];
-    
+
     // Suggestions depuis historique
     this.searchHistory.forEach(historyItem => {
       if (historyItem.toLowerCase().includes(lowerPartial)) {
         suggestions.push(historyItem);
       }
     });
-    
+
     // Suggestions depuis catégories
     this.categories.forEach(category => {
       if (category.toLowerCase().includes(lowerPartial)) {
         suggestions.push(category);
       }
     });
-    
+
     // Suggestions depuis langues
     this.languages.forEach(language => {
       if (language.toLowerCase().includes(lowerPartial)) {
         suggestions.push(language);
       }
     });
-    
+
     // Suggestions depuis pays
     this.countries.forEach(country => {
       if (country.toLowerCase().includes(lowerPartial)) {
         suggestions.push(country);
       }
     });
-    
+
     // Dédupliquer et mettre en cache
     const uniqueSuggestions = [...new Set(suggestions)];
     this.suggestionsCache.set(lowerPartial, uniqueSuggestions);
-    
+
     return uniqueSuggestions.slice(0, maxSuggestions);
   }
 
@@ -324,17 +336,25 @@ export class SearchService {
     const qualities = new Set<string>();
 
     channels.forEach(channel => {
-      if (channel.category) categories.add(channel.category);
-      if (channel.language) languages.add(channel.language);
-      if (channel.country) countries.add(channel.country);
-      if (channel.quality) qualities.add(channel.quality);
+      if (channel.category) {
+        categories.add(channel.category);
+      }
+      if (channel.language) {
+        languages.add(channel.language);
+      }
+      if (channel.country) {
+        countries.add(channel.country);
+      }
+      if (channel.quality) {
+        qualities.add(channel.quality);
+      }
     });
 
     return {
       categories: Array.from(categories).sort(),
       languages: Array.from(languages).sort(),
       countries: Array.from(countries).sort(),
-      qualities: Array.from(qualities).sort()
+      qualities: Array.from(qualities).sort(),
     };
   }
 
@@ -364,11 +384,11 @@ export class SearchService {
     const regex = new RegExp(`\\b${operator}\\s+([^\\s]+)`, 'gi');
     const matches = [];
     let match;
-    
+
     while ((match = regex.exec(query)) !== null) {
       matches.push(match[1]);
     }
-    
+
     return matches;
   }
 
@@ -378,21 +398,21 @@ export class SearchService {
       channel.group || '',
       channel.category || '',
       channel.language || '',
-      channel.country || ''
+      channel.country || '',
     ].join(' ');
   }
 
   private levenshteinDistance(a: string, b: string): number {
     const matrix = [];
-    
+
     for (let i = 0; i <= b.length; i++) {
       matrix[i] = [i];
     }
-    
+
     for (let j = 0; j <= a.length; j++) {
       matrix[0][j] = j;
     }
-    
+
     for (let i = 1; i <= b.length; i++) {
       for (let j = 1; j <= a.length; j++) {
         if (b.charAt(i - 1) === a.charAt(j - 1)) {
@@ -401,27 +421,29 @@ export class SearchService {
           matrix[i][j] = Math.min(
             matrix[i - 1][j - 1] + 1,
             matrix[i][j - 1] + 1,
-            matrix[i - 1][j] + 1
+            matrix[i - 1][j] + 1,
           );
         }
       }
     }
-    
+
     return matrix[b.length][a.length];
   }
 
   private addToHistory(query: string): void {
-    if (!query.trim()) return;
-    
+    if (!query.trim()) {
+      return;
+    }
+
     // Supprimer si déjà présent
     const index = this.searchHistory.indexOf(query);
     if (index > -1) {
       this.searchHistory.splice(index, 1);
     }
-    
+
     // Ajouter au début
     this.searchHistory.unshift(query);
-    
+
     // Limiter taille
     if (this.searchHistory.length > this.maxHistorySize) {
       this.searchHistory = this.searchHistory.slice(0, this.maxHistorySize);
@@ -431,9 +453,15 @@ export class SearchService {
   private updateAutoComplete(channels: Channel[]): void {
     // Mettre à jour sets pour auto-complétion
     channels.forEach(channel => {
-      if (channel.category) this.categories.add(channel.category);
-      if (channel.language) this.languages.add(channel.language);
-      if (channel.country) this.countries.add(channel.country);
+      if (channel.category) {
+        this.categories.add(channel.category);
+      }
+      if (channel.language) {
+        this.languages.add(channel.language);
+      }
+      if (channel.country) {
+        this.countries.add(channel.country);
+      }
     });
   }
 
@@ -448,7 +476,7 @@ export class SearchService {
       cacheSize: this.suggestionsCache.size,
       categoriesCount: this.categories.size,
       languagesCount: this.languages.size,
-      countriesCount: this.countries.size
+      countriesCount: this.countries.size,
     };
   }
 

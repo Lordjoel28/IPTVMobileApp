@@ -20,9 +20,9 @@ export type RootStackParamList = {
     selectedChannel: Channel;
     playlistName: string;
   };
-  Player: { channel: Channel; playlist?: Playlist };
+  Player: {channel: Channel; playlist?: Playlist};
   Settings: undefined;
-  PlaylistDetail: { playlist: Playlist };
+  PlaylistDetail: {playlist: Playlist};
   Search: undefined;
   UserProfile: undefined;
   ParentalControl: undefined;
@@ -109,8 +109,8 @@ export interface ParentalRestrictions {
 
 export interface TimeRestriction {
   startTime: string; // "HH:MM"
-  endTime: string;   // "HH:MM"
-  days: number[];    // 0-6 (Sunday-Saturday)
+  endTime: string; // "HH:MM"
+  days: number[]; // 0-6 (Sunday-Saturday)
 }
 
 // Settings Types
@@ -162,7 +162,16 @@ export interface NetworkSettings {
 }
 
 // Theme Types
-export type ThemeType = 'light' | 'dark' | 'auto' | 'blue' | 'green' | 'purple' | 'orange' | 'red' | 'pink';
+export type ThemeType =
+  | 'light'
+  | 'dark'
+  | 'auto'
+  | 'blue'
+  | 'green'
+  | 'purple'
+  | 'orange'
+  | 'red'
+  | 'pink';
 
 export interface CustomTheme {
   colors: {
@@ -437,17 +446,26 @@ export interface StorageAdapter {
 
 // Export all types (commentés car fichiers n'existent pas encore)
 // export type * from './navigation';
-// export type * from './video'; 
+// export type * from './video';
 // export type * from './api';
 
 // Re-export common React Navigation types
-import type { RouteProp } from '@react-navigation/native';
-import type { StackNavigationProp } from '@react-navigation/stack';
+import type {RouteProp} from '@react-navigation/native';
+import type {StackNavigationProp} from '@react-navigation/stack';
 
 export type HomeScreenRouteProp = RouteProp<RootStackParamList, 'Home'>;
 export type PlayerScreenRouteProp = RouteProp<RootStackParamList, 'Player'>;
 export type SettingsScreenRouteProp = RouteProp<RootStackParamList, 'Settings'>;
 
-export type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Home'>;
-export type PlayerScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Player'>;
-export type SettingsScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Settings'>;
+export type HomeScreenNavigationProp = StackNavigationProp<
+  RootStackParamList,
+  'Home'
+>;
+export type PlayerScreenNavigationProp = StackNavigationProp<
+  RootStackParamList,
+  'Player'
+>;
+export type SettingsScreenNavigationProp = StackNavigationProp<
+  RootStackParamList,
+  'Settings'
+>;

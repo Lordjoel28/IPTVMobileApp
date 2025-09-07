@@ -3,7 +3,7 @@
  * Affichage instantané pendant scroll avec shimmer effect
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, {useEffect, useRef} from 'react';
 import {
   View,
   Animated,
@@ -12,7 +12,7 @@ import {
   useColorScheme,
 } from 'react-native';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const {width: SCREEN_WIDTH} = Dimensions.get('window');
 
 interface SkeletonChannelCardProps {
   style?: any;
@@ -27,7 +27,9 @@ export const SkeletonChannelCard: React.FC<SkeletonChannelCardProps> = ({
   const shimmerAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    if (!animate) return;
+    if (!animate) {
+      return;
+    }
 
     // 🚀 SHIMMER ANIMATION - Effet brillant comme IPTV Smarters Pro
     const shimmerAnimation = Animated.loop(
@@ -43,7 +45,7 @@ export const SkeletonChannelCard: React.FC<SkeletonChannelCardProps> = ({
           useNativeDriver: true,
         }),
       ]),
-      { iterations: -1 }
+      {iterations: -1},
     );
 
     shimmerAnimation.start();
@@ -63,24 +65,23 @@ export const SkeletonChannelCard: React.FC<SkeletonChannelCardProps> = ({
   });
 
   return (
-    <View style={[
-      styles.skeletonCard,
-      isDarkMode && styles.skeletonCardDark,
-      style
-    ]}>
+    <View
+      style={[
+        styles.skeletonCard,
+        isDarkMode && styles.skeletonCardDark,
+        style,
+      ]}>
       <View style={styles.skeletonContent}>
         {/* 🖼️ SKELETON LOGO */}
-        <View style={[
-          styles.skeletonLogo,
-          isDarkMode && styles.skeletonLogoDark
-        ]}>
+        <View
+          style={[styles.skeletonLogo, isDarkMode && styles.skeletonLogoDark]}>
           {animate && (
             <Animated.View
               style={[
                 styles.shimmerOverlay,
                 {
                   opacity: shimmerOpacity,
-                  transform: [{ translateX: shimmerTranslateX }],
+                  transform: [{translateX: shimmerTranslateX}],
                 },
               ]}
             />
@@ -90,17 +91,18 @@ export const SkeletonChannelCard: React.FC<SkeletonChannelCardProps> = ({
         {/* 📝 SKELETON TEXT */}
         <View style={styles.skeletonInfo}>
           {/* Channel name skeleton */}
-          <View style={[
-            styles.skeletonTitle,
-            isDarkMode && styles.skeletonTitleDark
-          ]}>
+          <View
+            style={[
+              styles.skeletonTitle,
+              isDarkMode && styles.skeletonTitleDark,
+            ]}>
             {animate && (
               <Animated.View
                 style={[
                   styles.shimmerOverlay,
                   {
                     opacity: shimmerOpacity,
-                    transform: [{ translateX: shimmerTranslateX }],
+                    transform: [{translateX: shimmerTranslateX}],
                   },
                 ]}
               />
@@ -108,17 +110,18 @@ export const SkeletonChannelCard: React.FC<SkeletonChannelCardProps> = ({
           </View>
 
           {/* Category skeleton */}
-          <View style={[
-            styles.skeletonCategory,
-            isDarkMode && styles.skeletonCategoryDark
-          ]}>
+          <View
+            style={[
+              styles.skeletonCategory,
+              isDarkMode && styles.skeletonCategoryDark,
+            ]}>
             {animate && (
               <Animated.View
                 style={[
                   styles.shimmerOverlay,
                   {
                     opacity: shimmerOpacity,
-                    transform: [{ translateX: shimmerTranslateX }],
+                    transform: [{translateX: shimmerTranslateX}],
                   },
                 ]}
               />
@@ -127,17 +130,18 @@ export const SkeletonChannelCard: React.FC<SkeletonChannelCardProps> = ({
         </View>
 
         {/* ⭐ SKELETON FAVORITE BUTTON */}
-        <View style={[
-          styles.skeletonFavorite,
-          isDarkMode && styles.skeletonFavoriteDark
-        ]}>
+        <View
+          style={[
+            styles.skeletonFavorite,
+            isDarkMode && styles.skeletonFavoriteDark,
+          ]}>
           {animate && (
             <Animated.View
               style={[
                 styles.shimmerOverlay,
                 {
                   opacity: shimmerOpacity,
-                  transform: [{ translateX: shimmerTranslateX }],
+                  transform: [{translateX: shimmerTranslateX}],
                 },
               ]}
             />

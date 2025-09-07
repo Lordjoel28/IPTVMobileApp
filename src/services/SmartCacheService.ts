@@ -1,11 +1,11 @@
 /**
- * 🧠 Smart Caching Service L1/L2/L3 - Architecture 3-niveaux intelligent 
+ * 🧠 Smart Caching Service L1/L2/L3 - Architecture 3-niveaux intelligent
  * Optimisé pour gestion 100K+ chaînes avec prédiction usage
  * Inspiré IPTV Smarters Pro avec adaptabilité mobile
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { XtreamChannel, XtreamCategory } from './StreamingXtreamService';
+import {XtreamChannel, XtreamCategory} from './StreamingXtreamService';
 
 // ================================
 // INTERFACES ET TYPES
@@ -52,7 +52,7 @@ export interface CacheStats {
 
 export interface CacheConfig {
   l1MaxSize: number; // Memory cache max size (MB)
-  l2MaxSize: number; // AsyncStorage cache max size (MB)  
+  l2MaxSize: number; // AsyncStorage cache max size (MB)
   l1MaxItems: number;
   l2MaxItems: number;
   defaultTTL: number; // Default TTL en ms
@@ -71,7 +71,7 @@ class MemoryCache {
   private readonly maxSize: number;
   private readonly maxItems: number;
   private currentSize = 0;
-  
+
   // Statistiques
   private hits = 0;
   private misses = 0;
@@ -83,7 +83,7 @@ class MemoryCache {
 
   get(key: string): CacheItem | null {
     const item = this.cache.get(key);
-    
+
     if (!item) {
       this.misses++;
       return null;
@@ -105,21 +105,28 @@ class MemoryCache {
     return item;
   }
 
-  set(key: string, data: any, priority: CacheItem['priority'] = 'NORMAL', ttl?: number): boolean {
+  set(
+    key: string,
+    data: any,
+    priority: CacheItem['priority'] = 'NORMAL',
+    ttl?: number,
+  ): boolean {
     const itemSize = this.estimateSize(data);
     const expiry = ttl ? Date.now() + ttl : undefined;
 
     // Check if we need to evict
     while (
-      (this.currentSize + itemSize > this.maxSize || this.cache.size >= this.maxItems) &&
+      (this.currentSize + itemSize > this.maxSize ||
+        this.cache.size >= this.maxItems) &&
       this.cache.size > 0
     ) {
       const evicted = this.evictItem();
-      if (!evicted) break; // Could not evict anything
+      if (!evicted) {break;} // Could not evict anything
     }
 
     // Don't cache if item is too large
-    if (itemSize > this.maxSize * 0.1) { // Max 10% of cache size
+    if (itemSize > this.maxSize * 0.1) {
+      // Max 10% of cache size
       console.warn(`🧠 Item ${key} too large for L1 cache: ${itemSize} bytes`);
       return false;
     }
@@ -132,7 +139,7 @@ class MemoryCache {
       lastAccess: Date.now(),
       size: itemSize,
       priority,
-      expiry
+      expiry,
     };
 
     // Remove existing item if updating
@@ -145,13 +152,15 @@ class MemoryCache {
     this.currentSize += itemSize;
     this.updateAccessHistory(key);
 
-    console.log(`🧠 L1 Cache SET: ${key} (${itemSize} bytes, priority: ${priority})`);
+    console.log(
+      `🧠 L1 Cache SET: ${key} (${itemSize} bytes, priority: ${priority})`,
+    );
     return true;
   }
 
   delete(key: string): boolean {
     const item = this.cache.get(key);
-    if (!item) return false;
+    if (!item) {return false;}
 
     this.cache.delete(key);
     this.currentSize -= item.size;
@@ -172,23 +181,25 @@ class MemoryCache {
 
   // Éviction intelligente
   private evictItem(): boolean {
-    if (this.cache.size === 0) return false;
+    if (this.cache.size === 0) {return false;}
 
     // Stratégie adaptive : priorité basse d'abord, puis LRU
     let targetKey: string | null = null;
     let lowestPriority = Infinity;
     let oldestAccess = Infinity;
 
-    const priorityValues = { LOW: 1, NORMAL: 2, HIGH: 3, CRITICAL: 4 };
+    const priorityValues = {LOW: 1, NORMAL: 2, HIGH: 3, CRITICAL: 4};
 
     for (const [key, item] of this.cache) {
       const priorityValue = priorityValues[item.priority];
-      
-      // Évite d'évincer les items critiques
-      if (item.priority === 'CRITICAL') continue;
 
-      if (priorityValue < lowestPriority || 
-         (priorityValue === lowestPriority && item.lastAccess < oldestAccess)) {
+      // Évite d'évincer les items critiques
+      if (item.priority === 'CRITICAL') {continue;}
+
+      if (
+        priorityValue < lowestPriority ||
+        (priorityValue === lowestPriority && item.lastAccess < oldestAccess)
+      ) {
         targetKey = key;
         lowestPriority = priorityValue;
         oldestAccess = item.lastAccess;
@@ -215,7 +226,7 @@ class MemoryCache {
     this.removeFromAccessHistory(key);
     // Add to end (most recent)
     this.accessHistory.push(key);
-    
+
     // Limit history size
     if (this.accessHistory.length > this.maxItems * 2) {
       this.accessHistory = this.accessHistory.slice(-this.maxItems);
@@ -230,10 +241,10 @@ class MemoryCache {
   }
 
   private estimateSize(data: any): number {
-    if (data === null || data === undefined) return 4;
-    if (typeof data === 'string') return data.length * 2; // UTF-16
-    if (typeof data === 'number') return 8;
-    if (typeof data === 'boolean') return 4;
+    if (data === null || data === undefined) {return 4;}
+    if (typeof data === 'string') {return data.length * 2;} // UTF-16
+    if (typeof data === 'number') {return 8;}
+    if (typeof data === 'boolean') {return 4;}
     if (Array.isArray(data)) {
       return data.reduce((size, item) => size + this.estimateSize(item), 24); // Array overhead
     }
@@ -246,14 +257,15 @@ class MemoryCache {
   }
 
   getStats() {
-    const hitRate = this.hits + this.misses > 0 ? this.hits / (this.hits + this.misses) : 0;
-    
+    const hitRate =
+      this.hits + this.misses > 0 ? this.hits / (this.hits + this.misses) : 0;
+
     return {
       size: this.currentSize,
       maxSize: this.maxSize,
       hitRate,
       items: this.cache.size,
-      memoryUsage: this.currentSize
+      memoryUsage: this.currentSize,
     };
   }
 }
@@ -267,11 +279,14 @@ class AsyncStorageCache {
   private readonly maxItems: number;
   private readonly keyPrefix = 'smart_cache_l2_';
   private metaKey = 'smart_cache_l2_meta';
-  
+
   // Statistiques en mémoire
   private hits = 0;
   private misses = 0;
-  private metadata = new Map<string, { size: number; timestamp: number; priority: string }>();
+  private metadata = new Map<
+    string,
+    {size: number; timestamp: number; priority: string}
+  >();
 
   constructor(maxSize: number, maxItems: number) {
     this.maxSize = maxSize * 1024 * 1024; // Convert MB to bytes
@@ -283,14 +298,14 @@ class AsyncStorageCache {
     try {
       const storageKey = this.keyPrefix + key;
       const stored = await AsyncStorage.getItem(storageKey);
-      
+
       if (!stored) {
         this.misses++;
         return null;
       }
 
       const item: CacheItem = JSON.parse(stored);
-      
+
       // Check expiry
       if (item.expiry && Date.now() > item.expiry) {
         await this.delete(key);
@@ -302,11 +317,10 @@ class AsyncStorageCache {
       item.accessCount++;
       item.lastAccess = Date.now();
       await AsyncStorage.setItem(storageKey, JSON.stringify(item));
-      
+
       this.hits++;
       console.log(`🧠 L2 Cache HIT: ${key}`);
       return item;
-      
     } catch (error) {
       console.error('🧠 L2 Cache GET error:', error);
       this.misses++;
@@ -314,11 +328,16 @@ class AsyncStorageCache {
     }
   }
 
-  async set(key: string, data: any, priority: CacheItem['priority'] = 'NORMAL', ttl?: number): Promise<boolean> {
+  async set(
+    key: string,
+    data: any,
+    priority: CacheItem['priority'] = 'NORMAL',
+    ttl?: number,
+  ): Promise<boolean> {
     try {
       const itemSize = this.estimateSize(data);
       const expiry = ttl ? Date.now() + ttl : undefined;
-      
+
       // Check space and evict if needed
       await this.ensureSpace(itemSize);
 
@@ -330,23 +349,22 @@ class AsyncStorageCache {
         lastAccess: Date.now(),
         size: itemSize,
         priority,
-        expiry
+        expiry,
       };
 
       const storageKey = this.keyPrefix + key;
       await AsyncStorage.setItem(storageKey, JSON.stringify(item));
-      
+
       // Update metadata
       this.metadata.set(key, {
         size: itemSize,
         timestamp: Date.now(),
-        priority
+        priority,
       });
       await this.saveMetadata();
 
       console.log(`🧠 L2 Cache SET: ${key} (${itemSize} bytes)`);
       return true;
-      
     } catch (error) {
       console.error('🧠 L2 Cache SET error:', error);
       return false;
@@ -359,10 +377,10 @@ class AsyncStorageCache {
       await AsyncStorage.removeItem(storageKey);
       this.metadata.delete(key);
       await this.saveMetadata();
-      
+
       console.log(`🧠 L2 Cache DELETE: ${key}`);
       return true;
-      
+
     } catch (error) {
       console.error('🧠 L2 Cache DELETE error:', error);
       return false;
@@ -374,12 +392,12 @@ class AsyncStorageCache {
       // Get all keys with our prefix
       const allKeys = await AsyncStorage.getAllKeys();
       const cacheKeys = allKeys.filter(key => key.startsWith(this.keyPrefix));
-      
+
       await AsyncStorage.multiRemove([...cacheKeys, this.metaKey]);
       this.metadata.clear();
       this.hits = 0;
       this.misses = 0;
-      
+
       console.log('🧠 L2 Cache CLEARED');
     } catch (error) {
       console.error('🧠 L2 Cache CLEAR error:', error);
@@ -387,10 +405,14 @@ class AsyncStorageCache {
   }
 
   private async ensureSpace(newItemSize: number): Promise<void> {
-    const currentSize = Array.from(this.metadata.values())
-      .reduce((total, meta) => total + meta.size, 0);
-    
-    if (currentSize + newItemSize <= this.maxSize && this.metadata.size < this.maxItems) {
+    const currentSize = Array.from(this.metadata.values()).reduce(
+      (total, meta) => total + meta.size,
+      0,
+
+    if (
+      currentSize + newItemSize <= this.maxSize &&
+      this.metadata.size < this.maxItems
+    ) {
       return; // Space available
     }
 
@@ -399,26 +421,29 @@ class AsyncStorageCache {
     let sizeToFree = Math.max(newItemSize, this.maxSize * 0.1); // At least 10% of cache
 
     // Sort by priority and timestamp for eviction
-    const sortedItems = Array.from(this.metadata.entries())
-      .sort(([, a], [, b]) => {
-        const priorityOrder = { LOW: 1, NORMAL: 2, HIGH: 3, CRITICAL: 4 };
-        const aPriority = priorityOrder[a.priority as keyof typeof priorityOrder];
-        const bPriority = priorityOrder[b.priority as keyof typeof priorityOrder];
-        
+    const sortedItems = Array.from(this.metadata.entries()).sort(
+      ([, a], [, b]) => {
+        const priorityOrder = {LOW: 1, NORMAL: 2, HIGH: 3, CRITICAL: 4};
+        const aPriority =
+          priorityOrder[a.priority as keyof typeof priorityOrder];
+        const bPriority =
+          priorityOrder[b.priority as keyof typeof priorityOrder];
+
         if (aPriority !== bPriority) {
           return aPriority - bPriority; // Lower priority first
         }
         return a.timestamp - b.timestamp; // Older first
-      });
+      },
+    );
 
     let freedSize = 0;
     for (const [key, meta] of sortedItems) {
-      if (meta.priority === 'CRITICAL') continue; // Never evict critical
-      
+      if (meta.priority === 'CRITICAL') {continue;} // Never evict critical
+
       itemsToEvict.push(key);
       freedSize += meta.size;
-      
-      if (freedSize >= sizeToFree) break;
+
+      if (freedSize >= sizeToFree) {break;}
     }
 
     // Evict items
@@ -426,7 +451,9 @@ class AsyncStorageCache {
       await this.delete(key);
     }
 
-    console.log(`🧠 L2 Cache evicted ${itemsToEvict.length} items (${freedSize} bytes)`);
+    console.log(
+      `🧠 L2 Cache evicted ${itemsToEvict.length} items (${freedSize} bytes)`,
+    );
   }
 
   private async loadMetadata(): Promise<void> {
@@ -455,16 +482,18 @@ class AsyncStorageCache {
   }
 
   getStats() {
-    const hitRate = this.hits + this.misses > 0 ? this.hits / (this.hits + this.misses) : 0;
-    const storageUsage = Array.from(this.metadata.values())
-      .reduce((total, meta) => total + meta.size, 0);
-    
+    const hitRate =
+      this.hits + this.misses > 0 ? this.hits / (this.hits + this.misses) : 0;
+    const storageUsage = Array.from(this.metadata.values()).reduce(
+      (total, meta) => total + meta.size,
+      0,
+
     return {
       size: storageUsage,
       maxSize: this.maxSize,
       hitRate,
       items: this.metadata.size,
-      storageUsage
+      storageUsage,
     };
   }
 }
@@ -502,12 +531,13 @@ class DatabaseCache {
   }
 
   getStats() {
-    const hitRate = this.hits + this.misses > 0 ? this.hits / (this.hits + this.misses) : 0;
-    
+    const hitRate =
+      this.hits + this.misses > 0 ? this.hits / (this.hits + this.misses) : 0;
+
     return {
       hitRate,
       items: 0, // À implémenter
-      databaseSize: 0 // À implémenter
+      databaseSize: 0, // À implémenter
     };
   }
 }
@@ -520,7 +550,7 @@ class SmartCacheService {
   private l1Cache: MemoryCache;
   private l2Cache: AsyncStorageCache;
   private l3Cache: DatabaseCache;
-  
+
   private config: CacheConfig = {
     l1MaxSize: 50, // 50MB memory cache
     l2MaxSize: 200, // 200MB AsyncStorage cache
@@ -529,7 +559,7 @@ class SmartCacheService {
     defaultTTL: 30 * 60 * 1000, // 30 minutes
     evictionPolicy: 'ADAPTIVE',
     compressionEnabled: false,
-    predictiveLoading: true
+    predictiveLoading: true,
   };
 
   // Performance tracking
@@ -538,11 +568,17 @@ class SmartCacheService {
 
   constructor(config?: Partial<CacheConfig>) {
     if (config) {
-      this.config = { ...this.config, ...config };
+      this.config = {...this.config, ...config};
     }
 
-    this.l1Cache = new MemoryCache(this.config.l1MaxSize, this.config.l1MaxItems);
-    this.l2Cache = new AsyncStorageCache(this.config.l2MaxSize, this.config.l2MaxItems);
+    this.l1Cache = new MemoryCache(
+      this.config.l1MaxSize,
+      this.config.l1MaxItems,
+    );
+    this.l2Cache = new AsyncStorageCache(
+      this.config.l2MaxSize,
+      this.config.l2MaxItems,
+    );
     this.l3Cache = new DatabaseCache();
 
     console.log('🧠 Smart Cache Service initialized with 3-tier architecture');
@@ -587,7 +623,6 @@ class SmartCacheService {
       this.recordAccessTime(performance.now() - startTime);
       console.log(`🧠 Cache MISS: ${key}`);
       return null;
-
     } catch (error) {
       console.error(`🧠 Cache GET error for ${key}:`, error);
       this.recordAccessTime(performance.now() - startTime);
@@ -598,12 +633,16 @@ class SmartCacheService {
   /**
    * 💾 Set item in cache (all levels)
    */
-  async set(key: string, data: any, options?: {
-    priority?: CacheItem['priority'];
-    ttl?: number;
-    l1Only?: boolean;
-    l2Only?: boolean;
-  }): Promise<boolean> {
+  async set(
+    key: string,
+    data: any,
+    options?: {
+      priority?: CacheItem['priority'];
+      ttl?: number;
+      l1Only?: boolean;
+      l2Only?: boolean;
+    },
+  ): Promise<boolean> {
     const priority = options?.priority || 'NORMAL';
     const ttl = options?.ttl || this.config.defaultTTL;
 
@@ -616,7 +655,7 @@ class SmartCacheService {
         success = success && l1Success;
       }
 
-      // Set in L2 (unless l1Only specified)  
+      // Set in L2 (unless l1Only specified)
       if (!options?.l1Only) {
         const l2Success = await this.l2Cache.set(key, data, priority, ttl);
         success = success && l2Success;
@@ -627,9 +666,10 @@ class SmartCacheService {
         await this.l3Cache.set(key, data);
       }
 
-      console.log(`🧠 Cache SET: ${key} (priority: ${priority}, success: ${success})`);
+      console.log(
+        `🧠 Cache SET: ${key} (priority: ${priority}, success: ${success})`,
+      );
       return success;
-
     } catch (error) {
       console.error(`🧠 Cache SET error for ${key}:`, error);
       return false;
@@ -647,7 +687,6 @@ class SmartCacheService {
 
       console.log(`🧠 Cache DELETE: ${key}`);
       return l1Success || l2Success || l3Success;
-
     } catch (error) {
       console.error(`🧠 Cache DELETE error for ${key}:`, error);
       return false;
@@ -680,9 +719,10 @@ class SmartCacheService {
 
     const totalHits = l1Stats.hitRate + l2Stats.hitRate + l3Stats.hitRate;
     const overallHitRate = totalHits / 3; // Average of all levels
-    const avgAccessTime = this.accessTimes.length > 0 
-      ? this.accessTimes.reduce((a, b) => a + b, 0) / this.accessTimes.length 
-      : 0;
+    const avgAccessTime =
+      this.accessTimes.length > 0
+        ? this.accessTimes.reduce((a, b) => a + b, 0) / this.accessTimes.length
+        : 0;
 
     return {
       l1: l1Stats,
@@ -692,7 +732,7 @@ class SmartCacheService {
         hitRate: overallHitRate,
         totalItems: l1Stats.items + l2Stats.items + l3Stats.items,
         totalSize: l1Stats.size + l2Stats.size + l3Stats.databaseSize,
-        avgAccessTime
+        avgAccessTime,
       }
     };
   }
@@ -701,18 +741,22 @@ class SmartCacheService {
    * ⚙️ Update cache configuration
    */
   updateConfig(newConfig: Partial<CacheConfig>): void {
-    this.config = { ...this.config, ...newConfig };
+    this.config = {...this.config, ...newConfig};
     console.log('🧠 Cache configuration updated:', newConfig);
   }
 
   /**
    * 🔍 Predictive loading based on usage patterns
    */
-  async preloadRelatedData(baseKey: string, relatedKeys: string[]): Promise<void> {
-    if (!this.config.predictiveLoading) return;
+  async preloadRelatedData(
+    baseKey: string,
+    relatedKeys: string[],
+  ): Promise<void> {
+    if (!this.config.predictiveLoading) {return;}
 
-    console.log(`🧠 Predictive loading for ${baseKey}: ${relatedKeys.length} related items`);
-    
+    console.log(
+      `🧠 Predictive loading for ${baseKey}: ${relatedKeys.length} related items`,
+
     // Load related data in background with low priority
     for (const key of relatedKeys) {
       // Don't block - fire and forget
@@ -724,7 +768,7 @@ class SmartCacheService {
 
   private recordAccessTime(time: number): void {
     this.accessTimes.push(time);
-    
+
     if (this.accessTimes.length > this.MAX_ACCESS_TIME_SAMPLES) {
       this.accessTimes.shift(); // Remove oldest
     }

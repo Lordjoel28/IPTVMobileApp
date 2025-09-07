@@ -5,9 +5,9 @@
 
 import React from 'react';
 import './src/version'; // Load version info
-import { NavigationContainer } from '@react-navigation/native';
-import { createStackNavigator } from '@react-navigation/stack';
-import { PaperProvider } from 'react-native-paper';
+import {NavigationContainer} from '@react-navigation/native';
+import {createStackNavigator} from '@react-navigation/stack';
+import {PaperProvider} from 'react-native-paper';
 // AppProvider removed - replaced by UIStore
 // PlaylistProvider retiré - remplacé par PlaylistStore Zustand
 // import { PlaylistProvider } from './src/context/PlaylistContext';
@@ -17,7 +17,7 @@ import App_IPTV_SMARTERS from './App_IPTV_SMARTERS';
 import ChannelListScreen from './src/screens/ChannelListScreen';
 import ChannelsScreen from './src/screens/ChannelsScreen';
 import ChannelPlayerScreen from './src/screens/ChannelPlayerScreen';
-import type { Channel } from './src/types';
+import type {Channel} from './src/types';
 
 // Types navigation simple
 export type SimpleRootStackParamList = {
@@ -47,47 +47,34 @@ const AppWithNavigation: React.FC = () => {
     <PaperProvider>
       {/* AppProvider removed - replaced by UIStore */}
       {/* PlaylistProvider removed - replaced by PlaylistStore Zustand */}
-          <NavigationContainer>
-            <Stack.Navigator
-              initialRouteName="IPTVSmarters"
-              screenOptions={{
-                headerShown: false,
-                gestureEnabled: true,
-                cardStyleInterpolator: ({ current, layouts }) => ({
-                  cardStyle: {
-                    transform: [
-                      {
-                        translateX: current.progress.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [layouts.screen.width, 0],
-                        }),
-                      },
-                    ],
+      <NavigationContainer>
+        <Stack.Navigator
+          initialRouteName="IPTVSmarters"
+          screenOptions={{
+            headerShown: false,
+            gestureEnabled: true,
+            cardStyleInterpolator: ({current, layouts}) => ({
+              cardStyle: {
+                transform: [
+                  {
+                    translateX: current.progress.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [layouts.screen.width, 0],
+                    }),
                   },
-                }),
-              }}
-            >
-              <Stack.Screen 
-                name="IPTVSmarters" 
-                component={App_IPTV_SMARTERS}
-              />
-              <Stack.Screen 
-                name="ChannelList" 
-                component={ChannelListScreen}
-              />
-              <Stack.Screen 
-                name="ChannelsScreen" 
-                component={ChannelsScreen}
-              />
-              <Stack.Screen 
-                name="ChannelPlayer" 
-                component={ChannelPlayerScreen}
-              />
-            </Stack.Navigator>
-            {/* Overlays globaux pour toute l'app */}
-            <LoadingOverlay />
-            <NotificationToast />
-          </NavigationContainer>
+                ],
+              },
+            }),
+          }}>
+          <Stack.Screen name="IPTVSmarters" component={App_IPTV_SMARTERS} />
+          <Stack.Screen name="ChannelList" component={ChannelListScreen} />
+          <Stack.Screen name="ChannelsScreen" component={ChannelsScreen} />
+          <Stack.Screen name="ChannelPlayer" component={ChannelPlayerScreen} />
+        </Stack.Navigator>
+        {/* Overlays globaux pour toute l'app */}
+        <LoadingOverlay />
+        <NotificationToast />
+      </NavigationContainer>
       {/* PlaylistProvider removed - replaced by PlaylistStore Zustand */}
       {/* AppProvider removed */}
     </PaperProvider>

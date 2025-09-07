@@ -8,12 +8,12 @@ import 'react-native-gesture-handler';
 // Polyfill Base64 pour React Native
 import {encode, decode} from 'base-64';
 if (typeof global.btoa === 'undefined') {
-  global.btoa = function(str) {
+  global.btoa = function (str) {
     return encode(str);
   };
 }
 if (typeof global.atob === 'undefined') {
-  global.atob = function(str) {
+  global.atob = function (str) {
     return decode(str);
   };
 }

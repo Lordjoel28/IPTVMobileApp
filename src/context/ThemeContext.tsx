@@ -3,18 +3,24 @@
  * Gestion centralisée des thèmes avec persistence
  */
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useColorScheme } from 'react-native';
-import { 
-  getTheme, 
-  createIPTVTheme, 
-  THEME_STORAGE_KEY, 
+import {useColorScheme} from 'react-native';
+import {
+  getTheme,
+  createIPTVTheme,
+  THEME_STORAGE_KEY,
   DEFAULT_THEME,
-  IPTVThemes
+  IPTVThemes,
 } from '../styles/themes';
-import type { ThemeType } from '../types';
-import type { IPTVTheme } from '../styles/themes';
+import type {ThemeType} from '../types';
+import type {IPTVTheme} from '../styles/themes';
 
 interface ThemeContextType {
   theme: IPTVTheme;
@@ -36,22 +42,48 @@ interface ThemeProviderProps {
   children: ReactNode;
 }
 
-export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
+export const ThemeProvider: React.FC<ThemeProviderProps> = ({children}) => {
   const systemColorScheme = useColorScheme();
   const [themeType, setThemeType] = useState<ThemeType>(DEFAULT_THEME);
   const [isDarkMode, setIsDarkMode] = useState(true);
-  const [theme, setThemeState] = useState<IPTVTheme>(createIPTVTheme(DEFAULT_THEME, true));
+  const [theme, setThemeState] = useState<IPTVTheme>(
+    createIPTVTheme(DEFAULT_THEME, true),
+  );
 
   // Liste des thèmes disponibles
   const availableThemes = [
-    { name: 'dark' as ThemeType, displayName: 'Sombre', primaryColor: '#1E88E5' },
-    { name: 'light' as ThemeType, displayName: 'Clair', primaryColor: '#1E88E5' },
-    { name: 'blue' as ThemeType, displayName: 'Bleu Océan', primaryColor: '#2196F3' },
-    { name: 'green' as ThemeType, displayName: 'Vert Matrix', primaryColor: '#4CAF50' },
-    { name: 'purple' as ThemeType, displayName: 'Violet Royal', primaryColor: '#9C27B0' },
-    { name: 'orange' as ThemeType, displayName: 'Orange Coucher', primaryColor: '#FF9800' },
-    { name: 'red' as ThemeType, displayName: 'Rouge Feu', primaryColor: '#F44336' },
-    { name: 'pink' as ThemeType, displayName: 'Rose Cerise', primaryColor: '#E91E63' },
+    {name: 'dark' as ThemeType, displayName: 'Sombre', primaryColor: '#1E88E5'},
+    {name: 'light' as ThemeType, displayName: 'Clair', primaryColor: '#1E88E5'},
+    {
+      name: 'blue' as ThemeType,
+      displayName: 'Bleu Océan',
+      primaryColor: '#2196F3',
+    },
+    {
+      name: 'green' as ThemeType,
+      displayName: 'Vert Matrix',
+      primaryColor: '#4CAF50',
+    },
+    {
+      name: 'purple' as ThemeType,
+      displayName: 'Violet Royal',
+      primaryColor: '#9C27B0',
+    },
+    {
+      name: 'orange' as ThemeType,
+      displayName: 'Orange Coucher',
+      primaryColor: '#FF9800',
+    },
+    {
+      name: 'red' as ThemeType,
+      displayName: 'Rouge Feu',
+      primaryColor: '#F44336',
+    },
+    {
+      name: 'pink' as ThemeType,
+      displayName: 'Rose Cerise',
+      primaryColor: '#E91E63',
+    },
   ];
 
   // Charger le thème sauvegardé au démarrage
@@ -61,21 +93,31 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
 
   // Mettre à jour le thème quand les paramètres changent
   useEffect(() => {
-    const effectiveIsDark = themeType === 'auto' ? systemColorScheme === 'dark' : isDarkMode;
+    const effectiveIsDark =
+      themeType === 'auto' ? systemColorScheme === 'dark' : isDarkMode;
     const newTheme = createIPTVTheme(themeType, effectiveIsDark);
     setThemeState(newTheme);
-    
-    console.log(`🎨 Thème mis à jour: ${themeType} (${effectiveIsDark ? 'sombre' : 'clair'})`);
+
+    console.log(
+      `🎨 Thème mis à jour: ${themeType} (${
+        effectiveIsDark ? 'sombre' : 'clair'
+      })`,
+    );
   }, [themeType, isDarkMode, systemColorScheme]);
 
   const loadSavedTheme = async () => {
     try {
       const savedThemeData = await AsyncStorage.getItem(THEME_STORAGE_KEY);
       if (savedThemeData) {
-        const { themeType: savedTheme, isDarkMode: savedIsDark } = JSON.parse(savedThemeData);
+        const {themeType: savedTheme, isDarkMode: savedIsDark} =
+          JSON.parse(savedThemeData);
         setThemeType(savedTheme || DEFAULT_THEME);
         setIsDarkMode(savedIsDark !== undefined ? savedIsDark : true);
-        console.log(`📱 Thème chargé: ${savedTheme} (${savedIsDark ? 'sombre' : 'clair'})`);
+        console.log(
+          `📱 Thème chargé: ${savedTheme} (${
+            savedIsDark ? 'sombre' : 'clair'
+          })`,
+        );
       } else {
         console.log(`🎨 Thème par défaut: ${DEFAULT_THEME}`);
       }
@@ -94,7 +136,11 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
         timestamp: Date.now(),
       };
       await AsyncStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(themeData));
-      console.log(`💾 Thème sauvegardé: ${newThemeType} (${newIsDarkMode ? 'sombre' : 'clair'})`);
+      console.log(
+        `💾 Thème sauvegardé: ${newThemeType} (${
+          newIsDarkMode ? 'sombre' : 'clair'
+        })`,
+      );
     } catch (error) {
       console.warn('⚠️ Erreur sauvegarde thème:', error);
     }
@@ -123,7 +169,8 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   const contextValue: ThemeContextType = {
     theme,
     themeType,
-    isDarkMode: themeType === 'auto' ? systemColorScheme === 'dark' : isDarkMode,
+    isDarkMode:
+      themeType === 'auto' ? systemColorScheme === 'dark' : isDarkMode,
     availableThemes,
     setTheme,
     toggleDarkMode,

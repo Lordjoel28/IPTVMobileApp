@@ -3,8 +3,8 @@
  * Permet une migration en douceur sans casser l'app existante
  */
 
-import { ServiceRegistry, ServiceNames, getService } from './ServiceRegistry';
-import type { ServiceName } from './ServiceRegistry';
+import {ServiceRegistry, ServiceNames, getService} from './ServiceRegistry';
+import type {ServiceName} from './ServiceRegistry';
 
 /**
  * Wrapper de compatibility pour l'ancienne architecture singleton
@@ -17,16 +17,16 @@ export class ServiceMigration {
    * Initialise la migration - à appeler au démarrage de l'app
    */
   static initialize(): void {
-    if (this.initialized) return;
+    if (this.initialized) {return;}
 
     console.log('🔄 Starting Service Migration: Singleton → DI');
-    
+
     // Initialise le nouveau système DI
     ServiceRegistry.initialize();
-    
+
     // Configure les wrappers de compatibilité
     this.setupCompatibilityWrappers();
-    
+
     this.initialized = true;
     console.log('✅ Service Migration completed');
   }
@@ -52,10 +52,13 @@ export class ServiceMigration {
   /**
    * Crée un wrapper de compatibilité pour un service legacy
    */
-  private static wrapLegacyService(legacyClassName: string, serviceName: ServiceName): void {
+  private static wrapLegacyService(
+    legacyClassName: string,
+    serviceName: ServiceName,
+  ): void {
     // Note: Cette fonction crée des méthodes statiques getInstance()
     // qui redirigent vers le nouveau système DI
-    // 
+    //
     // Exemple d'utilisation:
     // const service = await CacheService.getInstance(); // Ancien code
     // const service = await getService('cache');         // Nouveau code
@@ -66,21 +69,26 @@ export class ServiceMigration {
    * Utilisé pendant la période de transition
    */
   static async getServiceWithFallback<T>(
-    serviceName: ServiceName, 
-    legacyGetter?: () => T
+    serviceName: ServiceName,
+    legacyGetter?: () => T,
   ): Promise<T> {
     try {
       // Essaie le nouveau système DI d'abord
       return await getService<T>(serviceName);
     } catch (error) {
-      console.warn(`⚠️ DI failed for ${serviceName}, falling back to legacy:`, error);
-      
+      console.warn(
+        `⚠️ DI failed for ${serviceName}, falling back to legacy:`,
+        error,
+      );
+
       // Fallback sur l'ancienne méthode si fournie
       if (legacyGetter) {
         return legacyGetter();
       }
-      
-      throw new Error(`Service ${serviceName} not available in DI or legacy mode`);
+
+      throw new Error(
+        `Service ${serviceName} not available in DI or legacy mode`,
+      );
     }
   }
 
@@ -95,7 +103,7 @@ export class ServiceMigration {
     return {
       initialized: this.initialized,
       servicesRegistered: ServiceRegistry.getRegisteredServices().length,
-      servicesReady: ServiceRegistry.getRegisteredServices()
+      servicesReady: ServiceRegistry.getRegisteredServices(),
     };
   }
 
@@ -132,7 +140,7 @@ export class ServiceMigration {
       }
     }
 
-    return { passed, failed };
+    return {passed, failed};
   }
 }
 
@@ -140,8 +148,8 @@ export class ServiceMigration {
  * Hook React pour la migration progressive des composants
  */
 export function useMigratedService<T>(
-  serviceName: ServiceName, 
-  legacyGetter?: () => T
+  serviceName: ServiceName,
+  legacyGetter?: () => T,
 ): T | null {
   const [service, setService] = React.useState<T | null>(null);
 

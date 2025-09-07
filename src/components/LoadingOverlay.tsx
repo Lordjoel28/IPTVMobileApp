@@ -3,7 +3,7 @@
  * Design sobre, centrage parfait, animations fluides premium
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, {useEffect, useRef} from 'react';
 import {
   View,
   Text,
@@ -13,16 +13,16 @@ import {
   StatusBar,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import { BlurView } from '@react-native-community/blur';
+import {BlurView} from '@react-native-community/blur';
 // AppContext removed - using UIStore instead
-import { useUIStore } from '../stores/UIStore';
+import {useUIStore} from '../stores/UIStore';
 
-const { width, height } = Dimensions.get('window');
+const {width, height} = Dimensions.get('window');
 
 const LoadingOverlay: React.FC = () => {
   // Replaced AppContext with UIStore
-  const { loading } = useUIStore();
-  const { visible, title, subtitle, progress } = loading;
+  const {loading} = useUIStore();
+  const {visible, title, subtitle, progress} = loading;
   const opacity = useRef(new Animated.Value(0)).current;
   const scale = useRef(new Animated.Value(0.8)).current;
   const rotateValue = useRef(new Animated.Value(0)).current;
@@ -59,7 +59,7 @@ const LoadingOverlay: React.FC = () => {
           duration: 2000,
           useNativeDriver: true,
         });
-        rotateAnimation.current.start(({ finished }) => {
+        rotateAnimation.current.start(({finished}) => {
           if (finished && visible) {
             startRotate();
           }
@@ -81,7 +81,7 @@ const LoadingOverlay: React.FC = () => {
             useNativeDriver: true,
           }),
         ]);
-        pulseAnimation.current.start(({ finished }) => {
+        pulseAnimation.current.start(({finished}) => {
           if (finished && visible) {
             startPulse();
           }
@@ -96,7 +96,7 @@ const LoadingOverlay: React.FC = () => {
           duration: 1500,
           useNativeDriver: false,
         });
-        dotsAnimation.current.start(({ finished }) => {
+        dotsAnimation.current.start(({finished}) => {
           if (finished && visible) {
             dotsValue.setValue(0);
             startDots();
@@ -104,7 +104,6 @@ const LoadingOverlay: React.FC = () => {
         });
       };
       startDots();
-
     } else {
       // Animation de sortie
       Animated.parallel([
@@ -121,15 +120,27 @@ const LoadingOverlay: React.FC = () => {
       ]).start();
 
       // Arrêter toutes les animations
-      if (rotateAnimation.current) rotateAnimation.current.stop();
-      if (pulseAnimation.current) pulseAnimation.current.stop();
-      if (dotsAnimation.current) dotsAnimation.current.stop();
+      if (rotateAnimation.current) {
+        rotateAnimation.current.stop();
+      }
+      if (pulseAnimation.current) {
+        pulseAnimation.current.stop();
+      }
+      if (dotsAnimation.current) {
+        dotsAnimation.current.stop();
+      }
     }
 
     return () => {
-      if (rotateAnimation.current) rotateAnimation.current.stop();
-      if (pulseAnimation.current) pulseAnimation.current.stop();
-      if (dotsAnimation.current) dotsAnimation.current.stop();
+      if (rotateAnimation.current) {
+        rotateAnimation.current.stop();
+      }
+      if (pulseAnimation.current) {
+        pulseAnimation.current.stop();
+      }
+      if (dotsAnimation.current) {
+        dotsAnimation.current.stop();
+      }
     };
   }, [visible]);
 
@@ -155,57 +166,55 @@ const LoadingOverlay: React.FC = () => {
           opacity,
         },
       ]}
-      pointerEvents={visible ? 'auto' : 'none'}
-    >
+      pointerEvents={visible ? 'auto' : 'none'}>
       <StatusBar barStyle="light-content" backgroundColor="rgba(0,0,0,0.95)" />
-      
+
       <BlurView
         style={styles.blurOverlay}
         blurType="dark"
         blurAmount={5}
-        reducedTransparencyFallbackColor="rgba(0,0,0,0.4)"
-      >
+        reducedTransparencyFallbackColor="rgba(0,0,0,0.4)">
         <View style={styles.centeringContainer}>
           <Animated.View
             style={[
               styles.container,
               {
-                transform: [{ scale }],
+                transform: [{scale}],
               },
-            ]}
-          >
+            ]}>
             <LinearGradient
-              colors={['rgba(26, 26, 26, 0.98)', 'rgba(45, 45, 45, 0.96)', 'rgba(30, 58, 95, 0.94)']}
+              colors={[
+                'rgba(26, 26, 26, 0.98)',
+                'rgba(45, 45, 45, 0.96)',
+                'rgba(30, 58, 95, 0.94)',
+              ]}
               locations={[0, 0.6, 1]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.contentContainer}
-            >
+              start={{x: 0, y: 0}}
+              end={{x: 1, y: 1}}
+              style={styles.contentContainer}>
               {/* Spinner principal moderne */}
               <Animated.View
                 style={[
                   styles.spinnerContainer,
                   {
-                    transform: [{ scale: pulseValue }, { rotate: spin }],
+                    transform: [{scale: pulseValue}, {rotate: spin}],
                   },
-                ]}
-              >
+                ]}>
                 <LinearGradient
                   colors={['#4a9b8e', '#2c5282', '#1e3a5f']}
-                  style={styles.spinner}
-                >
+                  style={styles.spinner}>
                   <View style={styles.spinnerInner} />
                 </LinearGradient>
               </Animated.View>
 
               {/* Texte principal sobre */}
               <Text style={styles.title}>{title}</Text>
-              
+
               {/* Sous-titre avec points animés */}
               {subtitle && (
                 <View style={styles.subtitleContainer}>
                   <Text style={styles.subtitle}>{subtitle}</Text>
-                  <Animated.Text style={[styles.dots, { opacity: dotsOpacity }]}>
+                  <Animated.Text style={[styles.dots, {opacity: dotsOpacity}]}>
                     ...
                   </Animated.Text>
                 </View>
@@ -218,15 +227,14 @@ const LoadingOverlay: React.FC = () => {
                     <Animated.View
                       style={[
                         styles.progressFill,
-                        { 
+                        {
                           width: `${Math.max(0, Math.min(100, progress))}%`,
                         },
-                      ]}
-                    >
+                      ]}>
                       <LinearGradient
                         colors={['#4a9b8e', '#2c5282']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
+                        start={{x: 0, y: 0}}
+                        end={{x: 1, y: 0}}
                         style={styles.progressGradient}
                       />
                     </Animated.View>
@@ -244,8 +252,8 @@ const LoadingOverlay: React.FC = () => {
                   'rgba(74, 155, 142, 0.08)',
                   'transparent',
                 ]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
+                start={{x: 0, y: 0}}
+                end={{x: 1, y: 1}}
                 style={styles.shine}
               />
             </LinearGradient>
@@ -292,7 +300,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'rgba(74, 155, 142, 0.2)',
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 12 },
+    shadowOffset: {width: 0, height: 12},
     shadowOpacity: 0.4,
     shadowRadius: 25,
     elevation: 20,
@@ -309,7 +317,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#4a9b8e',
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: {width: 0, height: 4},
     shadowOpacity: 0.4,
     shadowRadius: 12,
     elevation: 12,

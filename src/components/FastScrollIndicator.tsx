@@ -3,7 +3,7 @@
  * Affiche aperçu chaîne pendant scroll rapide pour navigation ultra-fluide
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, {useState, useEffect, useRef} from 'react';
 import {
   View,
   Text,
@@ -14,10 +14,10 @@ import {
   useColorScheme,
 } from 'react-native';
 import FastImage from 'react-native-fast-image';
-import { Channel } from '../types';
+import {Channel} from '../types';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const INDICATOR_WIDTH = 60; // 🚀 Plus fin mais plus visible  
+const {width: SCREEN_WIDTH, height: SCREEN_HEIGHT} = Dimensions.get('window');
+const INDICATOR_WIDTH = 60; // 🚀 Plus fin mais plus visible
 const PREVIEW_CARD_WIDTH = 220; // 🚀 Plus large pour meilleure lisibilité
 const PREVIEW_CARD_HEIGHT = 100; // 🚀 Plus compact mais lisible
 
@@ -51,7 +51,7 @@ export const FastScrollIndicator: React.FC<FastScrollIndicatorProps> = ({
       onMoveShouldSetPanResponder: () => true,
       onPanResponderTerminationRequest: () => false, // 🚀 Garde le contrôle
 
-      onPanResponderGrant: (evt) => {
+      onPanResponderGrant: evt => {
         setIsScrolling(true);
         // 🚀 Apparition INSTANTANÉE de la preview card
         Animated.timing(animatedOpacity, {
@@ -59,7 +59,7 @@ export const FastScrollIndicator: React.FC<FastScrollIndicatorProps> = ({
           duration: 100, // Plus rapide
           useNativeDriver: true,
         }).start();
-        
+
         // 🚀 Position initiale basée sur le touch
         const initialY = evt.nativeEvent.pageY;
         animatedPosition.setValue(initialY);
@@ -70,21 +70,27 @@ export const FastScrollIndicator: React.FC<FastScrollIndicatorProps> = ({
         const scrollableTop = 120; // Top margin
         const scrollableBottom = SCREEN_HEIGHT - 120; // Bottom margin
         const scrollableHeight = scrollableBottom - scrollableTop;
-        
+
         // 🚀 Position relative plus précise
-        const clampedY = Math.max(scrollableTop, Math.min(scrollableBottom, touchY));
+        const clampedY = Math.max(
+          scrollableTop,
+          Math.min(scrollableBottom, touchY),
+        );
         const relativePosition = (clampedY - scrollableTop) / scrollableHeight;
-        
+
         // 🚀 Index plus précis avec protection bounds
-        const newIndex = Math.max(0, Math.min(
-          channels.length - 1, 
-          Math.floor(relativePosition * channels.length)
-        ));
-        
+        const newIndex = Math.max(
+          0,
+          Math.min(
+            channels.length - 1,
+            Math.floor(relativePosition * channels.length),
+          ),
+        );
+
         if (newIndex !== previewIndex) {
           setPreviewIndex(newIndex);
         }
-        
+
         // 🚀 Position animée plus fluide
         animatedPosition.setValue(clampedY - scrollableTop);
       },
@@ -93,7 +99,7 @@ export const FastScrollIndicator: React.FC<FastScrollIndicatorProps> = ({
         setIsScrolling(false);
         // 🚀 Scroll INSTANTANÉ vers l'index sélectionné
         onScrollToIndex(previewIndex);
-        
+
         // 🚀 Disparition avec délai pour voir la sélection
         setTimeout(() => {
           Animated.timing(animatedOpacity, {
@@ -104,7 +110,13 @@ export const FastScrollIndicator: React.FC<FastScrollIndicatorProps> = ({
         }, 200);
       },
     });
-  }, [channels.length, previewIndex, onScrollToIndex, animatedOpacity, animatedPosition]);
+  }, [
+    channels.length,
+    previewIndex,
+    onScrollToIndex,
+    animatedOpacity,
+    animatedPosition,
+  ]);
 
   useEffect(() => {
     // Show/hide indicator based on visibility
@@ -115,7 +127,7 @@ export const FastScrollIndicator: React.FC<FastScrollIndicatorProps> = ({
     }).start();
   }, [visible, isScrolling, animatedOpacity]);
 
-  if (!visible && !isScrolling) return null;
+  if (!visible && !isScrolling) {return null;}
 
   return (
     <View style={styles.container}>
@@ -124,21 +136,26 @@ export const FastScrollIndicator: React.FC<FastScrollIndicatorProps> = ({
         style={[
           styles.scrollIndicator,
           isDarkMode && styles.scrollIndicatorDark,
-          { opacity: animatedOpacity }
+          {opacity: animatedOpacity},
         ]}
-        {...panResponder.current?.panHandlers}
-      >
+        {...panResponder.current?.panHandlers}>
         {/* Current position marker */}
-        <View style={[
-          styles.positionMarker,
-          {
-            top: (currentIndex / Math.max(1, channels.length - 1)) * (SCREEN_HEIGHT - 200) - 10
-          }
-        ]} />
+        <View
+          style={[
+            styles.positionMarker,
+            {
+              top:
+                (currentIndex / Math.max(1, channels.length - 1)) *
+                  (SCREEN_HEIGHT - 200) -
+                10,
+            },
+          ]}
+        />
 
         {/* Channel count display */}
         <View style={styles.channelCounter}>
-          <Text style={[styles.counterText, isDarkMode && styles.counterTextDark]}>
+          <Text
+            style={[styles.counterText, isDarkMode && styles.counterTextDark]}>
             {previewIndex + 1}/{channels.length}
           </Text>
         </View>
@@ -152,23 +169,27 @@ export const FastScrollIndicator: React.FC<FastScrollIndicatorProps> = ({
             isDarkMode && styles.previewCardDark,
             {
               opacity: animatedOpacity,
-              transform: [{
-                translateY: animatedPosition.interpolate({
-                  inputRange: [0, SCREEN_HEIGHT],
-                  outputRange: [-PREVIEW_CARD_HEIGHT / 2, SCREEN_HEIGHT - PREVIEW_CARD_HEIGHT / 2],
-                  extrapolate: 'clamp'
-                })
-              }]
-            }
-          ]}
-        >
+              transform: [
+                {
+                  translateY: animatedPosition.interpolate({
+                    inputRange: [0, SCREEN_HEIGHT],
+                    outputRange: [
+                      -PREVIEW_CARD_HEIGHT / 2,
+                      SCREEN_HEIGHT - PREVIEW_CARD_HEIGHT / 2,
+                    ],
+                    extrapolate: 'clamp',
+                  }),
+                },
+              ],
+            },
+          ]}>
           {/* Channel logo */}
           <View style={styles.previewImageContainer}>
             {currentChannel.logo ? (
               <FastImage
-                source={{ 
+                source={{
                   uri: currentChannel.logo,
-                  priority: FastImage.priority.high 
+                  priority: FastImage.priority.high, 
                 }}
                 style={styles.previewImage}
                 resizeMode={FastImage.resizeMode.cover}
@@ -182,18 +203,28 @@ export const FastScrollIndicator: React.FC<FastScrollIndicatorProps> = ({
 
           {/* Channel info */}
           <View style={styles.previewInfo}>
-            <Text 
-              style={[styles.previewTitle, isDarkMode && styles.previewTitleDark]}
-              numberOfLines={2}
-            >
+            <Text
+              style={[
+                styles.previewTitle,
+                isDarkMode && styles.previewTitleDark,
+              ]}
+              numberOfLines={2}>
               {currentChannel.name}
             </Text>
             {currentChannel.category && (
-              <Text style={[styles.previewCategory, isDarkMode && styles.previewCategoryDark]}>
+              <Text
+                style={[
+                  styles.previewCategory,
+                  isDarkMode && styles.previewCategoryDark,
+                ]}>
                 {currentChannel.category}
               </Text>
             )}
-            <Text style={[styles.previewIndex, isDarkMode && styles.previewIndexDark]}>
+            <Text
+              style={[
+                styles.previewIndex,
+                isDarkMode && styles.previewIndexDark,
+              ]}>
               #{previewIndex + 1}
             </Text>
           </View>
@@ -221,7 +252,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.95)', // 🚀 Plus opaque
     borderRadius: 30,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
+    shadowOffset: {width: 0, height: 3},
     shadowOpacity: 0.4, // 🚀 Ombre plus marquée
     shadowRadius: 6,
     elevation: 8, // 🚀 Plus d'élévation sur Android
@@ -240,7 +271,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: '#007AFF',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: {width: 0, height: 1},
     shadowOpacity: 0.3,
     shadowRadius: 2,
     elevation: 3,
@@ -268,7 +299,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.98)', // 🚀 Quasi-opaque pour lisibilité
     borderRadius: 15, // 🚀 Plus arrondi comme Smarters Pro
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
+    shadowOffset: {width: 0, height: 6},
     shadowOpacity: 0.4, // 🚀 Ombre plus forte
     shadowRadius: 12,
     elevation: 12, // 🚀 Très visible sur Android

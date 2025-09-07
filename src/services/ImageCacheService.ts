@@ -5,7 +5,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { ImageStyle } from 'react-native';
+import type {ImageStyle} from 'react-native';
 
 export interface CachedImageInfo {
   uri: string;
@@ -53,7 +53,7 @@ class AdaptiveLRUCache {
 
   get(key: string): CachedImageInfo | null {
     const item = this.cache.get(key);
-    if (!item) return null;
+    if (!item) {return null;}
 
     // Update access time (LRU)
     this.accessTimes.set(key, Date.now());
@@ -67,11 +67,14 @@ class AdaptiveLRUCache {
     // Remove existing if present
     if (this.cache.has(key)) {
       const existing = this.cache.get(key)!;
-      this.currentMemoryUsage -= (existing.size || 50000);
+      this.currentMemoryUsage -= existing.size || 50000;
     }
 
     // Evict old items if necessary
-    while (this.currentMemoryUsage + estimatedSize > this.maxSize && this.cache.size > 0) {
+    while (
+      this.currentMemoryUsage + estimatedSize > this.maxSize &&
+      this.cache.size > 0
+    ) {
       this.evictLeastRecentlyUsed();
     }
 
@@ -95,7 +98,7 @@ class AdaptiveLRUCache {
     if (oldestKey) {
       const item = this.cache.get(oldestKey);
       if (item) {
-        this.currentMemoryUsage -= (item.size || 50000);
+        this.currentMemoryUsage -= item.size || 50000;
       }
       this.cache.delete(oldestKey);
       this.accessTimes.delete(oldestKey);
@@ -112,7 +115,7 @@ class AdaptiveLRUCache {
     return {
       count: this.cache.size,
       memoryUsage: Math.round(this.currentMemoryUsage / 1024 / 1024), // MB
-      maxSize: Math.round(this.maxSize / 1024 / 1024) // MB
+      maxSize: Math.round(this.maxSize / 1024 / 1024), // MB
     };
   }
 }
@@ -123,12 +126,12 @@ export class ImageCacheService {
   private readonly CACHE_TTL = 24 * 60 * 60 * 1000; // 24h optimisé
   private readonly MAX_MEMORY_CACHE = 50; // 50MB mémoire
   private readonly MAX_DISK_CACHE = 200; // 200MB disque
-  
+
   private memoryCache: AdaptiveLRUCache;
   private pendingLoads = new Map<string, Promise<CachedImageInfo>>();
   private preloadQueue: string[] = [];
   private isPreloading = false;
-  
+
   // Statistiques performance
   private cacheHits = 0;
   private cacheMisses = 0;
@@ -154,7 +157,7 @@ export class ImageCacheService {
     try {
       const keys = await AsyncStorage.getAllKeys();
       const cacheKeys = keys.filter(key => key.startsWith(this.CACHE_PREFIX));
-      
+
       let totalSize = 0;
       for (const key of cacheKeys) {
         try {
@@ -168,9 +171,13 @@ export class ImageCacheService {
           await AsyncStorage.removeItem(key);
         }
       }
-      
+
       this.diskCacheSize = totalSize;
-      console.log(`📦 ImageCache initialisé: ${Math.round(totalSize/1024/1024)}MB sur disque`);
+      console.log(
+        `📦 ImageCache initialisé: ${Math.round(
+          totalSize / 1024 / 1024,
+        )}MB sur disque`,
+      );
     } catch (error) {
       console.warn('⚠️ Erreur initialisation cache disque:', error);
     }
@@ -193,7 +200,10 @@ export class ImageCacheService {
   /**
    * 🚀 CHARGEMENT IMAGE ULTRA-OPTIMISÉ avec cache 3-niveaux
    */
-  async loadOptimizedImage(uri: string, options: ImageLoadOptions = {}): Promise<CachedImageInfo> {
+  async loadOptimizedImage(
+    uri: string,
+    options: ImageLoadOptions = {},
+  ): Promise<CachedImageInfo> {
     if (!uri || !uri.trim()) {
       throw new Error('URI manquant');
     }
@@ -228,7 +238,11 @@ export class ImageCacheService {
   /**
    * Propriétés optimisées react-native-fast-image avec cache intelligent
    */
-  getOptimizedImageProps(uri: string | undefined | null, style?: ImageStyle, options: ImageLoadOptions = {}) {
+  getOptimizedImageProps(
+    uri: string | undefined | null,
+    style?: ImageStyle,
+    options: ImageLoadOptions = {},
+  ) {
     if (!uri || !uri.trim()) {
       return this.getPlaceholderProps(style);
     }
@@ -237,10 +251,10 @@ export class ImageCacheService {
     return {
       source: {
         uri: uri.trim(),
-        priority: options.priority || 'normal' as const,
+        priority: options.priority || ('normal' as const),
         cache: 'immutable' as const,
       },
-      style: style || { width: 56, height: 56 },
+      style: style || {width: 56, height: 56},
       resizeMode: 'contain' as const,
       fallback: options.fallback !== false,
       onLoadStart: () => this.onImageLoadStart(uri),
@@ -248,7 +262,7 @@ export class ImageCacheService {
       onError: () => this.onImageLoadError(uri),
       // Propriétés performance
       blurRadius: 0,
-      capInsets: { top: 0, left: 0, bottom: 0, right: 0 },
+      capInsets: {top: 0, left: 0, bottom: 0, right: 0},
       borderRadius: 0,
     };
   }
@@ -264,7 +278,11 @@ export class ImageCacheService {
   /**
    * 🔄 Chargement et mise en cache interne
    */
-  private async loadAndCacheImage(uri: string, cacheKey: string, options: ImageLoadOptions): Promise<CachedImageInfo> {
+  private async loadAndCacheImage(
+    uri: string,
+    cacheKey: string,
+    options: ImageLoadOptions,
+  ): Promise<CachedImageInfo> {
     try {
       // 1. CHECK CACHE DISQUE AsyncStorage
       const diskCached = await this.getDiskCached(cacheKey);
@@ -278,13 +296,12 @@ export class ImageCacheService {
       // 2. TÉLÉCHARGEMENT avec timeout et retry
       this.cacheMisses++;
       const imageInfo = await this.downloadWithRetry(uri, options);
-      
+
       // 3. MISE EN CACHE mémoire + disque
       this.memoryCache.set(cacheKey, imageInfo);
       await this.saveToDiskCache(cacheKey, imageInfo);
 
       return imageInfo;
-
     } catch (error) {
       console.warn(`⚠️ Erreur chargement image ${uri}:`, error);
       throw error;
@@ -294,7 +311,10 @@ export class ImageCacheService {
   /**
    * 📥 Téléchargement avec retry et timeout
    */
-  private async downloadWithRetry(uri: string, options: ImageLoadOptions): Promise<CachedImageInfo> {
+  private async downloadWithRetry(
+    uri: string,
+    options: ImageLoadOptions,
+  ): Promise<CachedImageInfo> {
     const timeout = options.timeout || 8000; // 8s par défaut
     const maxRetries = 2;
     let lastError;
@@ -309,8 +329,8 @@ export class ImageCacheService {
           signal: controller.signal,
           headers: {
             'User-Agent': 'IPTVMobileApp/1.0',
-            'Accept': 'image/*'
-          }
+            Accept: 'image/*',
+          },
         });
 
         clearTimeout(timeoutId);
@@ -328,11 +348,10 @@ export class ImageCacheService {
           size: parseInt(response.headers.get('content-length') || '50000'),
           contentType: response.headers.get('content-type') || 'image/jpeg',
           etag: response.headers.get('etag') || undefined,
-          quality: options.quality || 'medium'
+          quality: options.quality || 'medium',
         };
 
         return imageInfo;
-
       } catch (error) {
         lastError = error;
         if (attempt < maxRetries - 1) {
@@ -347,14 +366,19 @@ export class ImageCacheService {
   /**
    * 🚀 PRÉCHARGEMENT BATCH ULTRA-OPTIMISÉ pour 100K+ images
    */
-  async preloadImages(uris: string[], options: { batchSize?: number, priority?: 'low' | 'normal' | 'high' } = {}): Promise<void> {
-    const { batchSize = 15, priority = 'low' } = options;
-    
+  async preloadImages(
+    uris: string[],
+    options: {batchSize?: number; priority?: 'low' | 'normal' | 'high'} = {},
+  ): Promise<void> {
+    const {batchSize = 15, priority = 'low'} = options;
+
     console.log(`🚀 Préchargement ultra-optimisé: ${uris.length} images`);
-    
-    const validUris = uris.filter(uri => uri && uri.trim() && this.isValidImageUrl(uri));
+
+    const validUris = uris.filter(
+      uri => uri && uri.trim() && this.isValidImageUrl(uri),
+    );
     console.log(`📊 ${validUris.length} URLs valides à précharger`);
-    
+
     let successCount = 0;
     let errorCount = 0;
     const startTime = Date.now();
@@ -362,13 +386,15 @@ export class ImageCacheService {
     // Préchargement par batches optimisés
     for (let i = 0; i < validUris.length; i += batchSize) {
       const batch = validUris.slice(i, i + batchSize);
-      
+
       const batchResults = await Promise.allSettled(
-        batch.map(uri => this.loadOptimizedImage(uri, { 
-          priority, 
-          timeout: 3000, // Timeout court pour préchargement
-          fallback: false 
-        }))
+        batch.map(uri =>
+          this.loadOptimizedImage(uri, {
+            priority,
+            timeout: 3000, // Timeout court pour préchargement
+            fallback: false,
+          }),
+        ),
       );
 
       // Compter succès/erreurs
@@ -384,20 +410,25 @@ export class ImageCacheService {
       // Progress logging
       if (i % (batchSize * 10) === 0) {
         const progress = Math.round((i / validUris.length) * 100);
-        console.log(`📊 Préchargement: ${progress}% (${successCount} succès, ${errorCount} erreurs)`);
+        console.log(
+          `📊 Préchargement: ${progress}% (${successCount} succès, ${errorCount} erreurs)`,
+        );
       }
 
       // Pause dynamique entre batches selon priorité
       if (i + batchSize < validUris.length) {
-        const pauseMs = priority === 'high' ? 50 : priority === 'normal' ? 100 : 200;
+        const pauseMs =
+          priority === 'high' ? 50 : priority === 'normal' ? 100 : 200;
         await this.delay(pauseMs);
       }
     }
 
     const elapsed = Date.now() - startTime;
     const rate = Math.round((validUris.length / elapsed) * 1000); // images/seconde
-    
-    console.log(`✅ Préchargement terminé: ${successCount} succès, ${errorCount} erreurs en ${elapsed}ms (${rate} img/s)`);
+
+    console.log(
+      `✅ Préchargement terminé: ${successCount} succès, ${errorCount} erreurs en ${elapsed}ms (${rate} img/s)`,
+    );
   }
 
   /**
@@ -411,10 +442,10 @@ export class ImageCacheService {
         cached: true,
         timestamp: Date.now(),
       };
-      
+
       this.imageCache.set(uri, imageInfo);
       await this.saveCacheInfo(uri, imageInfo);
-      
+
     } catch (error) {
       console.warn(`⚠️ Failed to preload image: ${uri}`, error);
     }
@@ -424,19 +455,19 @@ export class ImageCacheService {
    * Vérifier si une URL d'image est valide
    */
   private isValidImageUrl(uri: string): boolean {
-    if (!uri || typeof uri !== 'string') return false;
-    
+    if (!uri || typeof uri !== 'string') {return false;}
+
     const trimmedUri = uri.trim();
-    
+
     // Vérifier le format de l'URL
-    if (!trimmedUri.startsWith('http')) return false;
-    
+    if (!trimmedUri.startsWith('http')) {return false;}
+
     // Vérifier les extensions d'image communes
     const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'];
-    const hasImageExtension = imageExtensions.some(ext => 
-      trimmedUri.toLowerCase().includes(ext)
+    const hasImageExtension = imageExtensions.some(ext =>
+      trimmedUri.toLowerCase().includes(ext),
     );
-    
+
     // Accepter si c'est une URL d'image ou si elle contient 'logo'
     return hasImageExtension || trimmedUri.toLowerCase().includes('logo');
   }
@@ -453,16 +484,16 @@ export class ImageCacheService {
    */
   private onImageLoadSuccess(uri: string): void {
     this.cacheHits++;
-    
+
     const imageInfo: CachedImageInfo = {
       uri,
       cached: true,
       timestamp: Date.now(),
     };
-    
+
     this.imageCache.set(uri, imageInfo);
     this.saveCacheInfo(uri, imageInfo);
-    
+
     // console.log(`✅ Image loaded successfully: ${uri}`);
   }
 
@@ -472,7 +503,7 @@ export class ImageCacheService {
   private onImageLoadError(uri: string): void {
     this.cacheMisses++;
     console.warn(`❌ Failed to load image: ${uri}`);
-    
+
     // Retirer de la cache en cas d'erreur
     this.imageCache.delete(uri);
     this.removeCacheInfo(uri);
@@ -489,7 +520,10 @@ export class ImageCacheService {
   /**
    * Sauvegarder les informations de cache
    */
-  private async saveCacheInfo(uri: string, info: CachedImageInfo): Promise<void> {
+  private async saveCacheInfo(
+    uri: string,
+    info: CachedImageInfo,
+  ): Promise<void> {
     try {
       const key = `${this.CACHE_PREFIX}${this.encodeBase64(uri)}`;
       await AsyncStorage.setItem(key, JSON.stringify(info));
@@ -516,19 +550,19 @@ export class ImageCacheService {
   async cleanExpiredCache(): Promise<void> {
     try {
       console.log('🧹 Cleaning expired image cache...');
-      
+
       const keys = await AsyncStorage.getAllKeys();
       const cacheKeys = keys.filter(key => key.startsWith(this.CACHE_PREFIX));
       const now = Date.now();
-      
+
       let cleanedCount = 0;
-      
+
       for (const key of cacheKeys) {
         try {
           const data = await AsyncStorage.getItem(key);
           if (data) {
             const info: CachedImageInfo = JSON.parse(data);
-            
+
             // Supprimer si expiré
             if (now - info.timestamp > this.CACHE_TTL) {
               await AsyncStorage.removeItem(key);
@@ -542,9 +576,8 @@ export class ImageCacheService {
           cleanedCount++;
         }
       }
-      
+
       console.log(`✅ Cleaned ${cleanedCount} expired cache entries`);
-      
     } catch (error) {
       console.warn('⚠️ Failed to clean image cache:', error);
     }
@@ -554,7 +587,10 @@ export class ImageCacheService {
    * 🔧 MÉTHODES UTILITAIRES PRIVÉES
    */
   private generateCacheKey(uri: string, options: ImageLoadOptions): string {
-    const sizeKey = options.width && options.height ? `_${options.width}x${options.height}` : '';
+    const sizeKey =
+      options.width && options.height
+        ? `_${options.width}x${options.height}`
+        : '';
     const qualityKey = options.quality ? `_${options.quality}` : '';
     return `${this.hashString(uri)}${sizeKey}${qualityKey}`;
   }
@@ -563,7 +599,7 @@ export class ImageCacheService {
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
       const char = str.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
+      hash = (hash << 5) - hash + char;
       hash = hash & hash; // Convert to 32-bit integer
     }
     return Math.abs(hash).toString(36);
@@ -582,11 +618,17 @@ export class ImageCacheService {
     }
   }
 
-  private async saveToDiskCache(key: string, imageInfo: CachedImageInfo): Promise<void> {
+  private async saveToDiskCache(
+    key: string,
+    imageInfo: CachedImageInfo,
+  ): Promise<void> {
     try {
-      await AsyncStorage.setItem(`${this.CACHE_PREFIX}${key}`, JSON.stringify(imageInfo));
+      await AsyncStorage.setItem(
+        `${this.CACHE_PREFIX}${key}`,
+        JSON.stringify(imageInfo),
+      );
       this.diskCacheSize += imageInfo.size || 50000;
-      
+
       // Nettoyage si dépassement
       if (this.diskCacheSize > this.MAX_DISK_CACHE * 1024 * 1024) {
         await this.cleanupDiskCacheInternal();
@@ -600,16 +642,16 @@ export class ImageCacheService {
     try {
       const keys = await AsyncStorage.getAllKeys();
       const cacheKeys = keys.filter(key => key.startsWith(this.CACHE_PREFIX));
-      
+
       // Récupérer toutes les images avec timestamps
-      const images: Array<{key: string, info: CachedImageInfo}> = [];
-      
+      const images: Array<{key: string; info: CachedImageInfo}> = [];
+
       for (const key of cacheKeys) {
         try {
           const data = await AsyncStorage.getItem(key);
           if (data) {
             const info = JSON.parse(data) as CachedImageInfo;
-            images.push({ key, info });
+            images.push({key, info});
           }
         } catch {
           // Supprimer entrées corrompues
@@ -618,22 +660,30 @@ export class ImageCacheService {
       }
 
       // Trier par dernière utilisation (LRU)
-      images.sort((a, b) => (a.info.lastAccessed || a.info.timestamp) - (b.info.lastAccessed || b.info.timestamp));
+      images.sort(
+        (a, b) =>
+          (a.info.lastAccessed || a.info.timestamp) -
+          (b.info.lastAccessed || b.info.timestamp),
+      );
 
       // Supprimer jusqu'à 80% de la limite
       const targetSize = this.MAX_DISK_CACHE * 0.8 * 1024 * 1024;
       let currentSize = this.diskCacheSize;
 
       for (const {key, info} of images) {
-        if (currentSize <= targetSize) break;
-        
+        if (currentSize <= targetSize) {break;}
+
         await AsyncStorage.removeItem(key);
-        currentSize -= (info.size || 50000);
+        currentSize -= info.size || 50000;
       }
 
       this.diskCacheSize = currentSize;
-      console.log(`🧹 Cache disque nettoyé: ${Math.round(currentSize/1024/1024)}MB restants`);
-      
+      console.log(
+        `🧹 Cache disque nettoyé: ${Math.round(
+          currentSize / 1024 / 1024,
+        )}MB restants`,
+      );
+
     } catch (error) {
       console.warn('⚠️ Erreur nettoyage cache:', error);
     }
@@ -648,9 +698,10 @@ export class ImageCacheService {
    */
   getCacheStats(): ImageCacheStats {
     const totalRequests = this.cacheHits + this.cacheMisses;
-    const hitRate = totalRequests > 0 ? (this.cacheHits / totalRequests) * 100 : 0;
+    const hitRate =
+      totalRequests > 0 ? (this.cacheHits / totalRequests) * 100 : 0;
     const memoryStats = this.memoryCache.getStats();
-    
+
     return {
       totalImages: memoryStats.count,
       cachedImages: this.cacheHits,
@@ -669,18 +720,18 @@ export class ImageCacheService {
     try {
       const startTime = Date.now();
       console.log('🗑️ Nettoyage complet cache images...');
-      
+
       // 1. Nettoyer mémoire
       this.memoryCache.clear();
-      
+
       // 2. Nettoyer disque
       const keys = await AsyncStorage.getAllKeys();
       const cacheKeys = keys.filter(key => key.startsWith(this.CACHE_PREFIX));
-      
+
       if (cacheKeys.length > 0) {
         await AsyncStorage.multiRemove(cacheKeys);
       }
-      
+
       // 3. Reset compteurs
       const oldStats = this.getCacheStats();
       this.cacheHits = 0;
@@ -689,10 +740,12 @@ export class ImageCacheService {
       this.diskCacheSize = 0;
       this.pendingLoads.clear();
       this.preloadQueue = [];
-      
+
       const elapsed = Date.now() - startTime;
-      console.log(`✅ Cache nettoyé: ${cacheKeys.length} entrées supprimées, ${oldStats.diskUsage}MB libérés en ${elapsed}ms`);
-      
+      console.log(
+        `✅ Cache nettoyé: ${cacheKeys.length} entrées supprimées, ${oldStats.diskUsage}MB libérés en ${elapsed}ms`,
+      );
+
     } catch (error) {
       console.warn('⚠️ Erreur nettoyage cache:', error);
     }
@@ -703,24 +756,26 @@ export class ImageCacheService {
    * Adapte la vitesse selon la performance du réseau et device
    */
   async intelligentPreload(uris: string[]): Promise<void> {
-    if (uris.length === 0) return;
+    if (uris.length === 0) {return;}
 
     // Test vitesse réseau avec premiers URLs
     const testSample = uris.slice(0, 3);
     const startTest = Date.now();
-    
+
     const testResults = await Promise.allSettled(
-      testSample.map(uri => this.loadOptimizedImage(uri, { timeout: 2000 }))
+      testSample.map(uri => this.loadOptimizedImage(uri, {timeout: 2000})),
     );
-    
+
     const testDuration = Date.now() - startTest;
-    const successRate = testResults.filter(r => r.status === 'fulfilled').length / testResults.length;
+    const successRate =
+      testResults.filter(r => r.status === 'fulfilled').length /
+      testResults.length;
     const avgSpeed = testResults.length / (testDuration / 1000); // images/seconde
 
     // Adapter paramètres selon performance
     let batchSize = 10;
     let priority: 'low' | 'normal' | 'high' = 'normal';
-    
+
     if (avgSpeed > 2 && successRate > 0.8) {
       // Connexion rapide et fiable
       batchSize = 20;
@@ -731,11 +786,15 @@ export class ImageCacheService {
       priority = 'low';
     }
 
-    console.log(`🧪 Test réseau: ${Math.round(avgSpeed * 100)/100} img/s, ${Math.round(successRate*100)}% succès → batch=${batchSize}, priorité=${priority}`);
+    console.log(
+      `🧪 Test réseau: ${Math.round(avgSpeed * 100) / 100} img/s, ${Math.round(
+        successRate * 100,
+      )}% succès → batch=${batchSize}, priorité=${priority}`,
+    );
 
     // Préchargement adaptatif avec paramètres optimisés
     const remainingUris = uris.slice(3); // Exclure échantillon test
-    await this.preloadImages(remainingUris, { batchSize, priority });
+    await this.preloadImages(remainingUris, {batchSize, priority});
   }
 
   /**
@@ -744,7 +803,7 @@ export class ImageCacheService {
   optimizeForDevice(): void {
     // Détecter capacité approximative (basique)
     const isLowEnd = this.memoryCache.getStats().maxSize < 30; // Moins de 30MB config
-    
+
     if (isLowEnd) {
       console.log('📱 Device low-end détecté - optimisation conservative');
       this.memoryCache = new AdaptiveLRUCache(20); // 20MB seulement

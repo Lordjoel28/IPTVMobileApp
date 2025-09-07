@@ -1,12 +1,12 @@
 /**
- * 🎬 VideoPlayerModern - PHASE 1: Infrastructure ExoPlayer + Contrôles TiviMate
+ * 🎬 VideoPlayerModern - PHASE 2: Gestures Avancés + Animations
  * 
- * OBJECTIFS PHASE 1:
- * ✅ Upgrade ExoPlayer (react-native-video v6.x)
- * ✅ Contrôles de base (play/pause centré)
- * ✅ Auto-hide overlay après 3s
- * ✅ Transition mini-lecteur → fullscreen immédiate
- * ✅ Structure overlay TiviMate (header/footer)
+ * NOUVELLES FONCTIONNALITÉS PHASE 2:
+ * ✅ Double-tap seek avant/arrière (±10s)
+ * ✅ Zones gestuelles style YouTube (gauche/droite/centre)
+ * ✅ Feedback visuel animé pour seek
+ * ✅ Animations fluides avec react-native-reanimated
+ * ✅ Gesture.Race pour résoudre conflits single/double tap
  */
 
 import React, { useRef, useState, useEffect } from 'react';
@@ -42,7 +42,7 @@ interface VideoPlayerModernProps {
   onError?: (error: string) => void;
   onProgress?: (data: any) => void;
   onFullscreenToggle?: (isFullscreen: boolean) => void;
-  isFullscreen?: boolean; // Contrôle externe du mode fullscreen
+  isFullscreen?: boolean;
 }
 
 const VideoPlayerModern: React.FC<VideoPlayerModernProps> = ({
@@ -54,7 +54,14 @@ const VideoPlayerModern: React.FC<VideoPlayerModernProps> = ({
   onFullscreenToggle,
   isFullscreen = false,
 }) => {
-  const videoRef = useRef<Video>(null);
+  console.log('📍 [DEBUG] VideoPlayerModernWithGestures LOADED');
+  console.log('📍 [DEBUG] Props:', {
+    channelName: channel?.name,
+    isVisible,
+    isFullscreen,
+    showInfo
+  });
+  const videoRef = useRef<any>(null);
   
   // États de base du lecteur
   const [isLoading, setIsLoading] = useState(false);
@@ -76,13 +83,15 @@ const VideoPlayerModern: React.FC<VideoPlayerModernProps> = ({
   const { width, height } = Dimensions.get('window');
   const maxRetries = 3;
 
-  // 🎯 PHASE 1: Auto-hide contrôles après 3s (TiviMate style)
+  // 🎯 PHASE 2: Auto-hide contrôles avec animations + DEBUG
   useEffect(() => {
+    console.log('📍 [DEBUG] Auto-hide effect - showControls:', showControls, 'isFullscreen:', isFullscreen);
     if (showControls && isFullscreen) {
       const timer = setTimeout(() => {
-        console.log('🕐 Auto-hiding controls after 3s');
+        console.log('🕐 [DEBUG] Auto-hiding controls after 3s');
         setShowControls(false);
-      }, 3000); // 3s comme TiviMate
+        controlsOpacity.value = withTiming(0, { duration: 300 });
+      }, 3000);
       return () => clearTimeout(timer);
     }
   }, [showControls, isFullscreen]);
@@ -99,18 +108,7 @@ const VideoPlayerModern: React.FC<VideoPlayerModernProps> = ({
     }
   }, [channel]);
 
-  // 🎯 PHASE 1: Gestion fullscreen SIMPLE (thème Android fait le travail)
-  useEffect(() => {
-    if (isFullscreen) {
-      console.log('🎬 Entering fullscreen mode (Theme-based)');
-      // Le thème Android s'occupe de tout automatiquement
-    } else {
-      console.log('📱 Exiting fullscreen mode (Theme-based)');
-      // Le thème Android s'occupe de tout automatiquement
-    }
-  }, [isFullscreen]);
-
-  // 🎯 HANDLERS VIDÉO (PHASE 1: Base)
+  // 🎯 HANDLERS VIDÉO (PHASE 2: Améliorés)
   const handleError = (error: any) => {
     console.error('🚨 Video playback error:', error);
     setIsLoading(false);
@@ -158,51 +156,76 @@ const VideoPlayerModern: React.FC<VideoPlayerModernProps> = ({
 
   // 🎯 CONTRÔLES TACTILES AVANCÉS (PHASE 2: Gestures)
   const togglePlayPause = () => {
+    console.log('📍 [DEBUG] togglePlayPause CALLED');
     const newPausedState = !isPaused;
-    console.log(`${newPausedState ? '⏸️' : '▶️'} Toggle play/pause:`, newPausedState ? 'PAUSED' : 'PLAYING');
+    console.log(`📍 [DEBUG] ${newPausedState ? '⏸️' : '▶️'} Toggle play/pause:`, newPausedState ? 'PAUSED' : 'PLAYING');
     setIsPaused(newPausedState);
     setShowControls(true);
+    console.log('📍 [DEBUG] Setting showControls to true');
     // Animation fluide des contrôles
     controlsOpacity.value = withTiming(1, { duration: 300 });
+    console.log('📍 [DEBUG] Animation triggered');
   };
 
   const handleScreenTouch = () => {
-    console.log('👆 Single tap - toggling controls visibility');
+    console.log('📍 [DEBUG] 👆 handleScreenTouch CALLED');
+    console.log('📍 [DEBUG] Current showControls:', showControls);
     const newShowControls = !showControls;
+    console.log('📍 [DEBUG] Setting showControls to:', newShowControls);
     setShowControls(newShowControls);
     // Animation fluide pour montrer/cacher contrôles
     controlsOpacity.value = withTiming(newShowControls ? 1 : 0, { duration: 300 });
+    console.log('📍 [DEBUG] Controls animation triggered');
   };
 
-  // Nouveaux handlers pour double-tap seek
+  // Handlers pour double-tap seek avec LOGS DÉTAILLÉS
   const handleSeekForward = () => {
-    console.log('⏭️ Double tap right - seek forward 10s');
+    console.log('📍 [DEBUG] ⏭️ handleSeekForward CALLED');
+    console.log('📍 [DEBUG] videoRef.current:', videoRef.current);
+    console.log('📍 [DEBUG] duration:', duration);
+    console.log('📍 [DEBUG] currentTime:', currentTime);
+    
     if (videoRef.current && duration > 0) {
       const newTime = Math.min(currentTime + 10, duration);
+      console.log('📍 [DEBUG] Seeking to:', newTime);
       videoRef.current.seek(newTime);
       showSeekFeedback('forward', 10);
+      console.log('📍 [DEBUG] Seek command sent successfully');
+    } else {
+      console.log('⚠️ [DEBUG] Cannot seek - videoRef or duration issue');
     }
   };
 
   const handleSeekBackward = () => {
-    console.log('⏮️ Double tap left - seek backward 10s');
+    console.log('📍 [DEBUG] ⏮️ handleSeekBackward CALLED');
+    console.log('📍 [DEBUG] videoRef.current:', videoRef.current);
+    console.log('📍 [DEBUG] duration:', duration);
+    console.log('📍 [DEBUG] currentTime:', currentTime);
+    
     if (videoRef.current) {
       const newTime = Math.max(currentTime - 10, 0);
+      console.log('📍 [DEBUG] Seeking to:', newTime);
       videoRef.current.seek(newTime);
       showSeekFeedback('backward', 10);
+      console.log('📍 [DEBUG] Seek command sent successfully');
+    } else {
+      console.log('⚠️ [DEBUG] Cannot seek - videoRef issue');
     }
   };
 
-  // Feedback visuel pour seek
+  // Feedback visuel pour seek avec LOGS
   const showSeekFeedback = (direction: 'forward' | 'backward', seconds: number) => {
+    console.log('📍 [DEBUG] showSeekFeedback CALLED:', direction, seconds);
     setSeekFeedback({ visible: true, direction, seconds });
     
     // Animation d'apparition
     seekFeedbackOpacity.value = withTiming(1, { duration: 150 });
     seekFeedbackScale.value = withSpring(1, { damping: 15, stiffness: 200 });
+    console.log('📍 [DEBUG] Seek feedback animation started');
     
     // Auto-hide après 1 seconde
     setTimeout(() => {
+      console.log('📍 [DEBUG] Hiding seek feedback');
       seekFeedbackOpacity.value = withTiming(0, { duration: 300 });
       seekFeedbackScale.value = withTiming(0.8, { duration: 300 });
       setTimeout(() => {
@@ -211,58 +234,124 @@ const VideoPlayerModern: React.FC<VideoPlayerModernProps> = ({
     }, 1000);
   };
 
-  // Configuration des gestures modernes (best practices 2024)
+  // Configuration des gestures SIMPLIFIÉE avec TESTS DE BASE
   const leftDoubleTap = Gesture.Tap()
     .numberOfTaps(2)
+    .onBegin(() => {
+      console.log('🔴 [GESTURE] leftDoubleTap BEGAN');
+    })
     .onEnd(() => {
+      console.log('🔴 [GESTURE] leftDoubleTap END - SEEK BACKWARD');
       runOnJS(handleSeekBackward)();
     });
   
   const rightDoubleTap = Gesture.Tap()
     .numberOfTaps(2)
+    .onBegin(() => {
+      console.log('🟢 [GESTURE] rightDoubleTap BEGAN');
+    })
     .onEnd(() => {
+      console.log('🟢 [GESTURE] rightDoubleTap END - SEEK FORWARD');
       runOnJS(handleSeekForward)();
     });
   
   const singleTap = Gesture.Tap()
     .numberOfTaps(1)
+    .onBegin(() => {
+      console.log('🔵 [GESTURE] singleTap BEGAN');
+    })
     .onEnd(() => {
+      console.log('🔵 [GESTURE] singleTap END - TOGGLE CONTROLS');
       runOnJS(handleScreenTouch)();
     });
   
-  // Gesture pour côté gauche (seek backward)
-  const leftSideGesture = Gesture.Race(leftDoubleTap, singleTap);
+  // Gestures spécifiques pour chaque zone avec LOGS DÉTAILLÉS
+  const leftSingleTap = Gesture.Tap()
+    .numberOfTaps(1)
+    .onBegin(() => {
+      console.log('🔴 [GESTURE] LEFT singleTap BEGAN');
+    })
+    .onEnd(() => {
+      console.log('🔴 [GESTURE] LEFT singleTap END');
+      runOnJS(handleScreenTouch)();
+    })
+    .requireExternalGestureToFail(leftDoubleTap);
   
-  // Gesture pour côté droit (seek forward) 
-  const rightSideGesture = Gesture.Race(rightDoubleTap, singleTap);
+  const rightSingleTap = Gesture.Tap()
+    .numberOfTaps(1)
+    .onBegin(() => {
+      console.log('🟢 [GESTURE] RIGHT singleTap BEGAN');
+    })
+    .onEnd(() => {
+      console.log('🟢 [GESTURE] RIGHT singleTap END');
+      runOnJS(handleScreenTouch)();
+    })
+    .requireExternalGestureToFail(rightDoubleTap);
   
-  // Gesture pour zone centrale (contrôles)
-  const centerGesture = singleTap;
+  const centerSingleTap = Gesture.Tap()
+    .numberOfTaps(1)
+    .onBegin(() => {
+      console.log('🔵 [GESTURE] CENTER singleTap BEGAN');
+    })
+    .onEnd(() => {
+      console.log('🔵 [GESTURE] CENTER singleTap END');
+      runOnJS(handleScreenTouch)();
+    });
+
+  // Gestures finaux - APPROCHE SIMPLIFIÉE
+  const leftSideGesture = Gesture.Race(leftDoubleTap, leftSingleTap);
+  const rightSideGesture = Gesture.Race(rightDoubleTap, rightSingleTap);
+  const centerGesture = centerSingleTap;
+  
+  console.log('📍 [DEBUG] All gestures configured with basic API');
 
   const handleExitFullscreen = () => {
-    console.log('❌ Exiting fullscreen mode (Simple)');
-    
-    // 🎯 SIMPLE: Le thème Android gère tout
+    console.log('❌ Exiting fullscreen mode (Advanced)');
     onFullscreenToggle?.(false);
   };
 
-  // 🎯 UTILITAIRES (PHASE 1)
+  // 🎯 UTILITAIRES (PHASE 2)
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // Styles animés pour feedback
+  const seekFeedbackAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      opacity: seekFeedbackOpacity.value,
+      transform: [{ scale: seekFeedbackScale.value }],
+    };
+  });
+
+  const controlsAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      opacity: controlsOpacity.value,
+    };
+  });
+
+  // LOGS pour débogage du rendu
+  console.log('📍 [DEBUG] Render conditions:');
+  console.log('📍 [DEBUG] - channel:', channel?.name || 'null');
+  console.log('📍 [DEBUG] - isVisible:', isVisible);
+  console.log('📍 [DEBUG] - isFullscreen:', isFullscreen);
+  
   // Ne pas rendre si pas de chaîne ou pas visible
   if (!channel || !isVisible) {
+    console.log('⚠️ [DEBUG] Not rendering: missing channel or not visible');
     return null;
   }
 
-  // 🎬 RENDU FULLSCREEN SEULEMENT (PHASE 1)
-  // Le mini-lecteur est géré par VideoPlayer.tsx
+  // 🎬 RENDU FULLSCREEN AVEC GESTURES AVANCÉS
   if (!isFullscreen) {
+    console.log('⚠️ [DEBUG] Not rendering: not fullscreen');
     return null;
   }
+  
+  console.log('✅ [DEBUG] Rendering VideoPlayerModernWithGestures in fullscreen!');
+  console.log('📍 [DEBUG] showControls state:', showControls);
+  console.log('📍 [DEBUG] controlsOpacity value:', controlsOpacity.value);
 
   return (
     <Modal
@@ -279,20 +368,17 @@ const VideoPlayerModern: React.FC<VideoPlayerModernProps> = ({
         translucent={true}
         barStyle="light-content"
       />
-      <View style={styles.fullscreenContainer}>
-        <TouchableOpacity
-          style={styles.fullscreenVideoContainer}
-          onPress={handleScreenTouch}
-          activeOpacity={1}
-        >
+      <View style={[styles.fullscreenContainer, { pointerEvents: 'box-none' }]}>
+        <View style={[styles.fullscreenVideoContainer, { pointerEvents: 'box-none' }]}>
+          
           {/* 🎯 LECTEUR VIDÉO PRINCIPAL */}
           {!hasError ? (
             <Video
               ref={videoRef}
               source={{ uri: channel.url }}
-              style={styles.fullscreenVideo}
+              style={[styles.fullscreenVideo, { pointerEvents: 'none' }]}
               resizeMode="contain"
-              controls={false} // Désactivé pour contrôles personnalisés
+              controls={false}
               paused={isPaused}
               onLoad={handleLoad}
               onError={handleError}
@@ -308,7 +394,6 @@ const VideoPlayerModern: React.FC<VideoPlayerModernProps> = ({
               playWhenInactive={false}
               playInBackground={false}
               ignoreSilentSwitch="ignore"
-              // 🎯 PHASE 1: ExoPlayer activé par défaut dans v6.x
             />
           ) : (
             <View style={styles.errorContainer}>
@@ -329,14 +414,73 @@ const VideoPlayerModern: React.FC<VideoPlayerModernProps> = ({
             </View>
           )}
 
+          {/* 🎯 ZONES GESTUELLES - Style YouTube/TiviMate */}
+          {console.log('📍 [DEBUG] Rendering gesture zones...')}
+          {console.log('📍 [DEBUG] leftSideGesture:', leftSideGesture)}
+          {console.log('📍 [DEBUG] rightSideGesture:', rightSideGesture)}
+          {console.log('📍 [DEBUG] centerGesture:', centerGesture)}
+          
+          {/* Zone gauche avec TEST TOUCHABLE */}
+          <GestureDetector gesture={leftSideGesture}>
+            <View style={[styles.gestureZoneLeft, {backgroundColor: 'rgba(255,0,0,0.3)'}]}>
+              <Text style={{color: 'white', position: 'absolute', top: 10, left: 10, fontSize: 16, fontWeight: 'bold'}}>LEFT ZONE</Text>
+              <Text style={{color: 'white', position: 'absolute', bottom: 40, left: 10, fontSize: 12}}>Double-tap: -10s</Text>
+              {/* TEST TOUCHABLE SIMPLE */}
+              <TouchableOpacity 
+                style={{position: 'absolute', bottom: 10, left: 10, backgroundColor: 'red', padding: 5, borderRadius: 3}}
+                onPress={() => {
+                  console.log('🔴 [TOUCHABLE TEST] LEFT TouchableOpacity PRESSED!');
+                  handleSeekBackward();
+                }}
+              >
+                <Text style={{color: 'white', fontSize: 10}}>TEST -10s</Text>
+              </TouchableOpacity>
+            </View>
+          </GestureDetector>
+          
+          {/* Zone droite avec TEST TOUCHABLE */}
+          <GestureDetector gesture={rightSideGesture}>
+            <View style={[styles.gestureZoneRight, {backgroundColor: 'rgba(0,255,0,0.3)'}]}>
+              <Text style={{color: 'white', position: 'absolute', top: 10, right: 10, fontSize: 16, fontWeight: 'bold'}}>RIGHT ZONE</Text>
+              <Text style={{color: 'white', position: 'absolute', bottom: 40, right: 10, fontSize: 12}}>Double-tap: +10s</Text>
+              {/* TEST TOUCHABLE SIMPLE */}
+              <TouchableOpacity 
+                style={{position: 'absolute', bottom: 10, right: 10, backgroundColor: 'green', padding: 5, borderRadius: 3}}
+                onPress={() => {
+                  console.log('🟢 [TOUCHABLE TEST] RIGHT TouchableOpacity PRESSED!');
+                  handleSeekForward();
+                }}
+              >
+                <Text style={{color: 'white', fontSize: 10}}>TEST +10s</Text>
+              </TouchableOpacity>
+            </View>
+          </GestureDetector>
+          
+          {/* Zone centrale avec TEST TOUCHABLE */}
+          <GestureDetector gesture={centerGesture}>
+            <View style={[styles.gestureZoneCenter, {backgroundColor: 'rgba(0,0,255,0.3)'}]}>
+              <Text style={{color: 'white', position: 'absolute', top: 10, alignSelf: 'center', fontSize: 16, fontWeight: 'bold'}}>CENTER ZONE</Text>
+              <Text style={{color: 'white', position: 'absolute', bottom: 40, alignSelf: 'center', fontSize: 12}}>Tap: Toggle controls</Text>
+              {/* TEST TOUCHABLE SIMPLE */}
+              <TouchableOpacity 
+                style={{position: 'absolute', bottom: 10, alignSelf: 'center', backgroundColor: 'blue', padding: 5, borderRadius: 3}}
+                onPress={() => {
+                  console.log('🔵 [TOUCHABLE TEST] CENTER TouchableOpacity PRESSED!');
+                  handleScreenTouch();
+                }}
+              >
+                <Text style={{color: 'white', fontSize: 10}}>TEST TOGGLE</Text>
+              </TouchableOpacity>
+            </View>
+          </GestureDetector>
+
           {/* 🎯 FEEDBACK VISUEL SEEK - Style YouTube */}
           {seekFeedback.visible && (
             <Animated.View
               style={[
                 styles.seekFeedbackContainer,
+                seekFeedbackAnimatedStyle,
                 {
-                  opacity: seekFeedbackOpacity,
-                  transform: [{ scale: seekFeedbackScale }],
                   left: seekFeedback.direction === 'backward' ? '20%' : undefined,
                   right: seekFeedback.direction === 'forward' ? '20%' : undefined,
                 }
@@ -352,19 +496,22 @@ const VideoPlayerModern: React.FC<VideoPlayerModernProps> = ({
           )}
 
           {/* 🎯 OVERLAY CONTRÔLES TIVIMATE ANIMÉS */}
+          {console.log('📍 [DEBUG] Rendering controls overlay, showControls:', showControls)}
           <Animated.View
             style={[
               styles.controlsOverlay,
+              controlsAnimatedStyle,
               {
-                opacity: controlsOpacity,
                 pointerEvents: showControls ? 'auto' : 'none',
+                backgroundColor: 'rgba(255,255,0,0.1)',
               }
             ]}
           >
           {showControls && (
             <>
+              {console.log('📍 [DEBUG] Rendering controls content inside overlay')}
               {/* HEADER: Bouton retour moderne + Info chaîne */}
-              <View style={styles.tiviMateHeader}>
+              <View style={[styles.tiviMateHeader, {backgroundColor: 'rgba(255,0,255,0.3)'}]}>
                 <TouchableOpacity
                   style={styles.backButtonModern}
                   onPress={handleExitFullscreen}
@@ -385,21 +532,23 @@ const VideoPlayerModern: React.FC<VideoPlayerModernProps> = ({
               </View>
 
               {/* CENTER: Bouton Play/Pause TiviMate style */}
-              <View style={styles.centerControls}>
+              {console.log('📍 [DEBUG] Rendering play/pause button, isPaused:', isPaused)}
+              <View style={[styles.centerControls, {backgroundColor: 'rgba(0,255,255,0.2)'}]}>
                 <TouchableOpacity
-                  style={styles.playPauseButton}
-                  onPress={togglePlayPause}
+                  style={[styles.playPauseButton, {backgroundColor: 'rgba(255,255,255,0.8)'}]}
+                  onPress={() => {
+                    console.log('📍 [DEBUG] Play/Pause button PRESSED!');
+                    togglePlayPause();
+                  }}
                   activeOpacity={0.7}
                 >
                   <View style={styles.playPauseIcon}>
                     {isPaused ? (
-                      // Triangle play
-                      <View style={styles.playTriangle} />
+                      <View style={[styles.playTriangle, {borderLeftColor: '#000'}]} />
                     ) : (
-                      // Barres pause
                       <View style={styles.pauseContainer}>
-                        <View style={styles.pauseBar} />
-                        <View style={styles.pauseBar} />
+                        <View style={[styles.pauseBar, {backgroundColor: '#000'}]} />
+                        <View style={[styles.pauseBar, {backgroundColor: '#000'}]} />
                       </View>
                     )}
                   </View>
@@ -408,7 +557,6 @@ const VideoPlayerModern: React.FC<VideoPlayerModernProps> = ({
 
               {/* FOOTER: Timeline seulement */}
               <View style={styles.tiviMateFooter}>
-                {/* Progress bar affinée */}
                 <View style={styles.progressBarContainer}>
                   <View 
                     style={[
@@ -432,15 +580,19 @@ const styles = StyleSheet.create({
   // Container principal
   fullscreenContainer: {
     flex: 1,
-    backgroundColor: '#000000', // Noir complet pour masquer StatusBar
-    paddingTop: Platform.OS === 'android' ? 0 : 0, // Pas de padding, StatusBar hidden
+    backgroundColor: '#000000',
+    paddingTop: Platform.OS === 'android' ? 0 : 0,
   },
   fullscreenVideoContainer: {
     flex: 1,
     position: 'relative',
   },
+  fullscreenVideo: {
+    flex: 1,
+    backgroundColor: '#0D0F12',
+  },
   
-  // 🎯 ZONES GESTUELLES (Style YouTube/TiviMate)
+  // 🎯 ZONES GESTUELLES (Style YouTube/TiviMate) - AVEC DEBUG VISUEL
   gestureZoneLeft: {
     position: 'absolute',
     left: 0,
@@ -448,7 +600,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: '30%',
     zIndex: 10,
-    // backgroundColor: 'rgba(255,0,0,0.1)', // Debug - à supprimer
+    backgroundColor: 'rgba(255,0,0,0.15)', // DEBUG: Visible pour test
   },
   gestureZoneRight: {
     position: 'absolute',
@@ -457,7 +609,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: '30%',
     zIndex: 10,
-    // backgroundColor: 'rgba(0,255,0,0.1)', // Debug - à supprimer  
+    backgroundColor: 'rgba(0,255,0,0.15)', // DEBUG: Visible pour test
   },
   gestureZoneCenter: {
     position: 'absolute',
@@ -466,7 +618,7 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     zIndex: 5,
-    // backgroundColor: 'rgba(0,0,255,0.1)', // Debug - à supprimer
+    backgroundColor: 'rgba(0,0,255,0.15)', // DEBUG: Visible pour test
   },
   
   // 🎯 FEEDBACK VISUEL SEEK
@@ -502,10 +654,6 @@ const styles = StyleSheet.create({
   controlsOverlay: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 15,
-  },
-  fullscreenVideo: {
-    flex: 1,
-    backgroundColor: '#0D0F12',
   },
 
   // États d'erreur et chargement
@@ -554,7 +702,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
   },
 
-  // 🎯 HEADER TIVIMATE STYLE (Paysage uniquement)
+  // 🎯 HEADER TIVIMATE STYLE
   tiviMateHeader: {
     position: 'absolute',
     top: 0,
@@ -564,10 +712,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 10, // Minimal padding pour paysage
+    paddingTop: 10,
     backgroundColor: 'rgba(0,0,0,0.75)',
   },
-  // Bouton retour moderne
   backButtonModern: {
     width: 48,
     height: 48,
@@ -583,7 +730,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
   },
-  // Conteneur icône retour
   backIconContainer: {
     width: 20,
     height: 16,
@@ -591,7 +737,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     position: 'relative',
   },
-  // Flèche moderne
   backArrowModern: {
     width: 0,
     height: 0,
@@ -605,7 +750,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
   },
-  // Ligne moderne
   backLineModern: {
     width: 12,
     height: 2,
@@ -624,17 +768,9 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   headerChannelCategory: {
-    color: '#1976d2', // Accent TiviMate
+    color: '#1976d2',
     fontSize: 14,
     marginTop: 2,
-  },
-  headerTime: {
-    alignItems: 'flex-end',
-  },
-  timeText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
   },
 
   // 🎯 CONTRÔLES CENTRÉS TiviMate style
@@ -648,7 +784,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   playPauseButton: {
-    backgroundColor: 'rgba(0, 0, 0, 0.6)', // Style YouTube translucide
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     borderRadius: 35,
     width: 70,
     height: 70,
@@ -664,7 +800,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  // Triangle play (comme TiviMate)
   playTriangle: {
     width: 0,
     height: 0,
@@ -676,9 +811,8 @@ const styles = StyleSheet.create({
     borderTopColor: 'transparent',
     borderBottomColor: 'transparent',
     borderLeftColor: '#FFFFFF',
-    marginLeft: 4, // Centrage visuel
+    marginLeft: 4,
   },
-  // Barres pause (comme TiviMate)
   pauseContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -692,7 +826,7 @@ const styles = StyleSheet.create({
     borderRadius: 1,
   },
 
-  // 🎯 FOOTER SIMPLE (Progress bar seulement)
+  // 🎯 FOOTER SIMPLE
   tiviMateFooter: {
     position: 'absolute',
     bottom: 0,
@@ -704,10 +838,8 @@ const styles = StyleSheet.create({
     paddingBottom: 5,
     justifyContent: 'flex-end',
   },
-  
-  // Progress bar optimisée
   progressBarContainer: {
-    height: 3, // Légèrement plus épaisse
+    height: 3,
     backgroundColor: 'rgba(255,255,255,0.2)',
     borderRadius: 1.5,
     overflow: 'hidden',
@@ -715,7 +847,7 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     height: '100%',
-    backgroundColor: '#1976d2', // Bleu conservé
+    backgroundColor: '#1976d2',
     borderRadius: 1.5,
   },
 });

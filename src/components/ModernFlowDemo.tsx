@@ -3,7 +3,7 @@
  * Composant exemple qui illustre parfaitement l'architecture moderne v3.0.0
  */
 
-import React, { useEffect, useState } from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,7 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
-import { useModernPlaylistFlow } from '../hooks/useModernPlaylistFlow';
+import {useModernPlaylistFlow} from '../hooks/useModernPlaylistFlow';
 
 const ModernFlowDemo: React.FC = () => {
   const {
@@ -20,16 +20,16 @@ const ModernFlowDemo: React.FC = () => {
     importPlaylistModern,
     selectCategoryModern,
     resetAllModern,
-    
+
     // 📊 Reactive Data from Zustand Stores
     channels,
     categories,
     selectedCategory,
     selectedPlaylistId,
-    
+
     // 📈 Flow Analytics
     getFlowStats,
-    
+
     // 🎯 Status
     hasData,
     isReady,
@@ -59,55 +59,72 @@ const ModernFlowDemo: React.FC = () => {
       'Reset Modern Flow',
       'Voulez-vous tester le reset complet du flux moderne ?',
       [
-        { text: 'Annuler', style: 'cancel' },
-        { 
-          text: 'Reset', 
+        {text: 'Annuler', style: 'cancel'},
+        {
+          text: 'Reset',
           style: 'destructive',
           onPress: () => {
             console.log('🚀 DEMO - Testing modern reset');
             resetAllModern();
-          }
+          },
         },
-      ]
+      ],
     );
   };
 
   const renderFlowStats = () => {
-    if (!flowStats) return null;
+    if (!flowStats) {
+      return null;
+    }
 
     return (
       <View style={styles.statsContainer}>
         <Text style={styles.statsTitle}>📊 Architecture Moderne v3.0.0</Text>
-        <Text style={styles.statsText}>Architecture: {flowStats.architecture}</Text>
-        <Text style={styles.statsText}>Stores: {flowStats.stores.join(', ')}</Text>
-        <Text style={styles.statsText}>Services: {flowStats.services.join(', ')}</Text>
-        <Text style={styles.statsText}>Channels: {flowStats.totalChannels}</Text>
-        <Text style={styles.statsText}>Categories: {flowStats.totalCategories}</Text>
-        <Text style={styles.statsText}>Selected: {flowStats.currentCategory || 'Aucune'}</Text>
+        <Text style={styles.statsText}>
+          Architecture: {flowStats.architecture}
+        </Text>
+        <Text style={styles.statsText}>
+          Stores: {flowStats.stores.join(', ')}
+        </Text>
+        <Text style={styles.statsText}>
+          Services: {flowStats.services.join(', ')}
+        </Text>
+        <Text style={styles.statsText}>
+          Channels: {flowStats.totalChannels}
+        </Text>
+        <Text style={styles.statsText}>
+          Categories: {flowStats.totalCategories}
+        </Text>
+        <Text style={styles.statsText}>
+          Selected: {flowStats.currentCategory || 'Aucune'}
+        </Text>
       </View>
     );
   };
 
   const renderCategories = () => {
-    if (!categories.length) return null;
+    if (!categories.length) {
+      return null;
+    }
 
     return (
       <View style={styles.categoriesContainer}>
         <Text style={styles.sectionTitle}>🗂️ Catégories (Store → UI)</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {categories.map((category) => (
+          {categories.map(category => (
             <TouchableOpacity
               key={category.name}
               style={[
                 styles.categoryButton,
-                selectedCategory === category.name && styles.selectedCategory
+                selectedCategory === category.name && styles.selectedCategory,
               ]}
-              onPress={() => handleCategoryTest(category.name)}
-            >
-              <Text style={[
-                styles.categoryText,
-                selectedCategory === category.name && styles.selectedCategoryText
-              ]}>
+              onPress={() => handleCategoryTest(category.name)}>
+              <Text
+                style={[
+                  styles.categoryText,
+                  selectedCategory === category.name &&
+                    styles.selectedCategoryText,
+                ]}>
                 {category.name} ({category.count})
               </Text>
             </TouchableOpacity>
@@ -129,11 +146,8 @@ const ModernFlowDemo: React.FC = () => {
       {/* Test Controls */}
       <View style={styles.controlsContainer}>
         <Text style={styles.sectionTitle}>🎮 Tests du Flux Moderne</Text>
-        
-        <TouchableOpacity
-          style={styles.button}
-          onPress={handleImportTest}
-        >
+
+        <TouchableOpacity style={styles.button} onPress={handleImportTest}>
           <Text style={styles.buttonText}>
             📥 Test Import Playlist (UI→Service→Store→UI)
           </Text>
@@ -141,8 +155,7 @@ const ModernFlowDemo: React.FC = () => {
 
         <TouchableOpacity
           style={[styles.button, styles.resetButton]}
-          onPress={handleResetTest}
-        >
+          onPress={handleResetTest}>
           <Text style={styles.buttonText}>
             🧹 Test Reset Complet (Modern Flow)
           </Text>
@@ -155,15 +168,9 @@ const ModernFlowDemo: React.FC = () => {
       {/* Data Status */}
       <View style={styles.statusContainer}>
         <Text style={styles.sectionTitle}>📈 État Réactif</Text>
-        <Text style={styles.statusText}>
-          Has Data: {hasData ? '✅' : '❌'}
-        </Text>
-        <Text style={styles.statusText}>
-          Is Ready: {isReady ? '✅' : '❌'}
-        </Text>
-        <Text style={styles.statusText}>
-          Channels Count: {channels.length}
-        </Text>
+        <Text style={styles.statusText}>Has Data: {hasData ? '✅' : '❌'}</Text>
+        <Text style={styles.statusText}>Is Ready: {isReady ? '✅' : '❌'}</Text>
+        <Text style={styles.statusText}>Channels Count: {channels.length}</Text>
         <Text style={styles.statusText}>
           Categories Count: {categories.length}
         </Text>
@@ -183,7 +190,9 @@ const ModernFlowDemo: React.FC = () => {
           {channels.slice(0, 5).map((channel, index) => (
             <View key={channel.id || index} style={styles.channelItem}>
               <Text style={styles.channelName}>{channel.name}</Text>
-              <Text style={styles.channelGroup}>{channel.group || channel.category || 'N/A'}</Text>
+              <Text style={styles.channelGroup}>
+                {channel.group || channel.category || 'N/A'}
+              </Text>
             </View>
           ))}
           {channels.length > 5 && (

@@ -3,9 +3,9 @@
  * Gestion des playlists M3U/M3U8 avec cache intelligent multi-niveaux
  */
 
-import { cacheService } from './CacheService';
-import { parsersService } from './ParsersService';
-import type { Playlist, Channel } from '../types';
+import {cacheService} from './CacheService';
+import {parsersService} from './ParsersService';
+import type {Playlist, Channel} from '../types';
 
 export interface PlaylistSource {
   id: string;
@@ -57,21 +57,25 @@ export class PlaylistService {
   /**
    * Ajouter une playlist avec cache automatique - Migration directe web
    */
-  async addPlaylist(name: string, content: string, source: string = 'manual'): Promise<string> {
+  async addPlaylist(
+    name: string,
+    content: string,
+    source: string = 'manual',
+  ): Promise<string> {
     const startTime = Date.now();
-    
+
     try {
       console.log(`📋 Ajout playlist: ${name}`);
-      
+
       // Parser M3U avec sélection automatique du parser optimal
       const parseResult = await parsersService.parseM3U(content, {
         useUltraOptimized: true,
         chunkSize: 25000,
-        yieldControl: true
+        yieldControl: true,
       });
 
       const playlistId = `playlist_${Date.now()}`;
-      
+
       const playlist: Playlist = {
         id: playlistId,
         name,
@@ -82,7 +86,7 @@ export class PlaylistService {
         lastUpdated: new Date().toISOString(),
         totalChannels: parseResult.channels.length,
         categories: this.extractCategories(parseResult.channels),
-        type: 'M3U'
+        type: 'M3U',
       };
 
       // Stockage en mémoire
@@ -92,9 +96,13 @@ export class PlaylistService {
       await this.cachePlaylist(playlistId, playlist);
 
       const loadTime = Date.now() - startTime;
-      console.log(`✅ Playlist ajoutée: ${playlist.totalChannels} chaînes en ${loadTime}ms`);
-      console.log(`📊 Performance: ${parseResult.stats.channelsPerSecond} ch/s, efficacité pool: ${parseResult.stats.poolEfficiency}%`);
-      
+      console.log(
+        `✅ Playlist ajoutée: ${playlist.totalChannels} chaînes en ${loadTime}ms`,
+      );
+      console.log(
+        `📊 Performance: ${parseResult.stats.channelsPerSecond} ch/s, efficacité pool: ${parseResult.stats.poolEfficiency}%`,
+      );
+
       return playlistId;
     } catch (error) {
       console.error('❌ Erreur ajout playlist:', error);
@@ -109,7 +117,7 @@ export class PlaylistService {
    * Obtenir la playlist courante
    */
   getCurrentPlaylist(): Playlist | null {
-    if (!this.currentPlaylistId) return null;
+    if (!this.currentPlaylistId) {return null;}
     return this.playlists.get(this.currentPlaylistId) || null;
   }
 
@@ -125,10 +133,10 @@ export class PlaylistService {
    */
   async deletePlaylist(playlistId: string): Promise<boolean> {
     console.log(`🗑️ Suppression playlist: ${playlistId}`);
-    
+
     const deleted = this.playlists.delete(playlistId);
     await cacheService.remove(`playlist_${playlistId}`, 'all');
-    
+
     if (this.currentPlaylistId === playlistId) {
       this.currentPlaylistId = null;
     }
@@ -144,7 +152,7 @@ export class PlaylistService {
     return await parsersService.parseM3U(content, {
       useUltraOptimized: true,
       chunkSize: 2000,
-      yieldControl: true
+      yieldControl: true,
     });
   }
 
@@ -152,26 +160,33 @@ export class PlaylistService {
    * 🚀 NOUVELLE MÉTHODE : Parser M3U avec streaming pour 100K+ chaînes
    * Utilise le parser streaming TiviMate-level avec progress callbacks
    */
-  async parseM3UWithStreaming(url: string, name: string, callbacks?: {
-    onProgress?: (progress: any) => void;
-    onStatusChange?: (status: string, details?: string) => void;
-  }) {
+  async parseM3UWithStreaming(
+    url: string,
+    name: string,
+    callbacks?: {
+      onProgress?: (progress: any) => void;
+      onStatusChange?: (status: string, details?: string) => void;
+    },
+  ) {
     console.log(`🚀🚀 PlaylistService.parseM3UWithStreaming: ${name}`);
 
     try {
       // 1. Télécharger le contenu M3U
       callbacks?.onStatusChange?.('Téléchargement...', `Récupération ${name}`);
-      
+
       const response = await fetch(url);
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
-      
+
       const content = await response.text();
       const contentSizeMB = Math.round(content.length / 1024 / 1024);
-      
+
       console.log(`📥 Downloaded ${contentSizeMB}MB M3U content`);
-      callbacks?.onStatusChange?.('Analyse...', `${contentSizeMB}MB téléchargés`);
+      callbacks?.onStatusChange?.(
+        'Analyse...',
+        `${contentSizeMB}MB téléchargés`,
+      );
 
       // 2. Estimer nombre de chaînes pour sélection parser
       const estimatedChannels = (content.match(/#EXTINF:/g) || []).length;
@@ -179,9 +194,12 @@ export class PlaylistService {
 
       // 🎯 STRATÉGIE ULTRA-AGGRESSIVE : Streaming dès 1K chaînes pour fluidité maximale
       const useStreaming = estimatedChannels >= 1000; // ⬇️ Seuil ultra-bas pour vos playlists moyennes
-      
+
       if (useStreaming) {
-        callbacks?.onStatusChange?.('Parser streaming...', `${estimatedChannels} chaînes détectées`);
+        callbacks?.onStatusChange?.(
+          'Parser streaming...',
+          `${estimatedChannels} chaînes détectées`,
+        );
         console.log('🚀🚀 Using STREAMING parser for large playlist');
       }
 
@@ -197,13 +215,14 @@ export class PlaylistService {
         streamingOptions: {
           maxMemoryMB: 200,
           yieldInterval: 8000,
-          enableSQLiteStream: false // Pour l'instant
+          enableSQLiteStream: false, // Pour l'instant
         }
       });
 
-      console.log(`🎉 parseM3UWithStreaming completed: ${parseResult.channels.length} channels`);
+      console.log(
+        `🎉 parseM3UWithStreaming completed: ${parseResult.channels.length} channels`,
+      );
       return parseResult;
-
     } catch (error) {
       console.error('❌ parseM3UWithStreaming error:', error);
       throw error;
@@ -213,19 +232,25 @@ export class PlaylistService {
   /**
    * Cache intelligent selon taille - Migration logique web
    */
-  private async cachePlaylist(playlistId: string, playlist: Playlist): Promise<void> {
+  private async cachePlaylist(
+    playlistId: string,
+    playlist: Playlist,
+  ): Promise<void> {
     const dataSize = this.estimatePlaylistSize(playlist);
     const cacheKey = `playlist_${playlistId}`;
-    
+
     console.log(`💾 Cache playlist ${playlist.name}: ${dataSize}KB`);
 
     // Stratégie cache selon taille (logique identique au web)
-    if (dataSize > 2048) { // >2MB → L3 uniquement
+    if (dataSize > 2048) {
+      // >2MB → L3 uniquement
       await cacheService.set(cacheKey, playlist, 'L3');
-    } else if (dataSize > 512) { // >512KB → L2+L3
+    } else if (dataSize > 512) {
+      // >512KB → L2+L3
       await cacheService.set(cacheKey, playlist, 'L2');
       await cacheService.set(cacheKey, playlist, 'L3');
-    } else { // <512KB → Tous niveaux
+    } else {
+      // <512KB → Tous niveaux
       await cacheService.set(cacheKey, playlist, 'all');
     }
   }
@@ -233,16 +258,18 @@ export class PlaylistService {
   /**
    * Charger playlist depuis cache multi-niveaux
    */
-  private async loadPlaylistFromCache(playlistId: string): Promise<Playlist | null> {
+  private async loadPlaylistFromCache(
+    playlistId: string,
+  ): Promise<Playlist | null> {
     const cacheKey = `playlist_${playlistId}`;
-    
+
     // Essayer cascade L1 → L2 → L3 (stratégie identique au web)
     const playlist = await cacheService.get<Playlist>(cacheKey, 'all');
     if (playlist) {
-      console.log(`📦 Playlist chargée depuis cache`);
+      console.log('📦 Playlist chargée depuis cache');
       return playlist;
     }
-    
+
     return null;
   }
 
@@ -260,8 +287,8 @@ export class PlaylistService {
   private extractCategories(channels: Channel[]): string[] {
     const categories = new Set<string>();
     channels.forEach(channel => {
-      if (channel.group) categories.add(channel.group);
-      if (channel.category) categories.add(channel.category);
+      if (channel.group) {categories.add(channel.group);}
+      if (channel.category) {categories.add(channel.category);}
     });
     return Array.from(categories).sort();
   }
@@ -271,19 +298,21 @@ export class PlaylistService {
    */
   searchChannels(channels: Channel[], query: string): Channel[] {
     const lowerQuery = query.toLowerCase();
-    return channels.filter(channel =>
-      channel.name.toLowerCase().includes(lowerQuery) ||
-      (channel.category && channel.category.toLowerCase().includes(lowerQuery)) ||
-      (channel.group && channel.group.toLowerCase().includes(lowerQuery))
+    return channels.filter(
+      channel =>
+        channel.name.toLowerCase().includes(lowerQuery) ||
+        (channel.category &&
+          channel.category.toLowerCase().includes(lowerQuery)) ||
+        (channel.group && channel.group.toLowerCase().includes(lowerQuery)),
     );
   }
 
   /**
    * Grouper chaînes par catégorie
    */
-  getChannelsByCategory(channels: Channel[]): { [key: string]: Channel[] } {
-    const grouped: { [key: string]: Channel[] } = {};
-    
+  getChannelsByCategory(channels: Channel[]): {[key: string]: Channel[]} {
+    const grouped: {[key: string]: Channel[]} = {};
+
     channels.forEach(channel => {
       const category = channel.category || 'Autres';
       if (!grouped[category]) {
@@ -300,16 +329,18 @@ export class PlaylistService {
    */
   getStats() {
     const totalPlaylists = this.playlists.size;
-    const totalChannels = Array.from(this.playlists.values())
-      .reduce((sum, playlist) => sum + (playlist.totalChannels || 0), 0);
-    
+    const totalChannels = Array.from(this.playlists.values()).reduce(
+      (sum, playlist) => sum + (playlist.totalChannels || 0),
+      0,
+    );
+
     return {
       totalPlaylists,
       totalChannels,
       currentPlaylistId: this.currentPlaylistId,
       memoryUsage: this.playlists.size * 0.5, // Estimation MB
       cacheStats: cacheService.getStats(),
-      parserStats: parsersService.getStats()
+      parserStats: parsersService.getStats(),
     };
   }
 

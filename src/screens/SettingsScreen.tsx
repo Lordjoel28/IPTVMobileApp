@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,7 @@ import {
   useColorScheme,
 } from 'react-native';
 // AppManager removed - will be replaced by DI services
-import { Settings } from '../types';
+import {Settings} from '../types';
 
 const SettingsScreen: React.FC = () => {
   // AppManager removed - will use DI services + Zustand stores
@@ -25,7 +25,9 @@ const SettingsScreen: React.FC = () => {
 
   const loadSettings = async () => {
     try {
-      const currentSettings = await appManager.getStorageService().getSettings();
+      const currentSettings = await appManager
+        .getStorageService()
+        .getSettings();
       setSettings(currentSettings);
     } catch (error) {
       console.error('❌ Erreur chargement paramètres:', error);
@@ -45,13 +47,13 @@ const SettingsScreen: React.FC = () => {
     try {
       await appManager.getStorageService().saveSettings(newSettings);
       setSettings(newSettings);
-      
+
       // Update player config if needed
       await appManager.getPlayerManager().updateConfig({
         autoplay: newSettings.autoplay,
         quality: newSettings.quality,
       });
-      
+
       console.log('⚙️ Paramètres sauvegardés');
     } catch (error) {
       console.error('❌ Erreur sauvegarde paramètres:', error);
@@ -61,25 +63,27 @@ const SettingsScreen: React.FC = () => {
 
   const handleToggleAutoplay = async (value: boolean) => {
     if (settings) {
-      await saveSettings({ ...settings, autoplay: value });
+      await saveSettings({...settings, autoplay: value});
     }
   };
 
   const handleToggleRememberPosition = async (value: boolean) => {
     if (settings) {
-      await saveSettings({ ...settings, rememberPosition: value });
+      await saveSettings({...settings, rememberPosition: value});
     }
   };
 
-  const handleQualityChange = async (quality: 'auto' | '1080p' | '720p' | '480p') => {
+  const handleQualityChange = async (
+    quality: 'auto' | '1080p' | '720p' | '480p',
+  ) => {
     if (settings) {
-      await saveSettings({ ...settings, quality });
+      await saveSettings({...settings, quality});
     }
   };
 
   const handleVolumeChange = async (volume: number) => {
     if (settings) {
-      await saveSettings({ ...settings, volume });
+      await saveSettings({...settings, volume});
       appManager.getPlayerManager().setVolume(volume);
     }
   };
@@ -89,7 +93,7 @@ const SettingsScreen: React.FC = () => {
       '⚠️ Attention',
       'Cette action supprimera toutes vos données (playlists, favoris, paramètres). Cette action est irréversible.',
       [
-        { text: 'Annuler', style: 'cancel' },
+        {text: 'Annuler', style: 'cancel'},
         {
           text: 'Confirmer',
           style: 'destructive',
@@ -104,27 +108,30 @@ const SettingsScreen: React.FC = () => {
             }
           },
         },
-      ]
+      ],
     );
   };
 
   const handleExportDebugData = () => {
     try {
       const debugData = appManager.exportDebugData();
-      Alert.alert(
-        '📊 Données de Debug',
-        JSON.stringify(debugData, null, 2),
-        [{ text: 'OK' }]
-      );
+      Alert.alert('📊 Données de Debug', JSON.stringify(debugData, null, 2), [
+        {text: 'OK'},
+      ]);
     } catch (error) {
-      Alert.alert('Erreur', 'Impossible d\'exporter les données de debug');
+      Alert.alert('Erreur', "Impossible d'exporter les données de debug");
     }
   };
 
   if (!settings) {
     return (
-      <View style={[styles.loadingContainer, isDarkMode && styles.loadingContainerDark]}>
-        <Text style={[styles.loadingText, isDarkMode && styles.loadingTextDark]}>
+      <View
+        style={[
+          styles.loadingContainer,
+          isDarkMode && styles.loadingContainerDark,
+        ]}>
+        <Text
+          style={[styles.loadingText, isDarkMode && styles.loadingTextDark]}>
           🔄 Chargement des paramètres...
         </Text>
       </View>
@@ -135,71 +142,95 @@ const SettingsScreen: React.FC = () => {
     <ScrollView style={[styles.container, isDarkMode && styles.containerDark]}>
       {/* Lecteur Section */}
       <View style={[styles.section, isDarkMode && styles.sectionDark]}>
-        <Text style={[styles.sectionTitle, isDarkMode && styles.sectionTitleDark]}>
+        <Text
+          style={[styles.sectionTitle, isDarkMode && styles.sectionTitleDark]}>
           🎬 Lecteur Vidéo
         </Text>
-        
+
         <View style={styles.settingRow}>
           <View style={styles.settingInfo}>
-            <Text style={[styles.settingLabel, isDarkMode && styles.settingLabelDark]}>
+            <Text
+              style={[
+                styles.settingLabel,
+                isDarkMode && styles.settingLabelDark,
+              ]}>
               Lecture automatique
             </Text>
-            <Text style={[styles.settingDescription, isDarkMode && styles.settingDescriptionDark]}>
+            <Text
+              style={[
+                styles.settingDescription,
+                isDarkMode && styles.settingDescriptionDark,
+              ]}>
               Démarrer automatiquement la lecture des chaînes
             </Text>
           </View>
           <Switch
             value={settings.autoplay}
             onValueChange={handleToggleAutoplay}
-            trackColor={{ false: '#767577', true: '#007AFF' }}
+            trackColor={{false: '#767577', true: '#007AFF'}}
             thumbColor={settings.autoplay ? '#ffffff' : '#f4f3f4'}
           />
         </View>
 
         <View style={styles.settingRow}>
           <View style={styles.settingInfo}>
-            <Text style={[styles.settingLabel, isDarkMode && styles.settingLabelDark]}>
+            <Text
+              style={[
+                styles.settingLabel,
+                isDarkMode && styles.settingLabelDark,
+              ]}>
               Mémoriser la position
             </Text>
-            <Text style={[styles.settingDescription, isDarkMode && styles.settingDescriptionDark]}>
+            <Text
+              style={[
+                styles.settingDescription,
+                isDarkMode && styles.settingDescriptionDark,
+              ]}>
               Reprendre la lecture où vous vous êtes arrêté
             </Text>
           </View>
           <Switch
             value={settings.rememberPosition}
             onValueChange={handleToggleRememberPosition}
-            trackColor={{ false: '#767577', true: '#007AFF' }}
+            trackColor={{false: '#767577', true: '#007AFF'}}
             thumbColor={settings.rememberPosition ? '#ffffff' : '#f4f3f4'}
           />
         </View>
 
         <View style={styles.settingRow}>
           <View style={styles.settingInfo}>
-            <Text style={[styles.settingLabel, isDarkMode && styles.settingLabelDark]}>
+            <Text
+              style={[
+                styles.settingLabel,
+                isDarkMode && styles.settingLabelDark,
+              ]}>
               Qualité par défaut
             </Text>
-            <Text style={[styles.settingDescription, isDarkMode && styles.settingDescriptionDark]}>
+            <Text
+              style={[
+                styles.settingDescription,
+                isDarkMode && styles.settingDescriptionDark,
+              ]}>
               Actuellement: {settings.quality}
             </Text>
           </View>
         </View>
 
         <View style={styles.qualityButtons}>
-          {['auto', '1080p', '720p', '480p'].map((quality) => (
+          {['auto', '1080p', '720p', '480p'].map(quality => (
             <TouchableOpacity
               key={quality}
               style={[
                 styles.qualityButton,
                 settings.quality === quality && styles.qualityButtonActive,
               ]}
-              onPress={() => handleQualityChange(quality as any)}
-            >
+              onPress={() => handleQualityChange(quality as any)}>
               <Text
                 style={[
                   styles.qualityButtonText,
-                  settings.quality === quality && styles.qualityButtonTextActive,
-                ]}
-              >
+                  settings.quality === quality &&
+                    styles.qualityButtonTextActive,
+                ]}>
                 {quality}
               </Text>
             </TouchableOpacity>
@@ -208,28 +239,30 @@ const SettingsScreen: React.FC = () => {
 
         <View style={styles.settingRow}>
           <View style={styles.settingInfo}>
-            <Text style={[styles.settingLabel, isDarkMode && styles.settingLabelDark]}>
+            <Text
+              style={[
+                styles.settingLabel,
+                isDarkMode && styles.settingLabelDark,
+              ]}>
               Volume par défaut: {settings.volume}%
             </Text>
           </View>
         </View>
 
         <View style={styles.volumeButtons}>
-          {[25, 50, 75, 100].map((volume) => (
+          {[25, 50, 75, 100].map(volume => (
             <TouchableOpacity
               key={volume}
               style={[
                 styles.volumeButton,
                 settings.volume === volume && styles.volumeButtonActive,
               ]}
-              onPress={() => handleVolumeChange(volume)}
-            >
+              onPress={() => handleVolumeChange(volume)}>
               <Text
                 style={[
                   styles.volumeButtonText,
                   settings.volume === volume && styles.volumeButtonTextActive,
-                ]}
-              >
+                ]}>
                 {volume}%
               </Text>
             </TouchableOpacity>
@@ -240,56 +273,80 @@ const SettingsScreen: React.FC = () => {
       {/* Statistics Section */}
       {stats && (
         <View style={[styles.section, isDarkMode && styles.sectionDark]}>
-          <Text style={[styles.sectionTitle, isDarkMode && styles.sectionTitleDark]}>
+          <Text
+            style={[
+              styles.sectionTitle,
+              isDarkMode && styles.sectionTitleDark,
+            ]}>
             📊 Statistiques
           </Text>
-          
+
           <View style={styles.statsGrid}>
             <View style={styles.statItem}>
-              <Text style={[styles.statValue, isDarkMode && styles.statValueDark]}>
+              <Text
+                style={[styles.statValue, isDarkMode && styles.statValueDark]}>
                 {stats.playlist.totalPlaylists}
               </Text>
-              <Text style={[styles.statLabel, isDarkMode && styles.statLabelDark]}>
+              <Text
+                style={[styles.statLabel, isDarkMode && styles.statLabelDark]}>
                 Playlists
               </Text>
             </View>
-            
+
             <View style={styles.statItem}>
-              <Text style={[styles.statValue, isDarkMode && styles.statValueDark]}>
+              <Text
+                style={[styles.statValue, isDarkMode && styles.statValueDark]}>
                 {stats.playlist.totalChannels}
               </Text>
-              <Text style={[styles.statLabel, isDarkMode && styles.statLabelDark]}>
+              <Text
+                style={[styles.statLabel, isDarkMode && styles.statLabelDark]}>
                 Chaînes
               </Text>
             </View>
-            
+
             <View style={styles.statItem}>
-              <Text style={[styles.statValue, isDarkMode && styles.statValueDark]}>
+              <Text
+                style={[styles.statValue, isDarkMode && styles.statValueDark]}>
                 {stats.app.favoritesCount}
               </Text>
-              <Text style={[styles.statLabel, isDarkMode && styles.statLabelDark]}>
+              <Text
+                style={[styles.statLabel, isDarkMode && styles.statLabelDark]}>
                 Favoris
               </Text>
             </View>
-            
+
             <View style={styles.statItem}>
-              <Text style={[styles.statValue, isDarkMode && styles.statValueDark]}>
+              <Text
+                style={[styles.statValue, isDarkMode && styles.statValueDark]}>
                 {stats.playlist.totalCategories}
               </Text>
-              <Text style={[styles.statLabel, isDarkMode && styles.statLabelDark]}>
+              <Text
+                style={[styles.statLabel, isDarkMode && styles.statLabelDark]}>
                 Catégories
               </Text>
             </View>
           </View>
 
           <View style={styles.statusInfo}>
-            <Text style={[styles.statusLabel, isDarkMode && styles.statusLabelDark]}>
+            <Text
+              style={[
+                styles.statusLabel,
+                isDarkMode && styles.statusLabelDark,
+              ]}>
               Utilisateur actuel: {stats.app.currentUser}
             </Text>
-            <Text style={[styles.statusLabel, isDarkMode && styles.statusLabelDark]}>
+            <Text
+              style={[
+                styles.statusLabel,
+                isDarkMode && styles.statusLabelDark,
+              ]}>
               Chaîne actuelle: {stats.app.currentChannel}
             </Text>
-            <Text style={[styles.statusLabel, isDarkMode && styles.statusLabelDark]}>
+            <Text
+              style={[
+                styles.statusLabel,
+                isDarkMode && styles.statusLabelDark,
+              ]}>
               Playlist actuelle: {stats.app.currentPlaylist}
             </Text>
           </View>
@@ -298,41 +355,42 @@ const SettingsScreen: React.FC = () => {
 
       {/* Debug Section */}
       <View style={[styles.section, isDarkMode && styles.sectionDark]}>
-        <Text style={[styles.sectionTitle, isDarkMode && styles.sectionTitleDark]}>
+        <Text
+          style={[styles.sectionTitle, isDarkMode && styles.sectionTitleDark]}>
           🔧 Debug & Maintenance
         </Text>
-        
+
         <TouchableOpacity
           style={[styles.debugButton, styles.debugButtonInfo]}
-          onPress={handleExportDebugData}
-        >
+          onPress={handleExportDebugData}>
           <Text style={styles.debugButtonText}>📊 Voir données de debug</Text>
         </TouchableOpacity>
-        
+
         <TouchableOpacity
           style={[styles.debugButton, styles.debugButtonWarning]}
           onPress={() => {
             loadStats();
             Alert.alert('✅ Succès', 'Statistiques mises à jour');
-          }}
-        >
+          }}>
           <Text style={styles.debugButtonText}>🔄 Actualiser statistiques</Text>
         </TouchableOpacity>
-        
+
         <TouchableOpacity
           style={[styles.debugButton, styles.debugButtonDanger]}
-          onPress={handleClearAllData}
-        >
-          <Text style={styles.debugButtonText}>🗑️ Supprimer toutes les données</Text>
+          onPress={handleClearAllData}>
+          <Text style={styles.debugButtonText}>
+            🗑️ Supprimer toutes les données
+          </Text>
         </TouchableOpacity>
       </View>
 
       {/* App Info */}
       <View style={[styles.section, isDarkMode && styles.sectionDark]}>
-        <Text style={[styles.sectionTitle, isDarkMode && styles.sectionTitleDark]}>
+        <Text
+          style={[styles.sectionTitle, isDarkMode && styles.sectionTitleDark]}>
           ℹ️ À propos
         </Text>
-        
+
         <Text style={[styles.appInfo, isDarkMode && styles.appInfoDark]}>
           📱 IPTV Mobile v1.0.0
         </Text>

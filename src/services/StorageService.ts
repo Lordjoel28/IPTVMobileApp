@@ -1,5 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Favorite, RecentChannel, Settings, User, ParentalControl } from '../types';
+import {
+  Favorite,
+  RecentChannel,
+  Settings,
+  User,
+  ParentalControl,
+} from '../types';
 
 export class StorageService {
   private static instance: StorageService;
@@ -42,7 +48,7 @@ export class StorageService {
     try {
       const favorites = await this.getFavorites();
       const exists = favorites.find(f => f.channelId === channelId);
-      
+
       if (!exists) {
         favorites.push({
           channelId,
@@ -89,10 +95,10 @@ export class StorageService {
   async addRecentChannel(channelId: string, playlistId: string): Promise<void> {
     try {
       let recent = await this.getRecentChannels();
-      
+
       // Remove if already exists
       recent = recent.filter(r => r.channelId !== channelId);
-      
+
       // Add to beginning
       recent.unshift({
         channelId,
@@ -206,7 +212,10 @@ export class StorageService {
 
   async saveParentalControl(control: ParentalControl): Promise<void> {
     try {
-      await AsyncStorage.setItem('iptv_parental_control', JSON.stringify(control));
+      await AsyncStorage.setItem(
+        'iptv_parental_control',
+        JSON.stringify(control),
+      );
     } catch (error) {
       console.error('Error saving parental control:', error);
     }

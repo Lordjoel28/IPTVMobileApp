@@ -3,7 +3,7 @@
  * Optimisé performance avec driver natif
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, {useEffect, useRef} from 'react';
 import {
   View,
   Text,
@@ -33,23 +33,23 @@ interface ChannelCardProps {
   hideChannelNames?: boolean;
 }
 
-const ChannelCard: React.FC<ChannelCardProps> = ({ 
-  channel, 
-  index, 
-  width, 
-  onPress, 
+const ChannelCard: React.FC<ChannelCardProps> = ({
+  channel,
+  index,
+  width,
+  onPress,
   serverUrl = '',
-  hideChannelNames = false
+  hideChannelNames = false,
 }) => {
   // 🎬 ÉTAPE 3: Animations avec driver natif
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
-  
+
   // Animation d'apparition au montage du composant
   useEffect(() => {
     // Délai staggered basé sur l'index pour effet cascade
     const delay = Math.min(index * 50, 300); // 50ms de délai, max 300ms
-    
+
     const timer = setTimeout(() => {
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -58,23 +58,31 @@ const ChannelCard: React.FC<ChannelCardProps> = ({
         isInteraction: false, // N'interrompt pas autres interactions
       }).start();
     }, delay);
-    
+
     return () => clearTimeout(timer); // Cleanup du timer
   }, [fadeAnim, index]);
 
   // Debug logs pour premières cartes seulement
   if (index < 3) {
-    console.log(`📺 ChannelCard ${index}: "${channel.name}" - Logo: "${channel.logo || 'ABSENT'}"`);
+    console.log(
+      `📺 ChannelCard ${index}: "${channel.name}" - Logo: "${
+        channel.logo || 'ABSENT'
+      }"`,
+    );
   }
-  
+
   // Validation et normalisation du logo
   const logoUrl = channel.logo;
-  const hasLogo = logoUrl && logoUrl.trim() !== '' && logoUrl !== 'null' && logoUrl !== 'undefined';
-  
+  const hasLogo =
+    logoUrl &&
+    logoUrl.trim() !== '' &&
+    logoUrl !== 'null' &&
+    logoUrl !== 'undefined';
+
   // 🎯 ÉTAPE 2: Feedback visuel avec Pressable - Styles conditionnels + animations
-  const getPressableStyle = ({ pressed }: PressableStateCallbackType) => [
+  const getPressableStyle = ({pressed}: PressableStateCallbackType) => [
     styles.channelCard,
-    { width },
+    {width},
     pressed && styles.channelCardPressed, // Style appliqué quand pressé
   ];
 
@@ -103,10 +111,9 @@ const ChannelCard: React.FC<ChannelCardProps> = ({
         styles.cardContainer,
         {
           opacity: fadeAnim, // Animation fade-in
-          transform: [{ scale: scaleAnim }], // Animation scale
-        }
-      ]}
-    >
+          transform: [{scale: scaleAnim}], // Animation scale
+        },
+      ]}>
       <Pressable
         style={getPressableStyle}
         onPress={() => onPress(channel)}
@@ -116,15 +123,15 @@ const ChannelCard: React.FC<ChannelCardProps> = ({
       >
         {/* Logo principal */}
         {hasLogo ? (
-          <Image 
-            source={{ 
+          <Image
+            source={{
               uri: logoUrl,
               headers: {
                 'User-Agent': 'IPTV-Player/1.0',
-                'Accept': 'image/*',
-                'Cache-Control': 'max-age=86400'
-              }
-            }} 
+                Accept: 'image/*',
+                'Cache-Control': 'max-age=86400',
+              },
+            }}
             style={styles.channelLogoFullscreen}
             resizeMode="contain"
             fadeDuration={100}
@@ -149,16 +156,18 @@ const ChannelCard: React.FC<ChannelCardProps> = ({
         {/* Superposition avec dégradé sombre pour lisibilité - conditionnel */}
         {!hideChannelNames && (
           <LinearGradient
-            colors={['transparent', 'rgba(0, 0, 0, 0.3)', 'rgba(0, 0, 0, 0.85)']}
+            colors={[
+              'transparent',
+              'rgba(0, 0, 0, 0.3)',
+              'rgba(0, 0, 0, 0.85)',
+            ]}
             locations={[0, 0.4, 1]}
-            style={styles.channelNameOverlay}
-          >
-            <Text 
-              style={styles.channelCardName} 
-              numberOfLines={2} 
+            style={styles.channelNameOverlay}>
+            <Text
+              style={styles.channelCardName}
+              numberOfLines={2}
               ellipsizeMode="tail"
-              adjustsFontSizeToFit={false}
-            >
+              adjustsFontSizeToFit={false}>
               {channel.name?.replace(/\s*\(\d+p\)$/, '') || 'Sans nom'}
             </Text>
           </LinearGradient>
@@ -184,7 +193,7 @@ const styles = StyleSheet.create({
     position: 'relative',
     // Ombres subtiles améliorées pour profondeur
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 6 },
+    shadowOffset: {width: 0, height: 6},
     shadowOpacity: 0.2,
     shadowRadius: 16,
     elevation: 8,
@@ -194,7 +203,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#252525', // Changement de couleur
     shadowOpacity: 0.35, // Ombre plus prononcée
     elevation: 12,
-    shadowOffset: { width: 0, height: 8 },
+    shadowOffset: {width: 0, height: 8},
     shadowRadius: 20,
     borderColor: 'rgba(0, 212, 170, 0.6)', // Bordure cyan menthe
     borderWidth: 2, // Bordure plus épaisse pour feedback
@@ -243,7 +252,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     width: '100%',
     textShadowColor: 'rgba(0, 0, 0, 0.9)',
-    textShadowOffset: { width: 1, height: 1 },
+    textShadowOffset: {width: 1, height: 1},
     textShadowRadius: 4,
   },
   channelNameFallback: {
@@ -255,7 +264,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     lineHeight: 12,
     textShadowColor: 'rgba(0, 0, 0, 0.8)',
-    textShadowOffset: { width: 1, height: 1 },
+    textShadowOffset: {width: 1, height: 1},
     textShadowRadius: 2,
   },
 });

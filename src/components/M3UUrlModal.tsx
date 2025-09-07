@@ -3,7 +3,7 @@
  * Modal complètement recréée avec design propre et optimisé
  */
 
-import React, { useState } from 'react';
+import React, {useState} from 'react';
 import {
   View,
   Text,
@@ -23,7 +23,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import DocumentPicker from 'react-native-document-picker';
 
-const { width, height } = Dimensions.get('window');
+const {width, height} = Dimensions.get('window');
 
 interface M3UUrlModalProps {
   visible: boolean;
@@ -48,7 +48,7 @@ const M3UUrlModal: React.FC<M3UUrlModalProps> = ({
   const [playlistName, setPlaylistName] = useState('');
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
-  
+
   // Animation hooks
   const [fadeAnim] = useState(new Animated.Value(0));
   const [scaleAnim] = useState(new Animated.Value(0.9));
@@ -77,7 +77,7 @@ const M3UUrlModal: React.FC<M3UUrlModalProps> = ({
       setConnectionMode('url');
       setIsConnecting(false);
       toggleAnim.setValue(0);
-      
+
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 0,
@@ -109,7 +109,7 @@ const M3UUrlModal: React.FC<M3UUrlModalProps> = ({
         type: [DocumentPicker.types.allFiles],
         copyTo: 'cachesDirectory',
       });
-      
+
       if (result.uri) {
         setSelectedFile(result.uri);
         if (!playlistName && result.name) {
@@ -126,7 +126,7 @@ const M3UUrlModal: React.FC<M3UUrlModalProps> = ({
   const handleConnect = async () => {
     // Validation
     if (connectionMode === 'url' && !url.trim()) {
-      Alert.alert('Erreur', 'Veuillez saisir l\'URL de la playlist M3U');
+      Alert.alert('Erreur', "Veuillez saisir l'URL de la playlist M3U");
       return;
     }
     if (connectionMode === 'file' && !selectedFile) {
@@ -139,14 +139,14 @@ const M3UUrlModal: React.FC<M3UUrlModalProps> = ({
     }
 
     setIsConnecting(true);
-    
+
     try {
       const source: M3USource = {
         type: connectionMode,
         source: connectionMode === 'url' ? url.trim() : selectedFile!,
         name: playlistName.trim(),
       };
-      
+
       await onConnect(source);
     } catch (error) {
       console.error('Erreur connexion M3U:', error);
@@ -175,205 +175,233 @@ const M3UUrlModal: React.FC<M3UUrlModalProps> = ({
       transparent
       animationType="none"
       statusBarTranslucent
-      onRequestClose={handleClose}
-    >
+      onRequestClose={handleClose}>
       <StatusBar barStyle="light-content" backgroundColor="rgba(0,0,0,0.9)" />
-      
-      <KeyboardAvoidingView 
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <Animated.View
-          style={[
-            styles.overlay,
-            { opacity: fadeAnim },
-          ]}
-        >
+
+      <KeyboardAvoidingView
+        style={{flex: 1}}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <Animated.View style={[styles.overlay, {opacity: fadeAnim}]}>
           <LinearGradient
             colors={['#0a0a0a', '#121212', '#181818', '#0e0e0e']}
             locations={[0, 0.3, 0.7, 1]}
             style={StyleSheet.absoluteFill}
           />
-          
+
           <ScrollView
             contentContainerStyle={styles.scrollContainer}
-            keyboardShouldPersistTaps="handled"
-          >
+            keyboardShouldPersistTaps="handled">
             <Animated.View
               style={[
                 styles.container,
                 {
-                  transform: [{ scale: scaleAnim }],
+                  transform: [{scale: scaleAnim}],
                   opacity: fadeAnim,
                 },
-              ]}
-            >
-          {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.titleContainer}>
-              <LinearGradient
-                colors={['rgba(76, 175, 80, 0.8)', 'rgba(76, 175, 80, 0.4)']}
-                style={styles.iconContainer}
-              >
-                <Icon name="folder-open" size={24} color="#FFFFFF" />
-              </LinearGradient>
-              <Text style={styles.title}>Connexion M3U</Text>
-            </View>
-            <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
-              <Icon name="close" size={24} color="#FFFFFF" />
-            </TouchableOpacity>
-          </View>
+              ]}>
+              {/* Header */}
+              <View style={styles.header}>
+                <View style={styles.titleContainer}>
+                  <LinearGradient
+                    colors={[
+                      'rgba(76, 175, 80, 0.8)',
+                      'rgba(76, 175, 80, 0.4)',
+                    ]}
+                    style={styles.iconContainer}>
+                    <Icon name="folder-open" size={24} color="#FFFFFF" />
+                  </LinearGradient>
+                  <Text style={styles.title}>Connexion M3U</Text>
+                </View>
+                <TouchableOpacity
+                  onPress={handleClose}
+                  style={styles.closeButton}>
+                  <Icon name="close" size={24} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
 
-          {/* Toggle Switch - Mode de connexion */}
-          <View style={styles.toggleContainer}>
-            <View style={styles.toggleBackground}>
-              <Animated.View
-                style={[
-                  styles.toggleSlider,
-                  {
-                    transform: [{
-                      translateX: toggleAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [2, (width * 0.94 - 32) / 2 - 2],
-                      })
-                    }]
-                  }
-                ]}
-              />
-              
-              <TouchableOpacity
-                style={styles.toggleOption}
-                onPress={() => handleToggleMode('url')}
-                activeOpacity={0.8}
-              >
-                <Icon 
-                  name="language" 
-                  size={16} 
-                  color={connectionMode === 'url' ? '#FFFFFF' : 'rgba(255,255,255,0.5)'} 
-                />
-                <Text style={[
-                  styles.toggleText,
-                  connectionMode === 'url' && styles.toggleTextActive
-                ]}>
-                  URL M3U
-                </Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={styles.toggleOption}
-                onPress={() => handleToggleMode('file')}
-                activeOpacity={0.8}
-              >
-                <Icon 
-                  name="insert-drive-file" 
-                  size={16} 
-                  color={connectionMode === 'file' ? '#FFFFFF' : 'rgba(255,255,255,0.5)'} 
-                />
-                <Text style={[
-                  styles.toggleText,
-                  connectionMode === 'file' && styles.toggleTextActive
-                ]}>
-                  Fichier local
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Form Content */}
-          <View style={styles.formContainer}>
-            {connectionMode === 'url' ? (
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>URL de la playlist M3U</Text>
-                <View style={styles.inputContainer}>
-                  <Icon name="link" size={18} color="rgba(255,255,255,0.6)" style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.textInput}
-                    value={url}
-                    onChangeText={setUrl}
-                    placeholder="https://exemple.com/playlist.m3u"
-                    placeholderTextColor="rgba(255,255,255,0.4)"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    keyboardType="url"
+              {/* Toggle Switch - Mode de connexion */}
+              <View style={styles.toggleContainer}>
+                <View style={styles.toggleBackground}>
+                  <Animated.View
+                    style={[
+                      styles.toggleSlider,
+                      {
+                        transform: [
+                          {
+                            translateX: toggleAnim.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: [2, (width * 0.94 - 32) / 2 - 2],
+                            }),
+                          },
+                        ],
+                      },
+                    ]}
                   />
+
+                  <TouchableOpacity
+                    style={styles.toggleOption}
+                    onPress={() => handleToggleMode('url')}
+                    activeOpacity={0.8}>
+                    <Icon
+                      name="language"
+                      size={16}
+                      color={
+                        connectionMode === 'url'
+                          ? '#FFFFFF'
+                          : 'rgba(255,255,255,0.5)'
+                      }
+                    />
+                    <Text
+                      style={[
+                        styles.toggleText,
+                        connectionMode === 'url' && styles.toggleTextActive,
+                      ]}>
+                      URL M3U
+                    </Text>
+                  </TouchableOpacity>
+
+              <TouchableOpacity
+                    style={styles.toggleOption}
+                    onPress={() => handleToggleMode('file')}
+                    activeOpacity={0.8}>
+                    <Icon
+                      name="insert-drive-file"
+                      size={16}
+                      color={
+                        connectionMode === 'file'
+                          ? '#FFFFFF'
+                          : 'rgba(255,255,255,0.5)'
+                      }
+                    />
+                    <Text
+                      style={[
+                        styles.toggleText,
+                        connectionMode === 'file' && styles.toggleTextActive,
+                      ]}>
+                      Fichier local
+                    </Text>
+                  </TouchableOpacity>
                 </View>
               </View>
-            ) : (
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Fichier M3U local</Text>
-                <TouchableOpacity 
-                  style={styles.fileContainer}
-                  onPress={handleFileSelect}
-                >
-                  <Icon name="attach-file" size={18} color="rgba(255,255,255,0.6)" style={styles.inputIcon} />
-                  <Text style={[
-                    styles.fileText,
-                    !selectedFile && styles.fileTextPlaceholder
-                  ]}>
-                    {selectedFile ? 'Fichier sélectionné' : 'Sélectionner un fichier M3U'}
-                  </Text>
-                  <Icon name="folder" size={18} color="rgba(76, 175, 80, 0.8)" />
-                </TouchableOpacity>
-                {selectedFile && (
-                  <Text style={styles.selectedFileName}>
-                    📁 {selectedFile.split('/').pop()}
-                  </Text>
-                )}
-              </View>
-            )}
 
-            {/* Nom de playlist - toujours présent */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Nom de la playlist</Text>
-              <View style={styles.inputContainer}>
-                <Icon name="playlist-play" size={18} color="rgba(255,255,255,0.6)" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.textInput}
-                  value={playlistName}
-                  onChangeText={setPlaylistName}
-                  placeholder="Ma playlist IPTV"
-                  placeholderTextColor="rgba(255,255,255,0.4)"
-                  autoCapitalize="words"
-                  autoCorrect={false}
-                />
-              </View>
-            </View>
-          </View>
-
-          {/* Buttons */}
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={handleClose}
-              disabled={isConnecting}
-            >
-              <Text style={styles.cancelButtonText}>Annuler</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={[styles.connectButton, isConnecting && styles.connectButtonDisabled]}
-              onPress={handleConnect}
-              disabled={isConnecting}
-            >
-              <LinearGradient
-                colors={
-                  isConnecting 
-                    ? ['rgba(76, 175, 80, 0.5)', 'rgba(76, 175, 80, 0.3)']
-                    : ['rgba(76, 175, 80, 0.8)', 'rgba(76, 175, 80, 0.6)']
-                }
-                style={styles.connectButtonGradient}
-              >
-                {isConnecting ? (
-                  <Text style={styles.connectButtonText}>Connexion...</Text>
+              {/* Form Content */}
+              <View style={styles.formContainer}>
+                {connectionMode === 'url' ? (
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.label}>URL de la playlist M3U</Text>
+                    <View style={styles.inputContainer}>
+                      <Icon
+                        name="link"
+                        size={18}
+                        color="rgba(255,255,255,0.6)"
+                        style={styles.inputIcon}
+                      />
+                      <TextInput
+                        style={styles.textInput}
+                        value={url}
+                        onChangeText={setUrl}
+                        placeholder="https://exemple.com/playlist.m3u"
+                        placeholderTextColor="rgba(255,255,255,0.4)"
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        keyboardType="url"
+                      />
+                    </View>
+                  </View>
                 ) : (
-                  <>
-                    <Icon name="play-arrow" size={18} color="#FFFFFF" />
-                    <Text style={styles.connectButtonText}>Charger playlist</Text>
-                  </>
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Fichier M3U local</Text>
+                    <TouchableOpacity
+                      style={styles.fileContainer}
+                      onPress={handleFileSelect}>
+                      <Icon
+                        name="attach-file"
+                        size={18}
+                        color="rgba(255,255,255,0.6)"
+                        style={styles.inputIcon}
+                      />
+                      <Text
+                        style={[
+                          styles.fileText,
+                          !selectedFile && styles.fileTextPlaceholder,
+                        ]}>
+                        {selectedFile
+                          ? 'Fichier sélectionné'
+                          : 'Sélectionner un fichier M3U'}
+                      </Text>
+                      <Icon
+                        name="folder"
+                        size={18}
+                        color="rgba(76, 175, 80, 0.8)"
+                      />
+                    </TouchableOpacity>
+                    {selectedFile && (
+                      <Text style={styles.selectedFileName}>
+                        📁 {selectedFile.split('/').pop()}
+                      </Text>
+                    )}
+                  </View>
                 )}
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
+
+                {/* Nom de playlist - toujours présent */}
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Nom de la playlist</Text>
+                  <View style={styles.inputContainer}>
+                    <Icon
+                      name="playlist-play"
+                      size={18}
+                      color="rgba(255,255,255,0.6)"
+                      style={styles.inputIcon}
+                    />
+                    <TextInput
+                      style={styles.textInput}
+                      value={playlistName}
+                      onChangeText={setPlaylistName}
+                      placeholder="Ma playlist IPTV"
+                      placeholderTextColor="rgba(255,255,255,0.4)"
+                      autoCapitalize="words"
+                      autoCorrect={false}
+                    />
+                  </View>
+                </View>
+              </View>
+
+              {/* Buttons */}
+              <View style={styles.buttonContainer}>
+                <TouchableOpacity
+                  style={styles.cancelButton}
+                  onPress={handleClose}
+                  disabled={isConnecting}>
+                  <Text style={styles.cancelButtonText}>Annuler</Text>
+                </TouchableOpacity>
+
+            <TouchableOpacity
+                  style={[
+                    styles.connectButton,
+                    isConnecting && styles.connectButtonDisabled,
+                  ]}
+                  onPress={handleConnect}
+                  disabled={isConnecting}>
+                  <LinearGradient
+                    colors={
+                      isConnecting
+                        ? ['rgba(76, 175, 80, 0.5)', 'rgba(76, 175, 80, 0.3)']
+                        : ['rgba(76, 175, 80, 0.8)', 'rgba(76, 175, 80, 0.6)']
+                    }
+                    style={styles.connectButtonGradient}>
+                    {isConnecting ? (
+                      <Text style={styles.connectButtonText}>Connexion...</Text>
+                    ) : (
+                      <>
+                        <Icon name="play-arrow" size={18} color="#FFFFFF" />
+                        <Text style={styles.connectButtonText}>
+                          Charger playlist
+                        </Text>
+                      </>
+                    )}
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
             </Animated.View>
           </ScrollView>
         </Animated.View>
@@ -404,7 +432,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 20 },
+    shadowOffset: {width: 0, height: 20},
     shadowOpacity: 0.6,
     shadowRadius: 30,
     elevation: 25,
@@ -460,7 +488,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(76, 175, 80, 0.9)',
     borderRadius: 12,
     shadowColor: '#4CAF50',
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: {width: 0, height: 4},
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,

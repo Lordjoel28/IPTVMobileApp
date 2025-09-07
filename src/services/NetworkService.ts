@@ -14,9 +14,16 @@ export interface NetworkRequestOptions {
 
 export class NetworkError extends Error {
   constructor(
-    public type: 'server' | 'timeout' | 'network' | 'notfound' | 'forbidden' | 'http' | 'abort',
+    public type:
+      | 'server'
+      | 'timeout'
+      | 'network'
+      | 'notfound'
+      | 'forbidden'
+      | 'http'
+      | 'abort',
     public statusCode?: number,
-    public details?: string
+    public details?: string,
   ) {
     super(details || `Erreur réseau: ${type}`);
     this.name = 'NetworkError';
@@ -28,9 +35,9 @@ export class NetworkError extends Error {
   getUserMessage(): string {
     switch (this.type) {
       case 'notfound':
-        return 'La playlist demandée n\'existe pas ou l\'URL est incorrecte';
+        return "La playlist demandée n'existe pas ou l'URL est incorrecte";
       case 'forbidden':
-        return 'Accès refusé. Vérifiez vos identifiants ou l\'URL';
+        return "Accès refusé. Vérifiez vos identifiants ou l'URL";
       case 'timeout':
         return 'La playlist met trop de temps à répondre. Réessayez plus tard';
       case 'server':
@@ -50,7 +57,7 @@ export class NetworkService {
     maxAttempts: 3,
     backoffMultiplier: 1.5,
     initialDelay: 1000,
-    maxDelay: 10000
+    maxDelay: 10000,
   };
 
   constructor() {
@@ -60,24 +67,29 @@ export class NetworkService {
   /**
    * Fetch avec retry automatique et gestion d'erreurs robuste
    */
-  async fetchWithRetry(url: string, options: NetworkRequestOptions = {}): Promise<Response> {
+  async fetchWithRetry(
+    url: string,
+    options: NetworkRequestOptions = {},
+  ): Promise<Response> {
     const {
       timeout = 30000,
       retryAttempts = this.retryConfig.maxAttempts,
       method = 'GET',
       headers = {},
-      body
+      body,
     } = options;
 
     let attempt = 0;
     let lastError: Error;
 
-    console.log(`🌐 Fetching: ${url.substring(0, 100)}${url.length > 100 ? '...' : ''}`);
+    console.log(
+      `🌐 Fetching: ${url.substring(0, 100)}${url.length > 100 ? '...' : ''}`,
+    );
 
     while (attempt < retryAttempts) {
       try {
         attempt++;
-        
+
         // AbortController pour timeout React Native compatible
         const controller = new AbortController();
         const timeoutId = setTimeout(() => {
@@ -88,37 +100,47 @@ export class NetworkService {
           method,
           headers: {
             'User-Agent': 'IPTV-Player/2.0',
-            'Accept': 'application/vnd.apple.mpegurl,application/x-mpegurl,text/plain,application/json,*/*',
-            ...headers
+            Accept:
+              'application/vnd.apple.mpegurl,application/x-mpegurl,text/plain,application/json,*/*',
+            ...headers,
           },
           signal: controller.signal,
-          body
+          body,
         });
 
         clearTimeout(timeoutId);
 
         // Analyse détaillée du code de statut
         if (response.status >= 500 && response.status < 600) {
-          throw new NetworkError('server', response.status, 
-            `Erreur serveur ${response.status}: ${response.statusText}`);
+          throw new NetworkError(
+            'server',
+            response.status,
+            `Erreur serveur ${response.status}: ${response.statusText}`,
+          );
         } else if (response.status === 404) {
           throw new NetworkError('notfound', 404, 'Ressource introuvable');
         } else if (response.status === 403 || response.status === 401) {
-          throw new NetworkError('forbidden', response.status, 'Accès non autorisé');
+          throw new NetworkError(
+            'forbidden',
+            response.status,
+            'Accès non autorisé',
+          );
         } else if (response.status === 408 || response.status === 504) {
           throw new NetworkError('timeout', response.status, 'Timeout serveur');
         } else if (!response.ok) {
-          throw new NetworkError('http', response.status, 
-            `Erreur HTTP ${response.status}: ${response.statusText}`);
+          throw new NetworkError(
+            'http',
+            response.status,
+            `Erreur HTTP ${response.status}: ${response.statusText}`,
+          );
         }
 
         // Succès !
         if (attempt > 1) {
           console.log(`✅ Succès après ${attempt} tentatives`);
         }
-        
-        return response;
 
+        return response;
       } catch (error) {
         lastError = error;
 
@@ -126,10 +148,14 @@ export class NetworkService {
         if (error.name === 'AbortError') {
           lastError = new NetworkError('timeout', 408, 'Timeout de connexion');
         }
-        
+
         // Pas de retry pour certaines erreurs définitives
         if (error instanceof NetworkError) {
-          if (error.type === 'notfound' || error.type === 'forbidden' || error.type === 'abort') {
+          if (
+            error.type === 'notfound' ||
+            error.type === 'forbidden' ||
+            error.type === 'abort'
+          ) {
             console.log(`❌ Erreur définitive: ${error.type}, pas de retry`);
             throw error;
           }
@@ -138,14 +164,20 @@ export class NetworkService {
         // Retry avec backoff exponentiel
         if (attempt < retryAttempts) {
           const delay = Math.min(
-            this.retryConfig.initialDelay * Math.pow(this.retryConfig.backoffMultiplier, attempt - 1),
-            this.retryConfig.maxDelay
+            this.retryConfig.initialDelay *
+              Math.pow(this.retryConfig.backoffMultiplier, attempt - 1),
+            this.retryConfig.maxDelay,
           );
-          
-          console.log(`🔄 Retry ${attempt}/${retryAttempts} dans ${delay}ms (${error.message})`);
+
+          console.log(
+            `🔄 Retry ${attempt}/${retryAttempts} dans ${delay}ms (${error.message})`,
+          );
           await this.delay(delay);
         } else {
-          console.error(`❌ Échec définitif après ${attempt} tentatives:`, error.message);
+          console.error(
+            `❌ Échec définitif après ${attempt} tentatives:`,
+            error.message,
+          );
         }
       }
     }
@@ -156,34 +188,47 @@ export class NetworkService {
   /**
    * Fetch JSON avec parsing automatique et validation
    */
-  async fetchJSON<T = any>(url: string, options: NetworkRequestOptions = {}): Promise<T> {
+  async fetchJSON<T = any>(
+    url: string,
+    options: NetworkRequestOptions = {},
+  ): Promise<T> {
     const response = await this.fetchWithRetry(url, {
       ...options,
       headers: {
         'Content-Type': 'application/json',
-        ...options.headers
-      }
+        ...options.headers,
+      },
     });
 
     const text = await response.text();
-    
+
     try {
       return JSON.parse(text) as T;
     } catch (parseError) {
-      throw new NetworkError('http', response.status, 
-        'Réponse JSON invalide du serveur');
+      throw new NetworkError(
+        'http',
+        response.status,
+        'Réponse JSON invalide du serveur',
+      );
     }
   }
 
   /**
    * Fetch text avec validation de contenu
    */
-  async fetchText(url: string, options: NetworkRequestOptions = {}): Promise<string> {
+  async fetchText(
+    url: string,
+    options: NetworkRequestOptions = {},
+  ): Promise<string> {
     const response = await this.fetchWithRetry(url, options);
     const text = await response.text();
 
     if (!text || typeof text !== 'string') {
-      throw new NetworkError('http', response.status, 'Contenu vide ou invalide');
+      throw new NetworkError(
+        'http',
+        response.status,
+        'Contenu vide ou invalide',
+      );
     }
 
     return text;
@@ -197,7 +242,7 @@ export class NetworkService {
       await this.fetchWithRetry(url, {
         timeout: 5000,
         retryAttempts: 1,
-        method: 'HEAD'
+        method: 'HEAD',
       });
       return true;
     } catch (error) {
@@ -217,8 +262,8 @@ export class NetworkService {
       timeouts: {
         default: 30000,
         quick: 5000,
-        large: 60000
-      }
+        large: 60000,
+      },
     };
   }
 

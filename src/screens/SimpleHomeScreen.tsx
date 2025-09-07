@@ -3,7 +3,7 @@
  * Pattern inspiré des vraies apps IPTV (navigation dans l'écran)
  */
 
-import React, { useState } from 'react';
+import React, {useState} from 'react';
 import {
   View,
   Text,
@@ -15,9 +15,9 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import LinearGradient from 'react-native-linear-gradient';
-import { useNavigation } from '@react-navigation/native';
-import type { StackNavigationProp } from '@react-navigation/stack';
-import type { RootStackParamList } from '../types';
+import {useNavigation} from '@react-navigation/native';
+import type {StackNavigationProp} from '@react-navigation/stack';
+import type {RootStackParamList} from '../types';
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -42,7 +42,7 @@ const SimpleHomeScreen: React.FC = () => {
       icon: 'playlist-play',
       color: '#4FACFE',
       description: 'Gérer vos playlists M3U et Xtream',
-      screen: 'Playlists'
+      screen: 'Playlists',
     },
     {
       id: 'favorites',
@@ -50,7 +50,7 @@ const SimpleHomeScreen: React.FC = () => {
       icon: 'favorite',
       color: '#FF4444',
       description: 'Vos chaînes préférées',
-      screen: 'Favorites'
+      screen: 'Favorites',
     },
     {
       id: 'search',
@@ -58,15 +58,15 @@ const SimpleHomeScreen: React.FC = () => {
       icon: 'search',
       color: '#00C851',
       description: 'Rechercher des chaînes',
-      screen: 'Search'
+      screen: 'Search',
     },
     {
       id: 'settings',
       title: 'Paramètres',
       icon: 'settings',
       color: '#FF8800',
-      description: 'Configuration de l\'app',
-      screen: 'Settings'
+      description: "Configuration de l'app",
+      screen: 'Settings',
     }
   ];
 
@@ -80,26 +80,23 @@ const SimpleHomeScreen: React.FC = () => {
 
   const renderMenuItem = (item: MenuItem) => {
     const isSelected = selectedItem === item.id;
-    
+
     return (
       <TouchableOpacity
         key={item.id}
-        style={[
-          styles.menuItem,
-          isSelected && styles.menuItemSelected
-        ]}
+        style={[styles.menuItem, isSelected && styles.menuItemSelected]}
         onPress={() => handleMenuPress(item)}
-        activeOpacity={0.8}
-      >
-        <View style={[styles.iconContainer, { backgroundColor: item.color + '20' }]}>
+        activeOpacity={0.8}>
+        <View
+          style={[styles.iconContainer, {backgroundColor: item.color + '20'}]}>
           <Icon name={item.icon} size={32} color={item.color} />
         </View>
-        
+
         <View style={styles.menuTextContainer}>
           <Text style={styles.menuTitle}>{item.title}</Text>
           <Text style={styles.menuDescription}>{item.description}</Text>
         </View>
-        
+
         <Icon name="chevron-right" size={24} color="rgba(255, 255, 255, 0.5)" />
       </TouchableOpacity>
     );
@@ -107,20 +104,22 @@ const SimpleHomeScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#000000" translucent />
-      
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor="#000000"
+        translucent
+
       {/* Header avec gradient */}
       <LinearGradient
         colors={['#1a1a2e', '#16213e', '#0f3460']}
-        style={styles.header}
-      >
+        style={styles.header}>
         <SafeAreaView>
           <View style={styles.headerContent}>
             <View style={styles.appInfo}>
               <Text style={styles.appTitle}>📱 IPTV Mobile</Text>
               <Text style={styles.appSubtitle}>Lecteur IPTV Professionnel</Text>
             </View>
-            
+
             <TouchableOpacity style={styles.headerButton}>
               <Icon name="notifications" size={24} color="#FFFFFF" />
             </TouchableOpacity>
@@ -129,28 +128,27 @@ const SimpleHomeScreen: React.FC = () => {
       </LinearGradient>
 
       {/* Contenu principal */}
-      <ScrollView 
+      <ScrollView
         style={styles.content}
         contentContainerStyle={styles.contentContainer}
-        showsVerticalScrollIndicator={false}
-      >
+        showsVerticalScrollIndicator={false}>
         {/* Section statistiques rapides */}
         <View style={styles.statsSection}>
           <Text style={styles.sectionTitle}>Vue d'ensemble</Text>
-          
+
           <View style={styles.statsGrid}>
             <View style={styles.statCard}>
               <Icon name="playlist-play" size={24} color="#4FACFE" />
               <Text style={styles.statNumber}>0</Text>
               <Text style={styles.statLabel}>Playlists</Text>
             </View>
-            
+
             <View style={styles.statCard}>
               <Icon name="tv" size={24} color="#00C851" />
               <Text style={styles.statNumber}>0</Text>
               <Text style={styles.statLabel}>Chaînes</Text>
             </View>
-            
+
             <View style={styles.statCard}>
               <Icon name="favorite" size={24} color="#FF4444" />
               <Text style={styles.statNumber}>0</Text>
@@ -162,16 +160,14 @@ const SimpleHomeScreen: React.FC = () => {
         {/* Menu principal */}
         <View style={styles.menuSection}>
           <Text style={styles.sectionTitle}>Navigation</Text>
-          
-          <View style={styles.menuGrid}>
-            {menuItems.map(renderMenuItem)}
-          </View>
+
+          <View style={styles.menuGrid}>{menuItems.map(renderMenuItem)}</View>
         </View>
 
         {/* Section récents (placeholder) */}
         <View style={styles.recentSection}>
           <Text style={styles.sectionTitle}>Récemment regardé</Text>
-          
+
           <View style={styles.emptyState}>
             <Icon name="tv-off" size={48} color="rgba(255, 255, 255, 0.3)" />
             <Text style={styles.emptyText}>Aucune chaîne récente</Text>
@@ -276,7 +272,7 @@ const styles = StyleSheet.create({
   menuItemSelected: {
     backgroundColor: '#2A2A2A',
     borderColor: 'rgba(255, 255, 255, 0.2)',
-    transform: [{ scale: 0.98 }],
+    transform: [{scale: 0.98}],
   },
   iconContainer: {
     width: 56,

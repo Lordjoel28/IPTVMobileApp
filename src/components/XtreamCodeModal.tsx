@@ -3,7 +3,7 @@
  * Formulaire de connexion Xtream Codes avec URL, username et password
  */
 
-import React, { useState } from 'react';
+import React, {useState} from 'react';
 import {
   View,
   Text,
@@ -23,7 +23,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 // import { BlurView } from '@react-native-community/blur';
 
-const { width, height } = Dimensions.get('window');
+const {width, height} = Dimensions.get('window');
 
 interface XtreamCodeModalProps {
   visible: boolean;
@@ -49,7 +49,7 @@ const XtreamCodeModal: React.FC<XtreamCodeModalProps> = ({
 
   const [fadeAnim] = useState(new Animated.Value(0));
   const [scaleAnim] = useState(new Animated.Value(0.8));
-  
+
   // Form state
   const [url, setUrl] = useState('');
   const [username, setUsername] = useState('');
@@ -91,11 +91,11 @@ const XtreamCodeModal: React.FC<XtreamCodeModalProps> = ({
   const handleConnect = async () => {
     // Validation des champs
     if (!url.trim()) {
-      Alert.alert('Erreur', 'Veuillez saisir l\'URL du serveur');
+      Alert.alert('Erreur', "Veuillez saisir l'URL du serveur");
       return;
     }
     if (!username.trim()) {
-      Alert.alert('Erreur', 'Veuillez saisir votre nom d\'utilisateur');
+      Alert.alert('Erreur', "Veuillez saisir votre nom d'utilisateur");
       return;
     }
     if (!password.trim()) {
@@ -104,14 +104,14 @@ const XtreamCodeModal: React.FC<XtreamCodeModalProps> = ({
     }
 
     setIsConnecting(true);
-    
+
     try {
       const credentials: XtreamCredentials = {
         url: url.trim(),
         username: username.trim(),
         password: password.trim(),
       };
-      
+
       await onConnect(credentials);
     } catch (error) {
       console.error('Erreur connexion Xtream:', error);
@@ -136,54 +136,53 @@ const XtreamCodeModal: React.FC<XtreamCodeModalProps> = ({
       transparent
       animationType="none"
       statusBarTranslucent
-      onRequestClose={handleClose}
-    >
+      onRequestClose={handleClose}>
       <StatusBar barStyle="light-content" backgroundColor="rgba(0,0,0,0.8)" />
-      
-      <KeyboardAvoidingView 
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
+
+      <KeyboardAvoidingView
+        style={{flex: 1}}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <Animated.View
           style={[
             styles.overlay,
             {
               opacity: fadeAnim,
             },
-          ]}
-        >
+          ]}>
           {/* Fond moderne granulé comme ConnectionModal */}
           <LinearGradient
             colors={['#0a0a0a', '#121212', '#181818', '#0e0e0e']}
             locations={[0, 0.3, 0.7, 1]}
             style={StyleSheet.absoluteFill}
           />
-          
+
           <ScrollView
             contentContainerStyle={styles.scrollContainer}
-            keyboardShouldPersistTaps="handled"
-          >
+            keyboardShouldPersistTaps="handled">
             <Animated.View
               style={[
                 styles.container,
                 {
-                  transform: [{ scale: scaleAnim }],
+                  transform: [{scale: scaleAnim}],
                   opacity: fadeAnim,
                 },
-              ]}
-            >
+              ]}>
               {/* Header */}
               <View style={styles.header}>
                 <View style={styles.titleContainer}>
                   <LinearGradient
-                    colors={['rgba(33, 150, 243, 0.8)', 'rgba(33, 150, 243, 0.4)']}
-                    style={styles.iconContainer}
-                  >
+                    colors={[
+                      'rgba(33, 150, 243, 0.8)',
+                      'rgba(33, 150, 243, 0.4)',
+                    ]}
+                    style={styles.iconContainer}>
                     <Icon name="person-outline" size={24} color="#FFFFFF" />
                   </LinearGradient>
                   <Text style={styles.title}>Connexion Xtream Codes</Text>
                 </View>
-                <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
+                <TouchableOpacity
+                  onPress={handleClose}
+                  style={styles.closeButton}>
                   <Icon name="close" size={28} color="#FFFFFF" />
                 </TouchableOpacity>
               </View>
@@ -194,7 +193,12 @@ const XtreamCodeModal: React.FC<XtreamCodeModalProps> = ({
                 <View style={styles.inputGroup}>
                   <Text style={styles.label}>URL du serveur</Text>
                   <View style={styles.inputContainer}>
-                    <Icon name="language" size={20} color="rgba(255,255,255,0.6)" style={styles.inputIcon} />
+                    <Icon
+                      name="language"
+                      size={20}
+                      color="rgba(255,255,255,0.6)"
+                      style={styles.inputIcon}
+                    />
                     <TextInput
                       style={styles.textInput}
                       value={url}
@@ -213,7 +217,12 @@ const XtreamCodeModal: React.FC<XtreamCodeModalProps> = ({
                   <View style={[styles.inputGroup, styles.halfWidth]}>
                     <Text style={styles.label}>Nom d'utilisateur</Text>
                     <View style={styles.inputContainer}>
-                      <Icon name="person" size={20} color="rgba(255,255,255,0.6)" style={styles.inputIcon} />
+                      <Icon
+                        name="person"
+                        size={20}
+                        color="rgba(255,255,255,0.6)"
+                        style={styles.inputIcon}
+                      />
                       <TextInput
                         style={styles.textInput}
                         value={username}
@@ -229,7 +238,12 @@ const XtreamCodeModal: React.FC<XtreamCodeModalProps> = ({
                   <View style={[styles.inputGroup, styles.halfWidth]}>
                     <Text style={styles.label}>Mot de passe</Text>
                     <View style={styles.inputContainer}>
-                      <Icon name="lock" size={20} color="rgba(255,255,255,0.6)" style={styles.inputIcon} />
+                      <Icon
+                        name="lock"
+                        size={20}
+                        color="rgba(255,255,255,0.6)"
+                        style={styles.inputIcon}
+                      />
                       <TextInput
                         style={styles.textInput}
                         value={password}
@@ -242,18 +256,16 @@ const XtreamCodeModal: React.FC<XtreamCodeModalProps> = ({
                       />
                       <TouchableOpacity
                         onPress={() => setShowPassword(!showPassword)}
-                        style={styles.eyeButton}
-                      >
-                        <Icon 
-                          name={showPassword ? "visibility-off" : "visibility"} 
-                          size={20} 
-                          color="rgba(255,255,255,0.6)" 
+                        style={styles.eyeButton}>
+                        <Icon
+                          name={showPassword ? 'visibility-off' : 'visibility'}
+                          size={20}
+                          color="rgba(255,255,255,0.6)"
                         />
                       </TouchableOpacity>
                     </View>
                   </View>
                 </View>
-
               </View>
 
               {/* Buttons */}
@@ -261,32 +273,36 @@ const XtreamCodeModal: React.FC<XtreamCodeModalProps> = ({
                 <TouchableOpacity
                   style={styles.cancelButton}
                   onPress={handleClose}
-                  disabled={isConnecting}
-                >
+                  disabled={isConnecting}>
                   <Text style={styles.cancelButtonText}>Annuler</Text>
                 </TouchableOpacity>
-                
+
                 <TouchableOpacity
-                  style={[styles.connectButton, isConnecting && styles.connectButtonDisabled]}
+                  style={[
+                    styles.connectButton,
+                    isConnecting && styles.connectButtonDisabled,
+                  ]}
                   onPress={handleConnect}
-                  disabled={isConnecting}
-                >
+                  disabled={isConnecting}>
                   <LinearGradient
                     colors={
-                      isConnecting 
+                      isConnecting
                         ? ['rgba(33, 150, 243, 0.5)', 'rgba(33, 150, 243, 0.3)']
                         : ['rgba(33, 150, 243, 0.8)', 'rgba(33, 150, 243, 0.6)']
                     }
-                    style={styles.connectButtonGradient}
-                  >
+                    style={styles.connectButtonGradient}>
                     {isConnecting ? (
                       <View style={styles.loadingContainer}>
-                        <Text style={styles.connectButtonText}>Connexion...</Text>
+                        <Text style={styles.connectButtonText}>
+                          Connexion...
+                        </Text>
                       </View>
                     ) : (
                       <>
                         <Icon name="login" size={20} color="#FFFFFF" />
-                        <Text style={styles.connectButtonText}>Se connecter</Text>
+                        <Text style={styles.connectButtonText}>
+                          Se connecter
+                        </Text>
                       </>
                     )}
                   </LinearGradient>
@@ -322,7 +338,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 20 },
+    shadowOffset: {width: 0, height: 20},
     shadowOpacity: 0.3,
     shadowRadius: 25,
     elevation: 20,

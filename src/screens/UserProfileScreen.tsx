@@ -3,22 +3,25 @@
  */
 
 import React from 'react';
-import { View, ScrollView, StyleSheet } from 'react-native';
-import { Text, useTheme } from 'react-native-paper';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import {View, ScrollView, StyleSheet} from 'react-native';
+import {Text, useTheme} from 'react-native-paper';
+import {SafeAreaView} from 'react-native-safe-area-context';
 
 const UserProfileScreen: React.FC = () => {
   const theme = useTheme();
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <SafeAreaView
+      style={[styles.container, {backgroundColor: theme.colors.background}]}>
       <ScrollView>
         <View style={styles.content}>
-          <Text variant="headlineMedium" style={{ color: theme.colors.onBackground }}>
+          <Text
+            variant="headlineMedium"
+            style={{color: theme.colors.onBackground}}>
             =d Profil Utilisateur
           </Text>
-          <Text style={{ color: theme.colors.onSurfaceVariant, marginTop: 16 }}>
-            Gestion utilisateur à implémenter
+          <Text style={{color: theme.colors.onSurfaceVariant, marginTop: 16}}>
+            Gestion utilisateur ï¿½ implï¿½menter
           </Text>
         </View>
       </ScrollView>
@@ -27,8 +30,8 @@ const UserProfileScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  content: { padding: 16 },
+  container: {flex: 1},
+  content: {padding: 16},
 });
 
 export default UserProfileScreen;

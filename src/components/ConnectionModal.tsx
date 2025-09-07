@@ -3,7 +3,7 @@
  * Interface basique avec cartes cliquables garanties
  */
 
-import React, { useState } from 'react';
+import React, {useState} from 'react';
 import {
   View,
   Text,
@@ -18,7 +18,7 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
-const { width, height } = Dimensions.get('window');
+const {width, height} = Dimensions.get('window');
 
 // Icônes PNG spécifiques pour les cartes de connexion
 const iconMap = {
@@ -45,7 +45,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
   // Animations - hooks toujours au début
   const [fadeAnim] = useState(new Animated.Value(0));
   const [scaleAnim] = useState(new Animated.Value(0.9));
-  
+
   // Animations des cartes - créées une seule fois
   const [cardAnimations] = useState(() => [
     {
@@ -61,7 +61,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
       opacity: new Animated.Value(0),
     },
   ]);
-  
+
   React.useEffect(() => {
     if (visible) {
       // Animation d'entrée ultra-rapide pour masquer immédiatement l'arrière-plan
@@ -78,7 +78,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
           useNativeDriver: true,
         }),
       ]).start();
-      
+
       // Animation des cartes en staggeré
       cardAnimations.forEach((cardAnim, index) => {
         Animated.sequence([
@@ -98,7 +98,6 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
           ]),
         ]).start();
       });
-      
     } else {
       Animated.parallel([
         Animated.timing(fadeAnim, {
@@ -112,7 +111,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
           useNativeDriver: true,
         }),
         // Reset des animations des cartes
-        ...cardAnimations.map(cardAnim => 
+        ...cardAnimations.map(cardAnim =>
           Animated.parallel([
             Animated.timing(cardAnim.scale, {
               toValue: 0.9,
@@ -124,7 +123,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
               duration: 200,
               useNativeDriver: true,
             }),
-          ])
+          ]),
         ),
       ]).start();
     }
@@ -162,36 +161,33 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
       transparent
       animationType="none"
       statusBarTranslucent
-      onRequestClose={onClose}
-    >
+      onRequestClose={onClose}>
       <StatusBar barStyle="light-content" backgroundColor="rgba(0,0,0,0.9)" />
-      
-      <Animated.View 
+
+      <Animated.View
         style={[
           styles.overlay,
           {
             opacity: fadeAnim,
           },
-        ]} 
-        pointerEvents="box-none"
-      >
+        ]}
+        pointerEvents="box-none">
         {/* Fond granulé premium - Plus opaque */}
         <LinearGradient
           colors={['#050505', '#0a0a0a', '#0f0f0f', '#080808']}
           locations={[0, 0.3, 0.7, 1]}
           style={StyleSheet.absoluteFill}
         />
-        
-        <Animated.View 
+
+        <Animated.View
           style={[
             styles.container,
             {
-              transform: [{ scale: scaleAnim }],
+              transform: [{scale: scaleAnim}],
               opacity: fadeAnim,
             },
-          ]} 
-          pointerEvents="box-none"
-        >
+          ]}
+          pointerEvents="box-none">
           {/* Bouton fermer */}
           <TouchableOpacity onPress={onClose} style={styles.closeButton}>
             <View style={styles.closeButtonContent}>
@@ -208,39 +204,37 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
           <View style={styles.cardsContainer} pointerEvents="box-none">
             {connectionOptions.map((option, index) => {
               const cardAnim = cardAnimations[index];
-              
+
               return (
-                <Animated.View 
-                  key={option.id} 
+                <Animated.View
+                  key={option.id}
                   style={[
                     styles.cardWrapper,
                     {
-                      transform: [{ scale: cardAnim.scale }],
+                      transform: [{scale: cardAnim.scale}],
                       opacity: cardAnim.opacity,
                     },
-                  ]}
-                >
+                  ]}>
                   <TouchableOpacity
                     onPress={option.onPress}
                     style={styles.card}
-                    activeOpacity={0.85}
-                  >
+                    activeOpacity={0.85}>
                     {/* Fond carte */}
                     <LinearGradient
                       colors={[
                         'rgba(255, 255, 255, 0.18)',
                         'rgba(255, 255, 255, 0.08)',
-                        'rgba(255, 255, 255, 0.03)'
+                        'rgba(255, 255, 255, 0.03)',
                       ]}
                       locations={[0, 0.5, 1]}
                       style={styles.cardGradient}
                     />
-                    
+
                     {/* Icône PNG */}
                     <View style={styles.iconContainer}>
                       <Image source={option.icon} style={styles.iconImage} />
                     </View>
-                    
+
                     {/* Texte */}
                     <Text style={styles.cardText}>{option.title}</Text>
                   </TouchableOpacity>
@@ -251,7 +245,9 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
 
           {/* Texte de guidage */}
           <View style={styles.guidanceContainer}>
-            <Text style={styles.guidanceText}>Choisissez votre mode de connexion</Text>
+            <Text style={styles.guidanceText}>
+              Choisissez votre mode de connexion
+            </Text>
           </View>
         </Animated.View>
       </Animated.View>
@@ -307,7 +303,7 @@ const styles = StyleSheet.create({
     letterSpacing: 3,
     textAlign: 'center',
     textShadowColor: 'rgba(0, 0, 0, 0.8)',
-    textShadowOffset: { width: 0, height: 3 },
+    textShadowOffset: {width: 0, height: 3},
     textShadowRadius: 8,
   },
   cardsContainer: {
@@ -334,7 +330,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.2)',
     elevation: 15,
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 15 },
+    shadowOffset: {width: 0, height: 15},
     shadowOpacity: 0.4,
     shadowRadius: 25,
     paddingVertical: 28,
@@ -368,7 +364,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     letterSpacing: 0.8,
     textShadowColor: 'rgba(0, 0, 0, 0.5)',
-    textShadowOffset: { width: 0, height: 2 },
+    textShadowOffset: {width: 0, height: 2},
     textShadowRadius: 4,
     paddingHorizontal: 12,
     marginTop: 8,

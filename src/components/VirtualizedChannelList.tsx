@@ -3,7 +3,7 @@
  * Performance cible : TiviMate/IPTV Smarters Pro level (scrolling 60fps)
  */
 
-import React, { useState, useMemo, useCallback, memo } from 'react';
+import React, {useState, useMemo, useCallback, memo} from 'react';
 import {
   View,
   Text,
@@ -15,9 +15,9 @@ import {
   useColorScheme,
   Dimensions,
 } from 'react-native';
-import { Channel } from '../types';
+import {Channel} from '../types';
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const {height: SCREEN_HEIGHT} = Dimensions.get('window');
 
 // 🔥 OPTIMISATION CRITIQUE : Item Heights fixes pour performances
 const ITEM_HEIGHT = 80; // Hauteur fixe channel card
@@ -43,10 +43,12 @@ const ChannelItem = memo<{
   isDarkMode: boolean;
   onSelect: (channel: Channel) => void;
   onToggleFavorite: (channelId: string) => void;
-}>(({ item, isSelected, isFavorite, isDarkMode, onSelect, onToggleFavorite }) => {
-
+}>(({item, isSelected, isFavorite, isDarkMode, onSelect, onToggleFavorite}) => {
   const handlePress = useCallback(() => onSelect(item), [item, onSelect]);
-  const handleFavoritePress = useCallback(() => onToggleFavorite(item.id), [item.id, onToggleFavorite]);
+  const handleFavoritePress = useCallback(
+    () => onToggleFavorite(item.id),
+    [item.id, onToggleFavorite],
+  );
 
   return (
     <TouchableOpacity
@@ -56,14 +58,13 @@ const ChannelItem = memo<{
         isSelected && styles.channelItemSelected,
       ]}
       onPress={handlePress}
-      activeOpacity={0.7}
-    >
+      activeOpacity={0.7}>
       <View style={styles.channelContent}>
         {/* Logo optimisé avec fallback rapide */}
         <View style={styles.logoContainer}>
           {item.logo ? (
             <Image
-              source={{ uri: item.logo }}
+              source={{uri: item.logo}}
               style={styles.channelLogo}
               resizeMode="cover"
               fadeDuration={0} // Pas d'animation fade pour perfs
@@ -84,15 +85,16 @@ const ChannelItem = memo<{
               isSelected && styles.channelNameSelected,
             ]}
             numberOfLines={1}
-            ellipsizeMode="tail"
-          >
+            ellipsizeMode="tail">
             {item.name}
           </Text>
           {item.category && (
-            <Text 
-              style={[styles.channelCategory, isDarkMode && styles.channelCategoryDark]}
-              numberOfLines={1}
-            >
+            <Text
+              style={[
+                styles.channelCategory,
+                isDarkMode && styles.channelCategoryDark,
+              ]}
+              numberOfLines={1}>
               {item.category}
             </Text>
           )}
@@ -102,11 +104,8 @@ const ChannelItem = memo<{
         <TouchableOpacity
           style={styles.favoriteButton}
           onPress={handleFavoritePress}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Text style={styles.favoriteIcon}>
-            {isFavorite ? '❤️' : '🤍'}
-          </Text>
+          hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
+          <Text style={styles.favoriteIcon}>{isFavorite ? '❤️' : '🤍'}</Text>
         </TouchableOpacity>
       </View>
     </TouchableOpacity>
@@ -150,16 +149,19 @@ export const VirtualizedChannelList: React.FC<VirtualizedChannelListProps> = ({
         const favoriteSet = new Set(favorites);
         filtered = channels.filter(channel => favoriteSet.has(channel.id));
       } else {
-        filtered = channels.filter(channel => channel.category === selectedCategory);
+        filtered = channels.filter(
+          channel => channel.category === selectedCategory,
+        );
       }
     }
 
     // Recherche par nom (case insensitive)
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
-      filtered = filtered.filter(channel => 
-        channel.name.toLowerCase().includes(query) ||
-        (channel.category && channel.category.toLowerCase().includes(query))
+      filtered = filtered.filter(
+        channel =>
+          channel.name.toLowerCase().includes(query) ||
+          (channel.category && channel.category.toLowerCase().includes(query)),
       );
     }
 
@@ -167,13 +169,19 @@ export const VirtualizedChannelList: React.FC<VirtualizedChannelListProps> = ({
   }, [channels, selectedCategory, searchQuery, favorites]);
 
   // 🎯 CALLBACKS OPTIMISÉS : useCallback pour éviter re-renders
-  const handleChannelSelect = useCallback((channel: Channel) => {
-    onChannelSelect(channel);
-  }, [onChannelSelect]);
+  const handleChannelSelect = useCallback(
+    (channel: Channel) => {
+      onChannelSelect(channel);
+    },
+    [onChannelSelect],
+  );
 
-  const handleToggleFavorite = useCallback((channelId: string) => {
-    onToggleFavorite(channelId);
-  }, [onToggleFavorite]);
+  const handleToggleFavorite = useCallback(
+    (channelId: string) => {
+      onToggleFavorite(channelId);
+    },
+    [onToggleFavorite],
+  );
 
   // 🚀 VIRTUALIZEDLIST : Fonctions de rendu optimisées
   const getItem = useCallback((data: Channel[], index: number) => {
@@ -184,38 +192,54 @@ export const VirtualizedChannelList: React.FC<VirtualizedChannelListProps> = ({
     return data.length;
   }, []);
 
-  const renderItem = useCallback(({ item, index }: { item: Channel; index: number }) => {
-    const isSelected = currentChannel?.id === item.id;
-    const isFavorite = favorites.includes(item.id);
+  const renderItem = useCallback(
+    ({item, index}: {item: Channel; index: number}) => {
+      const isSelected = currentChannel?.id === item.id;
+      const isFavorite = favorites.includes(item.id);
 
-    return (
-      <ChannelItem
-        item={item}
-        isSelected={isSelected}
-        isFavorite={isFavorite}
-        isDarkMode={isDarkMode}
-        onSelect={handleChannelSelect}
-        onToggleFavorite={handleToggleFavorite}
-      />
-    );
-  }, [currentChannel, favorites, isDarkMode, handleChannelSelect, handleToggleFavorite]);
+      return (
+        <ChannelItem
+          item={item}
+          isSelected={isSelected}
+          isFavorite={isFavorite}
+          isDarkMode={isDarkMode}
+          onSelect={handleChannelSelect}
+          onToggleFavorite={handleToggleFavorite}
+        />
+      );
+    },
+    [
+      currentChannel,
+      favorites,
+      isDarkMode,
+      handleChannelSelect,
+      handleToggleFavorite,
+    ],
+  );
 
   const keyExtractor = useCallback((item: Channel, index: number) => {
     return item.id || `channel_${index}`;
   }, []);
 
-  const getItemLayout = useCallback((data: any, index: number) => ({
-    length: ITEM_HEIGHT + SEPARATOR_HEIGHT,
-    offset: (ITEM_HEIGHT + SEPARATOR_HEIGHT) * index,
-    index,
-  }), []);
+  const getItemLayout = useCallback(
+    (data: any, index: number) => ({
+      length: ITEM_HEIGHT + SEPARATOR_HEIGHT,
+      offset: (ITEM_HEIGHT + SEPARATOR_HEIGHT) * index,
+      index,
+    }),
+    [],
+  );
 
   // 🎨 RENDER CATEGORIES BAR
   const renderCategoryButton = (category: string) => {
     const isSelected = selectedCategory === category;
-    const displayName = category === 'all' ? 'Toutes' : 
-                       category === 'favorites' ? 'Favoris' : category;
-    
+    const displayName =
+      category === 'all'
+        ? 'Toutes'
+        : category === 'favorites'
+        ? 'Favoris'
+        : category;
+
     return (
       <TouchableOpacity
         key={category}
@@ -224,16 +248,14 @@ export const VirtualizedChannelList: React.FC<VirtualizedChannelListProps> = ({
           isDarkMode && styles.categoryButtonDark,
           isSelected && styles.categoryButtonSelected,
         ]}
-        onPress={() => setSelectedCategory(category)}
-      >
+        onPress={() => setSelectedCategory(category)}>
         <Text
           style={[
             styles.categoryButtonText,
             isDarkMode && styles.categoryButtonTextDark,
             isSelected && styles.categoryButtonTextSelected,
           ]}
-          numberOfLines={1}
-        >
+          numberOfLines={1}>
           {displayName}
         </Text>
       </TouchableOpacity>
@@ -241,12 +263,18 @@ export const VirtualizedChannelList: React.FC<VirtualizedChannelListProps> = ({
   };
 
   // 📊 STATISTIQUES PERFORMANCE
-  console.log(`🚀 VirtualizedChannelList - Rendering ${filteredChannels.length} channels`);
+  console.log(
+    `🚀 VirtualizedChannelList - Rendering ${filteredChannels.length} channels`,
+  );
 
   return (
     <View style={[styles.container, isDarkMode && styles.containerDark]}>
       {/* 🔍 SEARCH BAR FIXE */}
-      <View style={[styles.searchContainer, isDarkMode && styles.searchContainerDark]}>
+      <View
+        style={[
+          styles.searchContainer,
+          isDarkMode && styles.searchContainerDark,
+        ]}>
         <TextInput
           style={[styles.searchInput, isDarkMode && styles.searchInputDark]}
           placeholder="Rechercher une chaîne..."
@@ -260,7 +288,11 @@ export const VirtualizedChannelList: React.FC<VirtualizedChannelListProps> = ({
       </View>
 
       {/* 📂 CATEGORIES HORIZONTALES */}
-      <View style={[styles.categoriesContainer, isDarkMode && styles.categoriesContainerDark]}>
+      <View
+        style={[
+          styles.categoriesContainer,
+          isDarkMode && styles.categoriesContainerDark,
+        ]}>
         <VirtualizedList
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -269,10 +301,10 @@ export const VirtualizedChannelList: React.FC<VirtualizedChannelListProps> = ({
           windowSize={10}
           maxToRenderPerBatch={5}
           updateCellsBatchingPeriod={50}
-          getItemCount={(data) => data.length}
+          getItemCount={data => data.length}
           getItem={(data, index) => data[index]}
-          keyExtractor={(item) => item}
-          renderItem={({ item }) => renderCategoryButton(item)}
+          keyExtractor={item => item}
+          renderItem={({item}) => renderCategoryButton(item)}
         />
       </View>
 
@@ -292,15 +324,24 @@ export const VirtualizedChannelList: React.FC<VirtualizedChannelListProps> = ({
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={[styles.emptyText, isDarkMode && styles.emptyTextDark]}>
-              {searchQuery ? 'Aucune chaîne trouvée' : 'Aucune chaîne disponible'}
+            <Text
+              style={[styles.emptyText, isDarkMode && styles.emptyTextDark]}>
+              {searchQuery
+                ? 'Aucune chaîne trouvée'
+                : 'Aucune chaîne disponible'}
             </Text>
           </View>
         }
         ListFooterComponent={
-          <View style={[styles.footerInfo, isDarkMode && styles.footerInfoDark]}>
-            <Text style={[styles.channelCount, isDarkMode && styles.channelCountDark]}>
-              📊 {filteredChannels.length.toLocaleString()} chaîne{filteredChannels.length !== 1 ? 's' : ''}
+          <View
+            style={[styles.footerInfo, isDarkMode && styles.footerInfoDark]}>
+            <Text
+              style={[
+                styles.channelCount,
+                isDarkMode && styles.channelCountDark,
+              ]}>
+              📊 {filteredChannels.length.toLocaleString()} chaîne
+              {filteredChannels.length !== 1 ? 's' : ''}
             </Text>
           </View>
         }
@@ -317,7 +358,7 @@ const styles = StyleSheet.create({
   containerDark: {
     backgroundColor: '#1a1a1a',
   },
-  
+
   // 🔍 SEARCH STYLES
   searchContainer: {
     height: SEARCH_BAR_HEIGHT,
@@ -396,7 +437,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     elevation: 2,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: {width: 0, height: 1},
     shadowOpacity: 0.1,
     shadowRadius: 2,
   },

@@ -22,20 +22,20 @@ export class CacheService {
   private L1Cache: Map<string, CacheEntry> = new Map();
   private readonly L1_MAX_SIZE = 100; // 100 entrées max
   private readonly L1_MAX_MEMORY = 50 * 1024 * 1024; // 50MB max
-  
-  // L2 Cache - AsyncStorage 
+
+  // L2 Cache - AsyncStorage
   private readonly L2_MAX_SIZE = 20; // 20 entrées max
   private readonly L2_MAX_MEMORY = 10 * 1024 * 1024; // 10MB max
-  
+
   // L3 Cache - SQLite (TODO: implémenter)
   private readonly L3_MAX_SIZE = 100; // 100 entrées max
   private readonly L3_MAX_MEMORY = 100 * 1024 * 1024; // 100MB max
 
   // Stats et monitoring
   private stats = {
-    L1: { hits: 0, misses: 0, sets: 0, evictions: 0 },
-    L2: { hits: 0, misses: 0, sets: 0, evictions: 0 },
-    L3: { hits: 0, misses: 0, sets: 0, evictions: 0 }
+    L1: {hits: 0, misses: 0, sets: 0, evictions: 0},
+    L2: {hits: 0, misses: 0, sets: 0, evictions: 0},
+    L3: {hits: 0, misses: 0, sets: 0, evictions: 0},
   };
 
   // 🆕 Singleton pattern instance
@@ -91,12 +91,13 @@ export class CacheService {
       if (entry) {
         this.stats.L2.hits++;
         console.log(`✅ L2 HIT: ${key}`);
-        
+
         // Promotion vers L1 si petit
-        if (this.estimateSize(entry) <= 1024 * 1024) { // 1MB
+        if (this.estimateSize(entry) <= 1024 * 1024) {
+          // 1MB
           await this.setToL1(key, entry);
         }
-        
+
         return entry;
       }
       this.stats.L2.misses++;
@@ -108,10 +109,10 @@ export class CacheService {
       if (entry) {
         this.stats.L3.hits++;
         console.log(`✅ L3 HIT: ${key}`);
-        
+
         // Promotion vers niveaux supérieurs
         await this.promoteFromL3(key, entry);
-        
+
         return entry;
       }
       this.stats.L3.misses++;
@@ -124,7 +125,12 @@ export class CacheService {
   /**
    * Stocker données dans cache selon niveau
    */
-  async set<T>(key: string, data: T, level: CacheLevel = 'all', ttl?: number): Promise<void> {
+  async set<T>(
+    key: string,
+    data: T,
+    level: CacheLevel = 'all',
+    ttl?: number,
+  ): Promise<void> {
     const dataSize = this.estimateSize(data);
     console.log(`💾 Cache SET: ${key} (${dataSize}KB) to ${level}`);
 
@@ -135,7 +141,7 @@ export class CacheService {
       ttl,
       size: dataSize,
       accessCount: 1,
-      lastAccess: Date.now()
+      lastAccess: Date.now(),
     };
 
     if (level === 'all' || level === 'L1') {
@@ -178,7 +184,7 @@ export class CacheService {
    */
   private getFromL1<T>(key: string): T | null {
     const entry = this.L1Cache.get(key);
-    if (!entry) return null;
+    if (!entry) {return null;}
 
     // Vérifier TTL
     if (entry.ttl && Date.now() - entry.timestamp > entry.ttl) {
@@ -189,7 +195,7 @@ export class CacheService {
     // Mettre à jour accès pour LRU
     entry.lastAccess = Date.now();
     entry.accessCount = (entry.accessCount || 0) + 1;
-    
+
     // Réorganiser pour LRU (delete + set = move to end)
     this.L1Cache.delete(key);
     this.L1Cache.set(key, entry);
@@ -197,14 +203,18 @@ export class CacheService {
     return entry.data;
   }
 
-  private async setToL1<T>(key: string, data: T, entry?: CacheEntry<T>): Promise<void> {
+  private async setToL1<T>(
+    key: string,
+    data: T,
+    entry?: CacheEntry<T>,
+  ): Promise<void> {
     const cacheEntry = entry || {
       key,
       data,
       timestamp: Date.now(),
       size: this.estimateSize(data),
       accessCount: 1,
-      lastAccess: Date.now()
+      lastAccess: Date.now(),
     };
 
     // Éviction LRU si nécessaire
@@ -225,14 +235,17 @@ export class CacheService {
     }
 
     // Éviction par mémoire (estimation)
-    const totalSize = Array.from(this.L1Cache.values())
-      .reduce((sum, entry) => sum + (entry.size || 0), 0);
-    
+    const totalSize = Array.from(this.L1Cache.values()).reduce(
+      (sum, entry) => sum + (entry.size || 0),
+      0,
+    );
+
     if (totalSize > this.L1_MAX_MEMORY) {
       // Supprimer les entrées les moins récemment utilisées
-      const entries = Array.from(this.L1Cache.entries())
-        .sort(([,a], [,b]) => (a.lastAccess || 0) - (b.lastAccess || 0));
-      
+      const entries = Array.from(this.L1Cache.entries()).sort(
+        ([, a], [, b]) => (a.lastAccess || 0) - (b.lastAccess || 0),
+      );
+
       const toRemove = Math.ceil(entries.length * 0.2); // Supprimer 20%
       for (let i = 0; i < toRemove; i++) {
         this.L1Cache.delete(entries[i][0]);
@@ -248,7 +261,7 @@ export class CacheService {
   private async getFromL2<T>(key: string): Promise<T | null> {
     try {
       const stored = await AsyncStorage.getItem(`cache_L2_${key}`);
-      if (!stored) return null;
+      if (!stored) {return null;}
 
       const entry: CacheEntry<T> = JSON.parse(stored);
 
@@ -265,13 +278,17 @@ export class CacheService {
     }
   }
 
-  private async setToL2<T>(key: string, data: T, entry?: CacheEntry<T>): Promise<void> {
+  private async setToL2<T>(
+    key: string,
+    data: T,
+    entry?: CacheEntry<T>,
+  ): Promise<void> {
     try {
       const cacheEntry = entry || {
         key,
         data,
         timestamp: Date.now(),
-        size: this.estimateSize(data)
+        size: this.estimateSize(data),
       };
 
       await AsyncStorage.setItem(`cache_L2_${key}`, JSON.stringify(cacheEntry));
@@ -288,7 +305,11 @@ export class CacheService {
     return null;
   }
 
-  private async setToL3<T>(key: string, data: T, entry?: CacheEntry<T>): Promise<void> {
+  private async setToL3<T>(
+    key: string,
+    data: T,
+    entry?: CacheEntry<T>,
+  ): Promise<void> {
     // TODO: Implémenter SQLite
   }
 
@@ -297,12 +318,12 @@ export class CacheService {
    */
   private async promoteFromL3<T>(key: string, data: T): Promise<void> {
     const dataSize = this.estimateSize(data);
-    
+
     // Promouvoir vers L2 si assez petit
     if (dataSize <= this.L2_MAX_MEMORY / 10) {
       await this.setToL2(key, data);
     }
-    
+
     // Promouvoir vers L1 si très petit
     if (dataSize <= this.L1_MAX_MEMORY / 20) {
       await this.setToL1(key, data);
@@ -322,28 +343,30 @@ export class CacheService {
    */
   getStats() {
     const L1Size = this.L1Cache.size;
-    const L1Memory = Array.from(this.L1Cache.values())
-      .reduce((sum, entry) => sum + (entry.size || 0), 0);
+    const L1Memory = Array.from(this.L1Cache.values()).reduce(
+      (sum, entry) => sum + (entry.size || 0),
+      0,
+    );
 
     return {
       L1: {
         ...this.stats.L1,
         entries: L1Size,
         memory: L1Memory,
-        hitRate: this.calculateHitRate(this.stats.L1)
+        hitRate: this.calculateHitRate(this.stats.L1),
       },
       L2: {
         ...this.stats.L2,
-        hitRate: this.calculateHitRate(this.stats.L2)
+        hitRate: this.calculateHitRate(this.stats.L2),
       },
       L3: {
         ...this.stats.L3,
-        hitRate: this.calculateHitRate(this.stats.L3)
+        hitRate: this.calculateHitRate(this.stats.L3),
       }
     };
   }
 
-  private calculateHitRate(stats: { hits: number; misses: number }): number {
+  private calculateHitRate(stats: {hits: number; misses: number}): number {
     const total = stats.hits + stats.misses;
     return total > 0 ? Math.round((stats.hits / total) * 100) : 0;
   }
@@ -353,22 +376,22 @@ export class CacheService {
    */
   async clearAll(): Promise<void> {
     console.log('🧹 Clearing all cache levels');
-    
+
     // L1
     this.L1Cache.clear();
-    
+
     // L2 - AsyncStorage
     const keys = await AsyncStorage.getAllKeys();
     const cacheKeys = keys.filter(key => key.startsWith('cache_L2_'));
     await AsyncStorage.multiRemove(cacheKeys);
-    
+
     // L3 - SQLite (TODO)
-    
+
     // Reset stats
     this.stats = {
-      L1: { hits: 0, misses: 0, sets: 0, evictions: 0 },
-      L2: { hits: 0, misses: 0, sets: 0, evictions: 0 },
-      L3: { hits: 0, misses: 0, sets: 0, evictions: 0 }
+      L1: {hits: 0, misses: 0, sets: 0, evictions: 0},
+      L2: {hits: 0, misses: 0, sets: 0, evictions: 0},
+      L3: {hits: 0, misses: 0, sets: 0, evictions: 0},
     };
   }
 
@@ -377,7 +400,7 @@ export class CacheService {
    */
   async cleanup(): Promise<void> {
     console.log('🧹 Cache cleanup - removing expired entries');
-    
+
     // L1 cleanup
     const now = Date.now();
     for (const [key, entry] of this.L1Cache.entries()) {
@@ -385,7 +408,7 @@ export class CacheService {
         this.L1Cache.delete(key);
       }
     }
-    
+
     // L2 cleanup (TODO: parcourir AsyncStorage)
     // L3 cleanup (TODO: SQLite)
   }

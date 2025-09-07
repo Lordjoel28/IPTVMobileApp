@@ -52,7 +52,7 @@ class ObjectPool<T> {
   constructor(createFn: () => T, resetFn: (obj: T) => void, initialSize = 100) {
     this.createFn = createFn;
     this.resetFn = resetFn;
-    
+
     // Pré-allocation pool
     for (let i = 0; i < initialSize; i++) {
       this.objects.push(createFn());
@@ -119,7 +119,7 @@ export class UltraOptimizedM3UParser {
     extinfCount: 0,
     validUrlCount: 0,
     orphanChannels: 0,
-    duplicateUrls: 0
+    duplicateUrls: 0,
   };
 
   constructor() {
@@ -135,9 +135,9 @@ export class UltraOptimizedM3UParser {
         language: '',
         country: '',
         tvgId: '',
-        groupTitle: ''
+        groupTitle: '',
       }),
-      (channel) => {
+      channel => {
         channel.id = '';
         channel.name = '';
         channel.url = '';
@@ -149,7 +149,7 @@ export class UltraOptimizedM3UParser {
         channel.tvgId = '';
         channel.groupTitle = '';
       },
-      500 // Initial pool size
+      500, // Initial pool size
     );
 
     this.stringCache = new LRUCache<string>(5000);
@@ -175,13 +175,13 @@ export class UltraOptimizedM3UParser {
       // Preprocessing ultra-optimisé
       const lines = this.preprocessLinesOptimized(content);
       const channels = await this.parseChannelsOptimized(lines, chunkSize);
-      
+
       this.calculateStats(startTime, channels.length);
-      
+
       return {
         channels,
         stats: this.stats,
-        errors: this.errors
+        errors: this.errors,
       };
     } catch (error) {
       console.error('Parse error:', error);
@@ -198,7 +198,7 @@ export class UltraOptimizedM3UParser {
       console.warn('⚠️ Content is undefined or not a string:', typeof content);
       return [];
     }
-    
+
     const lines: string[] = [];
     const contentLength = content.length;
     let start = 0;
@@ -212,22 +212,22 @@ export class UltraOptimizedM3UParser {
 
       if (pos > start) {
         let line = content.substring(start, pos);
-        
+
         // Trim ultra-optimisé
         let trimStart = 0;
         let trimEnd = line.length;
-        
+
         while (trimStart < trimEnd && line.charCodeAt(trimStart) <= 32) {
           trimStart++;
         }
-        
+
         while (trimEnd > trimStart && line.charCodeAt(trimEnd - 1) <= 32) {
           trimEnd--;
         }
 
         if (trimEnd > trimStart) {
           line = line.substring(trimStart, trimEnd);
-          
+
           // String interning avec cache
           const cachedLine = this.stringCache.get(line);
           if (cachedLine) {
@@ -249,7 +249,10 @@ export class UltraOptimizedM3UParser {
   /**
    * Parse channels avec chunking adaptatif
    */
-  private async parseChannelsOptimized(lines: string[], chunkSize: number): Promise<Channel[]> {
+  private async parseChannelsOptimized(
+    lines: string[],
+    chunkSize: number,
+  ): Promise<Channel[]> {
     const channels: Channel[] = [];
     let i = 0;
     let processedChunks = 0;
@@ -257,10 +260,10 @@ export class UltraOptimizedM3UParser {
     while (i < lines.length) {
       const chunkEnd = Math.min(i + chunkSize, lines.length);
       const chunk = lines.slice(i, chunkEnd);
-      
+
       const chunkChannels = this.parseChunk(chunk, i);
       channels.push(...chunkChannels);
-      
+
       i = chunkEnd;
       processedChunks++;
 
@@ -289,10 +292,11 @@ export class UltraOptimizedM3UParser {
         // Machine à états basée sur premier caractère (plus rapide que startsWith)
         const firstChar = line.charCodeAt(0);
 
-        if (firstChar === 35) { // '#'
+        if (firstChar === 35) {
+          // '#'
           if (line.startsWith('#EXTINF:')) {
             this.diagnostics.extinfCount++;
-            
+
             // 🔧 CORRECTION CRITIQUE: Finaliser channel précédent AVANT nouveau #EXTINF
             if (currentChannel) {
               if (currentChannel.url && currentChannel.name) {
@@ -301,7 +305,11 @@ export class UltraOptimizedM3UParser {
               } else {
                 // Channel orphelin (EXTINF sans URL)
                 this.diagnostics.orphanChannels++;
-                console.warn(`⚠️ Orphan channel detected: ${currentChannel.name || 'unnamed'}`);
+                console.warn(
+                  `⚠️ Orphan channel detected: ${
+                    currentChannel.name || 'unnamed'
+                  }`,
+                );
               }
               currentChannel = null;
             }
@@ -311,26 +319,26 @@ export class UltraOptimizedM3UParser {
           // Ces lignes sont ignorées mais l'état currentExtinf/currentChannel reste intact
         } else if (this.isValidUrlOptimized(line)) {
           this.diagnostics.validUrlCount++;
-          
+
           // Vérifier URL dupliquée - compter seulement
           if (this.urlSet.has(line)) {
             this.diagnostics.duplicateUrls++;
           } else {
             this.urlSet.add(line);
           }
-          
+
           // 🔧 CORRECTION: Créer channel si on a un EXTINF en attente
           if (currentExtinf) {
             // Finaliser channel précédent si existe
             if (currentChannel && currentChannel.url && currentChannel.name) {
               channels.push(currentChannel);
             }
-            
+
             currentChannel = this.channelPool.acquire();
             this.parseExtinf(currentExtinf, currentChannel);
             currentChannel.url = line;
             currentChannel.id = this.generateChannelId(currentChannel);
-            
+
             // Finaliser immédiatement si channel complet
             if (currentChannel.name && currentChannel.url) {
               channels.push(currentChannel);
@@ -345,7 +353,7 @@ export class UltraOptimizedM3UParser {
             currentChannel.name = this.extractNameFromUrl(line);
             currentChannel.url = line;
             currentChannel.id = this.generateChannelId(currentChannel);
-            
+
             if (currentChannel.name && currentChannel.url) {
               channels.push(currentChannel);
               currentChannel = null;
@@ -356,7 +364,7 @@ export class UltraOptimizedM3UParser {
         this.errors.push({
           line: lineNumber,
           content: line,
-          error: error.message || 'Unknown error'
+          error: error.message || 'Unknown error',
         });
       }
     }
@@ -377,65 +385,96 @@ export class UltraOptimizedM3UParser {
    * Validation URL ultra-optimisée pour TOUS les formats IPTV + edge cases
    */
   private isValidUrlOptimized(url: string): boolean {
-    if (url.length < 4) return false;
-    
+    if (url.length < 4) {
+      return false;
+    }
+
     const first = url.charCodeAt(0);
-    
+
     // http/https (même URLs mal formées avec hhttps, hhttp)
-    if (first === 104) { // 'h'
-      return url.startsWith('http://') || url.startsWith('https://') || 
-             url.startsWith('hhttps://') || url.startsWith('hhttp://');
+    if (first === 104) {
+      // 'h'
+      return (
+        url.startsWith('http://') ||
+        url.startsWith('https://') ||
+        url.startsWith('hhttps://') ||
+        url.startsWith('hhttp://')
+      );
     }
     // rtmp/rtp/rtsp
-    if (first === 114) { // 'r' 
-      return url.startsWith('rtmp://') || url.startsWith('rtp://') || url.startsWith('rtsp://');
+    if (first === 114) {
+      // 'r'
+      return (
+        url.startsWith('rtmp://') ||
+        url.startsWith('rtp://') ||
+        url.startsWith('rtsp://')
+      );
     }
     // udp
-    if (first === 117) { // 'u'
+    if (first === 117) {
+      // 'u'
       return url.startsWith('udp://') || url.startsWith('udpxy://');
     }
     // mmsh/mms
-    if (first === 109) { // 'm'
-      return url.startsWith('mmsh://') || url.startsWith('mms://') || url.startsWith('mcast://');
+    if (first === 109) {
+      // 'm'
+      return (
+        url.startsWith('mmsh://') ||
+        url.startsWith('mms://') ||
+        url.startsWith('mcast://')
+      );
     }
     // ftp/ftps
-    if (first === 102) { // 'f'
+    if (first === 102) {
+      // 'f'
       return url.startsWith('ftp://') || url.startsWith('ftps://');
     }
     // tcp
-    if (first === 116) { // 't'
+    if (first === 116) {
+      // 't'
       return url.startsWith('tcp://') || url.startsWith('tls://');
     }
     // pipe (VLC)
-    if (first === 112) { // 'p'
+    if (first === 112) {
+      // 'p'
       return url.startsWith('pipe://') || url.startsWith('pvr://');
     }
     // dvb/dshow
-    if (first === 100) { // 'd'
+    if (first === 100) {
+      // 'd'
       return url.startsWith('dvb://') || url.startsWith('dshow://');
     }
     // screen/file
-    if (first === 115) { // 's'
-      return url.startsWith('screen://') || url.startsWith('srt://') || url.startsWith('smb://');
+    if (first === 115) {
+      // 's'
+      return (
+        url.startsWith('screen://') ||
+        url.startsWith('srt://') ||
+        url.startsWith('smb://')
+      );
     }
     // v4l2
-    if (first === 118) { // 'v'
+    if (first === 118) {
+      // 'v'
       return url.startsWith('v4l2://') || url.startsWith('vlc://');
     }
-    
+
     // 🔧 FALLBACK ÉTENDU: Toute ligne avec protocole potentiel
     if (!url.startsWith('#') && url.includes('://')) {
       // Vérifier que ce n'est pas juste du texte avec ://
       const protocolMatch = url.match(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//);
       return protocolMatch !== null;
     }
-    
+
     // 🔧 EDGE CASE: URLs sans protocole mais qui ressemblent à des IPs/domaines
-    if (!url.startsWith('#') && (url.match(/^\d+\.\d+\.\d+\.\d+/) || url.includes('.'))) {
+    if (
+      !url.startsWith('#') &&
+      (url.match(/^\d+\.\d+\.\d+\.\d+/) || url.includes('.'))
+    ) {
       // Possiblement une URL malformée sans protocole
       return url.includes('.') && !url.includes(' ');
     }
-    
+
     return false;
   }
 
@@ -446,13 +485,13 @@ export class UltraOptimizedM3UParser {
   private parseExtinf(extinf: string, channel: Channel): void {
     // 🔧 FALLBACKS MULTIPLES pour extraction nom
     let channelName = '';
-    
+
     // Fallback 1: Texte après dernière virgule (standard)
     const nameMatch = extinf.match(/,([^,]*)$/);
     if (nameMatch && nameMatch[1] && nameMatch[1].trim()) {
       channelName = nameMatch[1].trim();
     }
-    
+
     // Fallback 2: Si pas de virgule, essayer après durée
     if (!channelName) {
       const noCommaMatch = extinf.match(/#EXTINF:[^,]*\s+(.+)$/);
@@ -460,7 +499,7 @@ export class UltraOptimizedM3UParser {
         channelName = noCommaMatch[1].trim();
       }
     }
-    
+
     // Fallback 3: Extraire depuis attributs (tvg-name, etc.)
     if (!channelName) {
       const tvgNameMatch = extinf.match(/tvg-name=["']?([^"'\s,]+)["']?/);
@@ -468,26 +507,29 @@ export class UltraOptimizedM3UParser {
         channelName = tvgNameMatch[1];
       }
     }
-    
+
     // Fallback 4: Nom générique avec index
     if (!channelName) {
-      channelName = `Channel_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      channelName = `Channel_${Date.now()}_${Math.random()
+        .toString(36)
+        .substr(2, 9)}`;
     }
-    
+
     channel.name = this.internString(channelName);
 
     // 🔧 REGEX ROBUSTE pour attributs avec gestion edge cases
     // Capture: key="value" | key='value' | key=value | key="value avec espace"
-    const attributeRegex = /(\w+(?:-\w+)*)=(?:"([^"]*)"|'([^']*)'|([^\s,"']+))/g;
+    const attributeRegex =
+      /(\w+(?:-\w+)*)=(?:"([^"]*)"|'([^']*)'|([^\s,"']+))/g;
     let match;
 
     while ((match = attributeRegex.exec(extinf)) !== null) {
       const [, key, doubleQuoted, singleQuoted, unquoted] = match;
       const value = doubleQuoted || singleQuoted || unquoted || '';
-      
+
       if (value && value.trim()) {
         const internedValue = this.internString(value.trim());
-        
+
         switch (key.toLowerCase()) {
           case 'tvg-id':
             channel.tvgId = internedValue;
@@ -529,11 +571,23 @@ export class UltraOptimizedM3UParser {
     const name = channel.name.toLowerCase();
     if (name.includes('4k') || name.includes('uhd') || name.includes('2160')) {
       channel.quality = '4K';
-    } else if (name.includes('fhd') || name.includes('1080') || name.includes('full hd')) {
+    } else if (
+      name.includes('fhd') ||
+      name.includes('1080') ||
+      name.includes('full hd')
+    ) {
       channel.quality = 'FHD';
-    } else if (name.includes('hd') || name.includes('720') || name.includes('high def')) {
+    } else if (
+      name.includes('hd') ||
+      name.includes('720') ||
+      name.includes('high def')
+    ) {
       channel.quality = 'HD';
-    } else if (name.includes('sd') || name.includes('480') || name.includes('576')) {
+    } else if (
+      name.includes('sd') ||
+      name.includes('480') ||
+      name.includes('576')
+    ) {
       channel.quality = 'SD';
     } else {
       channel.quality = 'Unknown';
@@ -545,12 +599,19 @@ export class UltraOptimizedM3UParser {
     } else {
       // Fallback: déduire catégorie depuis nom
       const lowerName = name;
-      if (lowerName.includes('sport')) channel.category = 'Sports';
-      else if (lowerName.includes('news') || lowerName.includes('info')) channel.category = 'News';
-      else if (lowerName.includes('movie') || lowerName.includes('cinema')) channel.category = 'Movies';
-      else if (lowerName.includes('music')) channel.category = 'Music';
-      else if (lowerName.includes('kids') || lowerName.includes('cartoon')) channel.category = 'Kids';
-      else channel.category = 'General';
+      if (lowerName.includes('sport')) {
+        channel.category = 'Sports';
+      } else if (lowerName.includes('news') || lowerName.includes('info')) {
+        channel.category = 'News';
+      } else if (lowerName.includes('movie') || lowerName.includes('cinema')) {
+        channel.category = 'Movies';
+      } else if (lowerName.includes('music')) {
+        channel.category = 'Music';
+      } else if (lowerName.includes('kids') || lowerName.includes('cartoon')) {
+        channel.category = 'Kids';
+      } else {
+        channel.category = 'General';
+      }
     }
   }
 
@@ -559,8 +620,10 @@ export class UltraOptimizedM3UParser {
    */
   private internString(str: string): string {
     const cached = this.stringCache.get(str);
-    if (cached) return cached;
-    
+    if (cached) {
+      return cached;
+    }
+
     this.stringCache.set(str, str);
     return str;
   }
@@ -570,7 +633,9 @@ export class UltraOptimizedM3UParser {
    */
   private generateChannelId(channel: Channel): string {
     const base = `${channel.name}_${channel.url}`;
-    return btoa(base).replace(/[^a-zA-Z0-9]/g, '').substring(0, 16);
+    return btoa(base)
+      .replace(/[^a-zA-Z0-9]/g, '')
+      .substring(0, 16);
   }
 
   /**
@@ -579,7 +644,7 @@ export class UltraOptimizedM3UParser {
   private calculateStats(startTime: number, channelCount: number): void {
     const parseTime = Date.now() - startTime;
     const channelsPerSecond = Math.round((channelCount / parseTime) * 1000);
-    
+
     this.stats = {
       totalChannels: channelCount,
       parseTime,
@@ -589,17 +654,22 @@ export class UltraOptimizedM3UParser {
       extinfCount: this.diagnostics.extinfCount,
       validUrlCount: this.diagnostics.validUrlCount,
       orphanChannels: this.diagnostics.orphanChannels,
-      duplicateUrls: this.diagnostics.duplicateUrls
+      duplicateUrls: this.diagnostics.duplicateUrls,
     };
-    
+
     // 🔧 DIAGNOSTIC PARSING - Logger pour debugging
-    console.log(`📊 PARSING DIAGNOSTICS:`);
+    console.log('📊 PARSING DIAGNOSTICS:');
     console.log(`   EXTINF found: ${this.diagnostics.extinfCount}`);
     console.log(`   Valid URLs: ${this.diagnostics.validUrlCount}`);
     console.log(`   Channels created: ${channelCount}`);
     console.log(`   Orphan channels: ${this.diagnostics.orphanChannels}`);
     console.log(`   Duplicate URLs: ${this.diagnostics.duplicateUrls}`);
-    console.log(`   Match rate: ${((channelCount / this.diagnostics.extinfCount) * 100).toFixed(1)}%`);
+    console.log(
+      `   Match rate: ${(
+        (channelCount / this.diagnostics.extinfCount) *
+        100
+      ).toFixed(1)}%`,
+    );
   }
 
   /**
@@ -608,7 +678,7 @@ export class UltraOptimizedM3UParser {
   private estimateMemoryUsage(): number {
     // Estimation basée sur pool size et cache
     const poolMemory = this.channelPool.size * 0.001; // ~1KB per channel object
-    const cacheMemory = this.stringCache['cache'].size * 0.0005; // ~0.5KB per cached string
+    const cacheMemory = this.stringCache.cache.size * 0.0005; // ~0.5KB per cached string
     return Math.round((poolMemory + cacheMemory) * 100) / 100;
   }
 
@@ -634,16 +704,16 @@ export class UltraOptimizedM3UParser {
       extinfCount: 0,
       validUrlCount: 0,
       orphanChannels: 0,
-      duplicateUrls: 0
+      duplicateUrls: 0,
     };
-    
+
     this.diagnostics = {
       extinfCount: 0,
       validUrlCount: 0,
       orphanChannels: 0,
-      duplicateUrls: 0
+      duplicateUrls: 0,
     };
-    
+
     this.urlSet.clear();
   }
 
@@ -655,17 +725,17 @@ export class UltraOptimizedM3UParser {
       // Extraire nom de fichier ou segment d'URL
       const urlParts = url.split('/');
       const lastPart = urlParts[urlParts.length - 1];
-      
+
       if (lastPart && lastPart.length > 0) {
         // Retirer extension et paramètres
         let name = lastPart.split('?')[0].split('.')[0];
         name = name.replace(/[_-]/g, ' ').trim();
-        
+
         if (name.length > 2) {
           return name.charAt(0).toUpperCase() + name.slice(1);
         }
       }
-      
+
       // Fallback: utiliser domaine
       try {
         const urlObj = new URL(url);
@@ -693,7 +763,7 @@ export class UltraOptimizedM3UParser {
    * Get current statistics
    */
   getStats(): ParseStats {
-    return { ...this.stats };
+    return {...this.stats};
   }
 }
 

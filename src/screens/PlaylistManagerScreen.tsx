@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,7 @@ import {
   Modal,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigation } from '@react-navigation/native';
+import {useNavigation} from '@react-navigation/native';
 
 interface PlaylistItem {
   id: string;
@@ -27,7 +27,9 @@ const PlaylistManagerScreen = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [renameModalVisible, setRenameModalVisible] = useState(false);
-  const [selectedPlaylist, setSelectedPlaylist] = useState<PlaylistItem | null>(null);
+  const [selectedPlaylist, setSelectedPlaylist] = useState<PlaylistItem | null>(
+    null,
+  );
   const [newName, setNewName] = useState('');
 
   useEffect(() => {
@@ -39,9 +41,9 @@ const PlaylistManagerScreen = () => {
       console.log('🗂️ Chargement des playlists sauvegardées...');
       const keys = await AsyncStorage.getAllKeys();
       const playlistKeys = keys.filter(key => key.startsWith('playlist_'));
-      
+
       const playlistsData: PlaylistItem[] = [];
-      
+
       for (const key of playlistKeys) {
         try {
           const data = await AsyncStorage.getItem(key);
@@ -52,7 +54,7 @@ const PlaylistManagerScreen = () => {
               name: playlist.name || 'Playlist sans nom',
               channelsCount: playlist.channels?.length || 0,
               dateAdded: playlist.dateAdded || new Date().toISOString(),
-              source: playlist.source || 'unknown'
+              source: playlist.source || 'unknown',
             });
           }
         } catch (error) {
@@ -61,8 +63,10 @@ const PlaylistManagerScreen = () => {
       }
 
       // Trier par date d'ajout (plus récent en premier)
-      playlistsData.sort((a, b) => new Date(b.dateAdded).getTime() - new Date(a.dateAdded).getTime());
-      
+      playlistsData.sort(
+        (a, b) =>
+          new Date(b.dateAdded).getTime() - new Date(a.dateAdded).getTime(),
+
       setPlaylists(playlistsData);
       console.log(`📋 ${playlistsData.length} playlists chargées`);
     } catch (error) {
@@ -84,17 +88,17 @@ const PlaylistManagerScreen = () => {
       const data = await AsyncStorage.getItem(`playlist_${playlistItem.id}`);
       if (data) {
         const playlist = JSON.parse(data);
-        
+
         navigation.navigate('ChannelList', {
           playlistId: playlistItem.id,
           playlistName: playlistItem.name,
           channels: playlist.channels || [],
-          totalChannels: playlist.channels?.length || 0
+          totalChannels: playlist.channels?.length || 0,
         });
       }
     } catch (error) {
       console.error('Erreur ouverture playlist:', error);
-      Alert.alert('Erreur', 'Impossible d\'ouvrir cette playlist');
+      Alert.alert('Erreur', "Impossible d'ouvrir cette playlist");
     }
   };
 
@@ -103,7 +107,7 @@ const PlaylistManagerScreen = () => {
       'Supprimer playlist',
       `Êtes-vous sûr de vouloir supprimer "${playlistItem.name}" ?`,
       [
-        { text: 'Annuler', style: 'cancel' },
+        {text: 'Annuler', style: 'cancel'},
         {
           text: 'Supprimer',
           style: 'destructive',
@@ -116,9 +120,9 @@ const PlaylistManagerScreen = () => {
               console.error('Erreur suppression:', error);
               Alert.alert('Erreur', 'Impossible de supprimer la playlist');
             }
-          }
+          },
         }
-      ]
+      ],
     );
   };
 
@@ -129,21 +133,27 @@ const PlaylistManagerScreen = () => {
   };
 
   const confirmRename = async () => {
-    if (!selectedPlaylist || !newName.trim()) return;
+    if (!selectedPlaylist || !newName.trim()) {return;}
 
     try {
-      const data = await AsyncStorage.getItem(`playlist_${selectedPlaylist.id}`);
+      const data = await AsyncStorage.getItem(
+        `playlist_${selectedPlaylist.id}`,
+      );
       if (data) {
         const playlist = JSON.parse(data);
         playlist.name = newName.trim();
-        await AsyncStorage.setItem(`playlist_${selectedPlaylist.id}`, JSON.stringify(playlist));
-        
+        await AsyncStorage.setItem(
+          `playlist_${selectedPlaylist.id}`,
+          JSON.stringify(playlist),
+
         setRenameModalVisible(false);
         setSelectedPlaylist(null);
         setNewName('');
         loadPlaylists();
-        
-        console.log(`✏️ Playlist renommée: ${selectedPlaylist.name} → ${newName.trim()}`);
+
+        console.log(
+          `✏️ Playlist renommée: ${selectedPlaylist.name} → ${newName.trim()}`,
+        );
       }
     } catch (error) {
       console.error('Erreur renommage:', error);
@@ -161,48 +171,51 @@ const PlaylistManagerScreen = () => {
 
   const getSourceIcon = (source: string) => {
     switch (source) {
-      case 'url': return '🌐';
-      case 'file': return '📁';
-      default: return '📺';
+      case 'url':
+        return '🌐';
+      case 'file':
+        return '📁';
+      default:
+        return '📺';
     }
   };
 
-  const renderPlaylistItem = ({ item }: { item: PlaylistItem }) => (
+  const renderPlaylistItem = ({item}: {item: PlaylistItem}) => (
     <TouchableOpacity
       style={styles.playlistCard}
       onPress={() => openPlaylist(item)}
-      activeOpacity={0.8}
-    >
+      activeOpacity={0.8}>
       <View style={styles.playlistHeader}>
         <View style={styles.playlistInfo}>
           <Text style={styles.playlistName}>{item.name}</Text>
           <Text style={styles.playlistDetails}>
-            {getSourceIcon(item.source)} {item.channelsCount} chaînes • {formatDate(item.dateAdded)}
+            {getSourceIcon(item.source)} {item.channelsCount} chaînes •{' '}
+            {formatDate(item.dateAdded)}
           </Text>
         </View>
         <View style={styles.playlistActions}>
           <TouchableOpacity
             style={styles.actionButton}
-            onPress={() => startRename(item)}
-          >
+            onPress={() => startRename(item)}>
             <Text style={styles.actionButtonText}>✏️</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.actionButton, styles.deleteButton]}
-            onPress={() => deletePlaylist(item)}
-          >
+            onPress={() => deletePlaylist(item)}>
             <Text style={styles.actionButtonText}>🗑️</Text>
           </TouchableOpacity>
         </View>
       </View>
-      
+
       <View style={styles.playlistStats}>
         <View style={styles.statItem}>
           <Text style={styles.statValue}>{item.channelsCount}</Text>
           <Text style={styles.statLabel}>Chaînes</Text>
         </View>
         <View style={styles.statItem}>
-          <Text style={styles.statValue}>{item.source === 'url' ? 'URL' : 'Fichier'}</Text>
+          <Text style={styles.statValue}>
+            {item.source === 'url' ? 'URL' : 'Fichier'}
+          </Text>
           <Text style={styles.statLabel}>Source</Text>
         </View>
       </View>
@@ -224,17 +237,18 @@ const PlaylistManagerScreen = () => {
       <View style={styles.header}>
         <Text style={styles.title}>Mes Playlists</Text>
         <Text style={styles.subtitle}>
-          {playlists.length} playlist{playlists.length !== 1 ? 's' : ''} sauvegardée{playlists.length !== 1 ? 's' : ''}
+          {playlists.length} playlist{playlists.length !== 1 ? 's' : ''}{' '}
+          sauvegardée{playlists.length !== 1 ? 's' : ''}
         </Text>
       </View>
 
       <FlatList
         data={playlists}
         renderItem={renderPlaylistItem}
-        keyExtractor={(item) => item.id}
+        keyExtractor={item => item.id}
         contentContainerStyle={[
           styles.listContainer,
-          playlists.length === 0 && styles.centerContent
+          playlists.length === 0 && styles.centerContent,
         ]}
         refreshControl={
           <RefreshControl
@@ -253,12 +267,11 @@ const PlaylistManagerScreen = () => {
         visible={renameModalVisible}
         animationType="fade"
         transparent={true}
-        onRequestClose={() => setRenameModalVisible(false)}
-      >
+        onRequestClose={() => setRenameModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
             <Text style={styles.modalTitle}>Renommer la playlist</Text>
-            
+
             <TextInput
               style={styles.modalInput}
               value={newName}
@@ -267,20 +280,18 @@ const PlaylistManagerScreen = () => {
               autoFocus={true}
               selectTextOnFocus={true}
             />
-            
+
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => setRenameModalVisible(false)}
-              >
+                onPress={() => setRenameModalVisible(false)}>
                 <Text style={styles.cancelButtonText}>Annuler</Text>
               </TouchableOpacity>
-              
+
               <TouchableOpacity
                 style={[styles.modalButton, styles.confirmButton]}
                 onPress={confirmRename}
-                disabled={!newName.trim()}
-              >
+                disabled={!newName.trim()}>
                 <Text style={styles.confirmButtonText}>Renommer</Text>
               </TouchableOpacity>
             </View>
@@ -326,7 +337,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#2A3441',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 3,

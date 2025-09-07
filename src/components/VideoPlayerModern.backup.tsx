@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, {useRef, useState, useEffect} from 'react';
 import {
   View,
   StyleSheet,
@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import Video from 'react-native-video';
 import Orientation from 'react-native-orientation-locker';
-import { Channel } from '../types';
+import {Channel} from '../types';
 
 interface VideoPlayerModernProps {
   channel: Channel | null;
@@ -40,7 +40,7 @@ const VideoPlayerModern: React.FC<VideoPlayerModernProps> = ({
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
 
-  const { width, height } = Dimensions.get('window');
+  const {width, height} = Dimensions.get('window');
   const maxRetries = 3;
 
   // Auto-hide controls after 3 seconds
@@ -67,7 +67,10 @@ const VideoPlayerModern: React.FC<VideoPlayerModernProps> = ({
   // Handle orientation changes
   useEffect(() => {
     const orientationListener = (orientation: string) => {
-      if (orientation === 'LANDSCAPE-LEFT' || orientation === 'LANDSCAPE-RIGHT') {
+      if (
+        orientation === 'LANDSCAPE-LEFT' ||
+        orientation === 'LANDSCAPE-RIGHT'
+      ) {
         if (!isFullscreen) {
           setIsFullscreen(true);
           onFullscreenToggle?.(true);
@@ -93,16 +96,13 @@ const VideoPlayerModern: React.FC<VideoPlayerModernProps> = ({
         setIsLoading(true);
       }, 2000);
     } else {
-      const errorMessage = 'Impossible de lire cette chaîne. Veuillez vérifier votre connexion internet.';
+      const errorMessage =
+        'Impossible de lire cette chaîne. Veuillez vérifier votre connexion internet.';
       onError?.(errorMessage);
-      Alert.alert(
-        'Erreur de lecture',
-        errorMessage,
-        [
-          { text: 'Réessayer', onPress: () => handleRetry() },
-          { text: 'OK', style: 'cancel' },
-        ]
-      );
+      Alert.alert('Erreur de lecture', errorMessage, [
+        {text: 'Réessayer', onPress: () => handleRetry()},
+        {text: 'OK', style: 'cancel'},
+      ]);
     }
   };
 
@@ -176,19 +176,18 @@ const VideoPlayerModern: React.FC<VideoPlayerModernProps> = ({
         <TouchableOpacity
           style={styles.videoContainer}
           onPress={handleMiniPlayerPress}
-          activeOpacity={1}
-        >
+          activeOpacity={1}>
           {!hasError ? (
             <Video
               ref={videoRef}
-              source={{ uri: channel.url }}
+              source={{uri: channel.url}}
               style={styles.video}
               resizeMode="contain"
               paused={isPaused}
               onLoad={handleLoad}
               onError={handleError}
               onProgress={handleProgress}
-              onBuffer={(data) => setIsLoading(data.isBuffering)}
+              onBuffer={data => setIsLoading(data.isBuffering)}
               bufferConfig={{
                 minBufferMs: 15000,
                 maxBufferMs: 50000,
@@ -206,7 +205,9 @@ const VideoPlayerModern: React.FC<VideoPlayerModernProps> = ({
               <Text style={styles.errorSubText}>
                 Tentative {retryCount + 1}/{maxRetries + 1}
               </Text>
-              <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
+              <TouchableOpacity
+                style={styles.retryButton}
+                onPress={handleRetry}>
                 <Text style={styles.retryButtonText}>🔄 Réessayer</Text>
               </TouchableOpacity>
             </View>
@@ -231,14 +232,11 @@ const VideoPlayerModern: React.FC<VideoPlayerModernProps> = ({
           <View style={styles.miniControlsOverlay}>
             <TouchableOpacity
               style={styles.miniPlayButton}
-              onPress={(e) => {
+              onPress={e => {
                 e.stopPropagation();
                 togglePlayPause();
-              }}
-            >
-              <Text style={styles.miniPlayText}>
-                {isPaused ? '▶️' : '⏸️'}
-              </Text>
+              }}>
+              <Text style={styles.miniPlayText}>{isPaused ? '▶️' : '⏸️'}</Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
@@ -255,33 +253,33 @@ const VideoPlayerModern: React.FC<VideoPlayerModernProps> = ({
   };
 
   const renderFullscreenPlayer = () => {
-    if (!channel) return null;
+    if (!channel) {
+      return null;
+    }
 
     return (
       <Modal
         visible={isFullscreen}
         animationType="slide"
         onRequestClose={handleExitFullscreen}
-        supportedOrientations={['landscape-left', 'landscape-right']}
-      >
+        supportedOrientations={['landscape-left', 'landscape-right']}>
         <StatusBar hidden />
         <View style={styles.fullscreenContainer}>
           <TouchableOpacity
             style={styles.fullscreenVideoContainer}
             onPress={handleScreenTouch}
-            activeOpacity={1}
-          >
+            activeOpacity={1}>
             {!hasError ? (
               <Video
                 ref={videoRef}
-                source={{ uri: channel.url }}
+                source={{uri: channel.url}}
                 style={styles.fullscreenVideo}
                 resizeMode="contain"
                 paused={isPaused}
                 onLoad={handleLoad}
                 onError={handleError}
                 onProgress={handleProgress}
-                onBuffer={(data) => setIsLoading(data.isBuffering)}
+                onBuffer={data => setIsLoading(data.isBuffering)}
                 bufferConfig={{
                   minBufferMs: 15000,
                   maxBufferMs: 50000,
@@ -295,16 +293,24 @@ const VideoPlayerModern: React.FC<VideoPlayerModernProps> = ({
               />
             ) : (
               <View style={styles.fullscreenErrorContainer}>
-                <Text style={styles.fullscreenErrorText}>❌ Erreur de lecture</Text>
-                <TouchableOpacity style={styles.fullscreenRetryButton} onPress={handleRetry}>
-                  <Text style={styles.fullscreenRetryButtonText}>🔄 Réessayer</Text>
+                <Text style={styles.fullscreenErrorText}>
+                  ❌ Erreur de lecture
+                </Text>
+                <TouchableOpacity
+                  style={styles.fullscreenRetryButton}
+                  onPress={handleRetry}>
+                  <Text style={styles.fullscreenRetryButtonText}>
+                    🔄 Réessayer
+                  </Text>
                 </TouchableOpacity>
               </View>
             )}
 
             {isLoading && (
               <View style={styles.fullscreenLoadingContainer}>
-                <Text style={styles.fullscreenLoadingText}>⏳ Chargement...</Text>
+                <Text style={styles.fullscreenLoadingText}>
+                  ⏳ Chargement...
+                </Text>
               </View>
             )}
 
@@ -315,19 +321,23 @@ const VideoPlayerModern: React.FC<VideoPlayerModernProps> = ({
                 <View style={styles.fullscreenHeader}>
                   <TouchableOpacity
                     style={styles.backButton}
-                    onPress={handleExitFullscreen}
-                  >
+                    onPress={handleExitFullscreen}>
                     <Text style={styles.backButtonText}>←</Text>
                   </TouchableOpacity>
                   <View style={styles.headerChannelInfo}>
                     <Text style={styles.headerChannelName}>{channel.name}</Text>
                     {channel.category && (
-                      <Text style={styles.headerChannelCategory}>{channel.category}</Text>
+                      <Text style={styles.headerChannelCategory}>
+                        {channel.category}
+                      </Text>
                     )}
                   </View>
                   <View style={styles.headerTime}>
                     <Text style={styles.timeText}>
-                      {new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                      {new Date().toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
                     </Text>
                   </View>
                 </View>
@@ -336,8 +346,7 @@ const VideoPlayerModern: React.FC<VideoPlayerModernProps> = ({
                 <View style={styles.fullscreenCenterControls}>
                   <TouchableOpacity
                     style={styles.fullscreenPlayButton}
-                    onPress={togglePlayPause}
-                  >
+                    onPress={togglePlayPause}>
                     <Text style={styles.fullscreenPlayText}>
                       {isPaused ? '▶️' : '⏸️'}
                     </Text>
@@ -353,11 +362,16 @@ const VideoPlayerModern: React.FC<VideoPlayerModernProps> = ({
                   </View>
                   {/* Progress bar placeholder for now */}
                   <View style={styles.progressBarContainer}>
-                    <View 
+                    <View
                       style={[
                         styles.progressBar,
-                        { width: duration > 0 ? `${(currentTime / duration) * 100}%` : '0%' }
-                      ]} 
+                        {
+                          width:
+                            duration > 0
+                              ? `${(currentTime / duration) * 100}%`
+                              : '0%',
+                        },
+                      ]}
                     />
                   </View>
                 </View>
@@ -450,7 +464,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
     textShadowColor: 'rgba(0,0,0,0.7)',
-    textShadowOffset: { width: 1, height: 1 },
+    textShadowOffset: {width: 1, height: 1},
     textShadowRadius: 3,
   },
   channelCategory: {
@@ -458,7 +472,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
     textShadowColor: 'rgba(0,0,0,0.7)',
-    textShadowOffset: { width: 1, height: 1 },
+    textShadowOffset: {width: 1, height: 1},
     textShadowRadius: 3,
   },
   miniControlsOverlay: {

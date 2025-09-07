@@ -3,7 +3,7 @@
  * Design avec bords parfaitement lisses, animations fluides
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, {useEffect, useRef} from 'react';
 import {
   View,
   Text,
@@ -13,18 +13,18 @@ import {
   StatusBar,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import { BlurView } from '@react-native-community/blur';
+import {BlurView} from '@react-native-community/blur';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 // AppContext removed - using UIStore instead
-import { useUIStore } from '../stores/UIStore';
+import {useUIStore} from '../stores/UIStore';
 
-const { width, height } = Dimensions.get('window');
+const {width, height} = Dimensions.get('window');
 
 const NotificationToast: React.FC = () => {
   // Replaced AppContext with UIStore
-  const { notification } = useUIStore();
-  const { visible, message, type } = notification;
-  
+  const {notification} = useUIStore();
+  const {visible, message, type} = notification;
+
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(-100)).current;
   const scale = useRef(new Animated.Value(0.8)).current;
@@ -114,21 +114,19 @@ const NotificationToast: React.FC = () => {
         styles.overlay,
         {
           opacity,
-          transform: [{ translateY }, { scale }],
+          transform: [{translateY}, {scale}],
         },
       ]}
-      pointerEvents={visible ? 'auto' : 'none'}
-    >
+      pointerEvents={visible ? 'auto' : 'none'}>
       <StatusBar barStyle="light-content" />
-      
+
       {/* Conteneur de notification */}
       <View style={styles.container}>
         <LinearGradient
           colors={config.colors}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.contentContainer}
-        >
+          start={{x: 0, y: 0}}
+          end={{x: 1, y: 1}}
+          style={styles.contentContainer}>
           {/* BlurView pour effet glassmorphisme */}
           <BlurView
             style={styles.blurOverlay}
@@ -136,27 +134,23 @@ const NotificationToast: React.FC = () => {
             blurAmount={10}
             reducedTransparencyFallbackColor="rgba(255, 255, 255, 0.1)"
           />
-          
+
           {/* Contenu */}
           <View style={styles.content}>
             {/* Icône */}
             <View style={styles.iconContainer}>
               <Icon name={config.icon} size={28} color={config.iconColor} />
             </View>
-            
+
             {/* Message */}
             <Text style={styles.message}>{message}</Text>
           </View>
-          
+
           {/* Effet de brillance */}
           <LinearGradient
-            colors={[
-              'transparent',
-              'rgba(255, 255, 255, 0.1)',
-              'transparent',
-            ]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
+            colors={['transparent', 'rgba(255, 255, 255, 0.1)', 'transparent']}
+            start={{x: 0, y: 0}}
+            end={{x: 1, y: 1}}
             style={styles.shine}
           />
         </LinearGradient>
@@ -187,7 +181,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden', // CRUCIAL pour éviter les pixels crénelés
     // Propriétés anti-aliasing avancées
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 6 },
+    shadowOffset: {width: 0, height: 6},
     shadowOpacity: 0.2,
     shadowRadius: 16,
     elevation: 12,
@@ -216,7 +210,7 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     lineHeight: 22,
     textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 1 },
+    textShadowOffset: {width: 0, height: 1},
     textShadowRadius: 2,
   },
   shine: {

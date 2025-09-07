@@ -1,19 +1,26 @@
-import React, { useState } from 'react';
-import { View, Text, FlatList, StyleSheet, Image, TouchableOpacity } from 'react-native';
+import React, {useState} from 'react';
+import {
+  View,
+  Text,
+  FlatList,
+  StyleSheet,
+  Image,
+  TouchableOpacity,
+} from 'react-native';
 // PlaylistContext remplacé par PlaylistStore
-import { usePlaylist } from '../stores/PlaylistStore';
-import { Channel } from '../types';
+import {usePlaylist} from '../stores/PlaylistStore';
+import {Channel} from '../types';
 
-const ChannelCard: React.FC<{ item: Channel }> = ({ item }) => {
+const ChannelCard: React.FC<{item: Channel}> = ({item}) => {
   const logoUrl = item.logoUrl || item.streamIcon || '';
   const [showFallback, setShowFallback] = useState(false);
-  
+
   return (
     <TouchableOpacity style={styles.card}>
       {logoUrl && !showFallback ? (
-        <Image 
-          source={{ uri: logoUrl }} 
-          style={styles.logo} 
+        <Image
+          source={{uri: logoUrl}}
+          style={styles.logo}
           resizeMode="contain"
           onError={() => {
             console.log('❌ Logo échoué pour', item.name + ':', logoUrl);
@@ -26,22 +33,24 @@ const ChannelCard: React.FC<{ item: Channel }> = ({ item }) => {
           <Text style={styles.logoText}>📺</Text>
         </View>
       )}
-      <Text style={styles.channelName} numberOfLines={1}>{item.name}</Text>
+      <Text style={styles.channelName} numberOfLines={1}>
+        {item.name}
+      </Text>
     </TouchableOpacity>
   );
 };
 
 const ChannelGrid: React.FC = () => {
-  const { channels } = usePlaylist();
-  
+  const {channels} = usePlaylist();
+
   console.log('🔍 CHANNEL GRID - Rendu avec chaînes:', channels.length);
   console.log('🔍 CHANNEL GRID - Détail 3 premières:', channels.slice(0, 3));
-  
+
   if (!channels || channels.length === 0) {
     console.log('❌ CHANNEL GRID - AUCUNE CHAÎNE À AFFICHER !');
     return (
-      <View style={{ padding: 20 }}>
-        <Text style={{ color: 'white' }}>❌ Aucune chaîne trouvée</Text>
+      <View style={{padding: 20}}>
+        <Text style={{color: 'white'}}>❌ Aucune chaîne trouvée</Text>
       </View>
     );
   }
@@ -50,8 +59,8 @@ const ChannelGrid: React.FC = () => {
     <FlatList
       data={channels}
       numColumns={3}
-      keyExtractor={(item) => item.id}
-      renderItem={({ item }) => <ChannelCard item={item} />}
+      keyExtractor={item => item.id}
+      renderItem={({item}) => <ChannelCard item={item} />}
       contentContainerStyle={styles.grid}
     />
   );
@@ -74,7 +83,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     height: 140,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: {width: 0, height: 4},
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,

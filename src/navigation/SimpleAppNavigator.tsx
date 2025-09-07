@@ -4,11 +4,11 @@
  */
 
 import React from 'react';
-import { createStackNavigator } from '@react-navigation/stack';
+import {createStackNavigator} from '@react-navigation/stack';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
 // Types
-import type { RootStackParamList } from '../types';
+import type {RootStackParamList} from '../types';
 
 // Screens
 import HomeScreen from '../screens/HomeScreen'; // Votre interface originale
@@ -48,8 +48,7 @@ const SimpleAppNavigator: React.FC = () => {
         },
         gestureEnabled: true,
         headerBackTitleVisible: false,
-      }}
-    >
+      }}>
       {/* Écran principal avec votre interface originale */}
       <Stack.Screen
         name="Home"
@@ -59,7 +58,7 @@ const SimpleAppNavigator: React.FC = () => {
           headerShown: false, // Interface custom dans HomeScreen
         }}
       />
-      
+
       {/* Mes Playlists */}
       <Stack.Screen
         name="Playlists"
@@ -68,17 +67,17 @@ const SimpleAppNavigator: React.FC = () => {
           title: 'Mes Playlists',
         }}
       />
-      
+
       {/* Liste des chaînes d'une playlist */}
       <Stack.Screen
         name="ChannelList"
         component={ChannelListScreen}
-        options={({ route }) => ({
+        options={({route}) => ({
           title: route.params?.playlistName || 'Chaînes IPTV',
           headerShown: false, // Interface custom
         })}
       />
-      
+
       {/* Interface 3-zones IPTV Smarters Pro */}
       <Stack.Screen
         name="ChannelPlayer"
@@ -88,7 +87,7 @@ const SimpleAppNavigator: React.FC = () => {
           gestureEnabled: true,
         }}
       />
-      
+
       {/* Favoris */}
       <Stack.Screen
         name="Favorites"
@@ -100,12 +99,12 @@ const SimpleAppNavigator: React.FC = () => {
               name="favorite"
               size={24}
               color="#FF4444"
-              style={{ marginRight: 15 }}
+              style={{marginRight: 15}}
             />
           ),
         }}
       />
-      
+
       {/* Recherche */}
       <Stack.Screen
         name="Search"
@@ -117,12 +116,12 @@ const SimpleAppNavigator: React.FC = () => {
               name="filter-list"
               size={24}
               color="#FFFFFF"
-              style={{ marginRight: 15 }}
+              style={{marginRight: 15}}
             />
           ),
         }}
       />
-      
+
       {/* Paramètres */}
       <Stack.Screen
         name="Settings"
@@ -134,7 +133,7 @@ const SimpleAppNavigator: React.FC = () => {
               name="save"
               size={24}
               color="#FFFFFF"
-              style={{ marginRight: 15 }}
+              style={{marginRight: 15}}
             />
           ),
         }}

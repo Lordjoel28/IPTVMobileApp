@@ -4,12 +4,7 @@
  */
 
 import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  useColorScheme,
-} from 'react-native';
+import {View, Text, StyleSheet, useColorScheme} from 'react-native';
 import XtreamOptimizedTest from '../components/XtreamOptimizedTest';
 
 const DevelopmentScreen: React.FC = () => {
@@ -20,7 +15,7 @@ const DevelopmentScreen: React.FC = () => {
       <Text style={[styles.header, isDarkMode && styles.headerDark]}>
         🛠️ Development Tools
       </Text>
-      
+
       <XtreamOptimizedTest />
     </View>
   );

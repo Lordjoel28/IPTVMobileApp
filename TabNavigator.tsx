@@ -1,8 +1,8 @@
 import React from 'react';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { View, Text, StyleSheet } from 'react-native';
-import { AppProvider } from './src/context/AppContext';
+import {View, Text, StyleSheet} from 'react-native';
+import {AppProvider} from './src/context/AppContext';
 import LoadingOverlay from './src/components/LoadingOverlay';
 import NotificationToast from './src/components/NotificationToast';
 
@@ -12,7 +12,7 @@ import PlaylistsScreen from './src/screens/PlaylistsScreen';
 const Tab = createBottomTabNavigator();
 
 // Écran temporaire pour les autres onglets
-const ComingSoonScreen = ({ route }: { route: any }) => (
+const ComingSoonScreen = ({route}: {route: any}) => (
   <View style={styles.comingSoon}>
     <Icon name="construction" size={64} color="#8E9AAF" />
     <Text style={styles.comingSoonTitle}>{route.name}</Text>
@@ -40,59 +40,58 @@ const TabNavigator = () => {
             fontWeight: '600',
           },
           headerShown: false,
-        }}
-      >
+        }}>
         <Tab.Screen
           name="Accueil"
           component={App_IPTV_SMARTERS}
           options={{
-            tabBarIcon: ({ color, size }) => (
+            tabBarIcon: ({color, size}) => (
               <Icon name="home" color={color} size={size} />
             ),
           }}
         />
-        
+
         <Tab.Screen
           name="Playlists"
           component={PlaylistsScreen}
           options={{
-            tabBarIcon: ({ color, size }) => (
+            tabBarIcon: ({color, size}) => (
               <Icon name="playlist-play" color={color} size={size} />
             ),
           }}
         />
-        
+
         <Tab.Screen
           name="Favoris"
           component={ComingSoonScreen}
           options={{
-            tabBarIcon: ({ color, size }) => (
+            tabBarIcon: ({color, size}) => (
               <Icon name="favorite" color={color} size={size} />
             ),
           }}
         />
-        
+
         <Tab.Screen
           name="Recherche"
           component={ComingSoonScreen}
           options={{
-            tabBarIcon: ({ color, size }) => (
+            tabBarIcon: ({color, size}) => (
               <Icon name="search" color={color} size={size} />
             ),
           }}
         />
-        
+
         <Tab.Screen
           name="Paramètres"
           component={ComingSoonScreen}
           options={{
-            tabBarIcon: ({ color, size }) => (
+            tabBarIcon: ({color, size}) => (
               <Icon name="settings" color={color} size={size} />
             ),
           }}
         />
       </Tab.Navigator>
-      
+
       {/* 🎬 Overlays nécessaires pour animations */}
       <LoadingOverlay />
       <NotificationToast />

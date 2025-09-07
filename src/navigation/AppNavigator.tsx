@@ -4,14 +4,14 @@
  */
 
 import React from 'react';
-import { createStackNavigator } from '@react-navigation/stack';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { createDrawerNavigator } from '@react-navigation/drawer';
-import { useTheme } from 'react-native-paper';
+import {createStackNavigator} from '@react-navigation/stack';
+import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
+import {createDrawerNavigator} from '@react-navigation/drawer';
+import {useTheme} from 'react-native-paper';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
 // Types
-import type { RootStackParamList, BottomTabParamList } from '../types';
+import type {RootStackParamList, BottomTabParamList} from '../types';
 
 // Screens (à créer)
 import HomeScreen from '../screens/HomeScreen';
@@ -38,13 +38,13 @@ const Drawer = createDrawerNavigator();
  */
 const TabNavigator: React.FC = () => {
   const theme = useTheme();
-  
+
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
-        tabBarIcon: ({ focused, color, size }) => {
+      screenOptions={({route}) => ({
+        tabBarIcon: ({focused, color, size}) => {
           let iconName: string;
-          
+
           switch (route.name) {
             case 'HomeTab':
               iconName = 'home';
@@ -64,7 +64,7 @@ const TabNavigator: React.FC = () => {
             default:
               iconName = 'help';
           }
-          
+
           return <Icon name={iconName} size={size} color={color} />;
         },
         tabBarActiveTintColor: theme.colors.primary,
@@ -92,8 +92,7 @@ const TabNavigator: React.FC = () => {
           fontSize: 18,
         },
         headerTintColor: theme.colors.onSurface,
-      })}
-    >
+      })}>
       <Tab.Screen
         name="HomeTab"
         component={HomeScreen}
@@ -143,7 +142,7 @@ const TabNavigator: React.FC = () => {
  */
 const DrawerNavigator: React.FC = () => {
   const theme = useTheme();
-  
+
   return (
     <Drawer.Navigator
       screenOptions={{
@@ -164,14 +163,13 @@ const DrawerNavigator: React.FC = () => {
           color: theme.colors.onSurface,
         },
         headerTintColor: theme.colors.onSurface,
-      }}
-    >
+      }}>
       <Drawer.Screen
         name="MainTabs"
         component={TabNavigator}
         options={{
           title: 'IPTV Mobile',
-          drawerIcon: ({ color, size }) => (
+          drawerIcon: ({color, size}) => (
             <Icon name="home" size={size} color={color} />
           ),
         }}
@@ -181,7 +179,7 @@ const DrawerNavigator: React.FC = () => {
         component={UserProfileScreen}
         options={{
           title: 'Profil Utilisateur',
-          drawerIcon: ({ color, size }) => (
+          drawerIcon: ({color, size}) => (
             <Icon name="account-circle" size={size} color={color} />
           ),
         }}
@@ -191,7 +189,7 @@ const DrawerNavigator: React.FC = () => {
         component={ParentalControlScreen}
         options={{
           title: 'Contrôle Parental',
-          drawerIcon: ({ color, size }) => (
+          drawerIcon: ({color, size}) => (
             <Icon name="child-care" size={size} color={color} />
           ),
         }}
@@ -205,7 +203,7 @@ const DrawerNavigator: React.FC = () => {
  */
 const AppNavigator: React.FC = () => {
   const theme = useTheme();
-  
+
   return (
     <Stack.Navigator
       initialRouteName="Home"
@@ -226,8 +224,7 @@ const AppNavigator: React.FC = () => {
         },
         gestureEnabled: true,
         headerBackTitleVisible: false,
-      }}
-    >
+      }}>
       {/* Écran principal avec navigation par onglets et tiroir */}
       <Stack.Screen
         name="Home"
@@ -236,17 +233,17 @@ const AppNavigator: React.FC = () => {
           headerShown: false,
         }}
       />
-      
+
       {/* Liste des chaînes d'une playlist */}
       <Stack.Screen
         name="ChannelList"
         component={ChannelListScreen}
-        options={({ route }) => ({
+        options={({route}) => ({
           title: route.params?.playlistName || 'Chaînes IPTV',
           headerShown: false, // Interface custom dans ChannelListScreen
         })}
       />
-      
+
       {/* Interface 3-zones IPTV Smarters Pro */}
       <Stack.Screen
         name="ChannelPlayer"
@@ -256,7 +253,7 @@ const AppNavigator: React.FC = () => {
           gestureEnabled: true,
         }}
       />
-      
+
       {/* Lecteur vidéo en plein écran */}
       <Stack.Screen
         name="Player"
@@ -267,24 +264,24 @@ const AppNavigator: React.FC = () => {
           gestureEnabled: false,
         }}
       />
-      
+
       {/* Détail d'une playlist */}
       <Stack.Screen
         name="PlaylistDetail"
         component={PlaylistDetailScreen}
-        options={({ route }) => ({
+        options={({route}) => ({
           title: route.params?.playlist?.name || 'Playlist',
           headerRight: () => (
             <Icon
               name="more-vert"
               size={24}
               color={theme.colors.onSurface}
-              style={{ marginRight: 15 }}
+              style={{marginRight: 15}}
             />
           ),
         })}
       />
-      
+
       {/* Recherche globale */}
       <Stack.Screen
         name="Search"
@@ -296,12 +293,12 @@ const AppNavigator: React.FC = () => {
               name="filter-list"
               size={24}
               color={theme.colors.onSurface}
-              style={{ marginRight: 15 }}
+              style={{marginRight: 15}}
             />
           ),
         }}
       />
-      
+
       {/* Paramètres utilisateur */}
       <Stack.Screen
         name="Settings"
@@ -313,12 +310,12 @@ const AppNavigator: React.FC = () => {
               name="save"
               size={24}
               color={theme.colors.onSurface}
-              style={{ marginRight: 15 }}
+              style={{marginRight: 15}}
             />
           ),
         }}
       />
-      
+
       {/* Profil utilisateur */}
       <Stack.Screen
         name="UserProfile"
@@ -327,7 +324,7 @@ const AppNavigator: React.FC = () => {
           title: 'Profil Utilisateur',
         }}
       />
-      
+
       {/* Contrôle parental */}
       <Stack.Screen
         name="ParentalControl"
@@ -339,7 +336,7 @@ const AppNavigator: React.FC = () => {
               name="security"
               size={24}
               color={theme.colors.onSurface}
-              style={{ marginRight: 15 }}
+              style={{marginRight: 15}}
             />
           ),
         }}

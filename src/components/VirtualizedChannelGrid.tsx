@@ -3,7 +3,7 @@
  * Style TiviMate/IPTV Smarters Pro avec scrolling fluide 60fps
  */
 
-import React, { useState, useMemo, useCallback, memo } from 'react';
+import React, {useState, useMemo, useCallback, memo} from 'react';
 import {
   View,
   Text,
@@ -15,15 +15,17 @@ import {
   useColorScheme,
   Dimensions,
 } from 'react-native';
-import { Channel } from '../types';
+import {Channel} from '../types';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const {width: SCREEN_WIDTH, height: SCREEN_HEIGHT} = Dimensions.get('window');
 
 // 🔥 OPTIMISATIONS CRITIQUES : Constantes de performance
 const GRID_COLUMNS = 3; // Colonnes par défaut
 const CARD_MARGIN = 6;
 const GRID_PADDING = 12;
-const CARD_WIDTH = (SCREEN_WIDTH - (GRID_PADDING * 2) - (CARD_MARGIN * (GRID_COLUMNS + 1))) / GRID_COLUMNS;
+const CARD_WIDTH =
+  (SCREEN_WIDTH - GRID_PADDING * 2 - CARD_MARGIN * (GRID_COLUMNS + 1)) /
+  GRID_COLUMNS;
 const CARD_HEIGHT = 140;
 const ROW_HEIGHT = CARD_HEIGHT + CARD_MARGIN * 2;
 const SEARCH_HEIGHT = 50;
@@ -48,87 +50,96 @@ const ChannelCard = memo<{
   onSelect: (channel: Channel) => void;
   onToggleFavorite: (channelId: string) => void;
   cardWidth: number;
-}>(({ item, isSelected, isFavorite, isDarkMode, onSelect, onToggleFavorite, cardWidth }) => {
+}>(
+  ({
+    item,
+    isSelected,
+    isFavorite,
+    isDarkMode,
+    onSelect,
+    onToggleFavorite,
+    cardWidth,
+  }) => {
+    const handlePress = useCallback(() => onSelect(item), [item, onSelect]);
+    const handleFavoritePress = useCallback(
+      (e: any) => {
+        e.stopPropagation();
+        onToggleFavorite(item.id);
+      },
+      [item.id, onToggleFavorite],
+    );
 
-  const handlePress = useCallback(() => onSelect(item), [item, onSelect]);
-  const handleFavoritePress = useCallback((e: any) => {
-    e.stopPropagation();
-    onToggleFavorite(item.id);
-  }, [item.id, onToggleFavorite]);
-
-  return (
-    <TouchableOpacity
-      style={[
-        styles.channelCard,
-        { width: cardWidth },
-        isDarkMode && styles.channelCardDark,
-        isSelected && styles.channelCardSelected,
-      ]}
-      onPress={handlePress}
-      activeOpacity={0.8}
-    >
-      {/* Logo avec gestion fallback optimisée */}
-      <View style={styles.logoContainer}>
-        {item.logo ? (
-          <Image
-            source={{ uri: item.logo }}
-            style={styles.channelLogo}
-            resizeMode="cover"
-            fadeDuration={0} // Pas d'animation pour les perfs
-            defaultSource={require('../assets/channel-placeholder.png')} // Fallback par défaut
-          />
-        ) : (
-          <View style={[styles.channelLogo, styles.logoPlaceholder]}>
-            <Text style={styles.logoEmoji}>📺</Text>
-          </View>
-        )}
-        
-        {/* Badge favoris */}
-        {isFavorite && (
-          <View style={styles.favoriteBadge}>
-            <Text style={styles.favoriteBadgeText}>❤️</Text>
-          </View>
-        )}
-      </View>
-
-      {/* Nom chaîne avec gestion overflow */}
-      <View style={styles.channelInfo}>
-        <Text
-          style={[
-            styles.channelName,
-            isDarkMode && styles.channelNameDark,
-            isSelected && styles.channelNameSelected,
-          ]}
-          numberOfLines={2}
-          ellipsizeMode="tail"
-        >
-          {item.name}
-        </Text>
-        
-        {/* Catégorie optionnelle */}
-        {item.category && (
-          <Text 
-            style={[styles.channelCategory, isDarkMode && styles.channelCategoryDark]}
-            numberOfLines={1}
-          >
-            {item.category}
-          </Text>
-        )}
-      </View>
-
-      {/* Bouton favoris discret */}
+    return (
       <TouchableOpacity
-        style={styles.favoriteToggle}
-        onPress={handleFavoritePress}
-        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-      >
-        <Text style={styles.favoriteIcon}>
-          {isFavorite ? '💖' : '🤍'}
-        </Text>
+        style={[
+          styles.channelCard,
+          {width: cardWidth},
+          isDarkMode && styles.channelCardDark,
+          isSelected && styles.channelCardSelected,
+        ]}
+        onPress={handlePress}
+        activeOpacity={0.8}>
+        {/* Logo avec gestion fallback optimisée */}
+        <View style={styles.logoContainer}>
+          {item.logo ? (
+            <Image
+              source={{uri: item.logo}}
+              style={styles.channelLogo}
+              resizeMode="cover"
+              fadeDuration={0} // Pas d'animation pour les perfs
+              defaultSource={require('../assets/channel-placeholder.png')} // Fallback par défaut
+            />
+          ) : (
+            <View style={[styles.channelLogo, styles.logoPlaceholder]}>
+              <Text style={styles.logoEmoji}>📺</Text>
+            </View>
+          )}
+
+          {/* Badge favoris */}
+          {isFavorite && (
+            <View style={styles.favoriteBadge}>
+              <Text style={styles.favoriteBadgeText}>❤️</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Nom chaîne avec gestion overflow */}
+        <View style={styles.channelInfo}>
+          <Text
+            style={[
+              styles.channelName,
+              isDarkMode && styles.channelNameDark,
+              isSelected && styles.channelNameSelected,
+            ]}
+            numberOfLines={2}
+            ellipsizeMode="tail">
+            {item.name}
+          </Text>
+
+          {/* Catégorie optionnelle */}
+          {item.category && (
+            <Text
+              style={[
+                styles.channelCategory,
+                isDarkMode && styles.channelCategoryDark,
+              ]}
+              numberOfLines={1}>
+              {item.category}
+            </Text>
+          )}
+        </View>
+
+        {/* Bouton favoris discret */}
+        <TouchableOpacity
+          style={styles.favoriteToggle}
+          onPress={handleFavoritePress}
+          hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+          <Text style={styles.favoriteIcon}>{isFavorite ? '💖' : '🤍'}</Text>
+        </TouchableOpacity>
       </TouchableOpacity>
-    </TouchableOpacity>
-  );
-});
+    );
+  },
+);
 
 /**
  * 🚀 RANGÉE DE GRILLE VIRTUALISÉE pour performance maximale
@@ -142,30 +153,39 @@ const GridRow = memo<{
   cardWidth: number;
   onChannelSelect: (channel: Channel) => void;
   onToggleFavorite: (channelId: string) => void;
-}>(({ rowData, currentChannel, favorites, isDarkMode, cardWidth, onChannelSelect, onToggleFavorite }) => {
+}>(
+  ({
+    rowData,
+    currentChannel,
+    favorites,
+    isDarkMode,
+    cardWidth,
+    onChannelSelect,
+    onToggleFavorite,
+  }) => {
+    return (
+      <View style={styles.gridRow}>
+        {rowData.map(channel => {
+          const isSelected = currentChannel?.id === channel.id;
+          const isFavorite = favorites.includes(channel.id);
 
-  return (
-    <View style={styles.gridRow}>
-      {rowData.map((channel) => {
-        const isSelected = currentChannel?.id === channel.id;
-        const isFavorite = favorites.includes(channel.id);
-
-        return (
-          <ChannelCard
-            key={channel.id}
-            item={channel}
-            isSelected={isSelected}
-            isFavorite={isFavorite}
-            isDarkMode={isDarkMode}
-            cardWidth={cardWidth}
-            onSelect={onChannelSelect}
-            onToggleFavorite={onToggleFavorite}
-          />
-        );
-      })}
-    </View>
-  );
-});
+          return (
+            <ChannelCard
+              key={channel.id}
+              item={channel}
+              isSelected={isSelected}
+              isFavorite={isFavorite}
+              isDarkMode={isDarkMode}
+              cardWidth={cardWidth}
+              onSelect={onChannelSelect}
+              onToggleFavorite={onToggleFavorite}
+            />
+          );
+        })}
+      </View>
+    );
+  },
+);
 
 /**
  * 🏆 GRILLE VIRTUALISÉE PRINCIPALE
@@ -184,7 +204,9 @@ export const VirtualizedChannelGrid: React.FC<VirtualizedChannelGridProps> = ({
 
   // 📏 Calcul dynamique largeur cartes selon colonnes
   const cardWidth = useMemo(() => {
-    return (SCREEN_WIDTH - (GRID_PADDING * 2) - (CARD_MARGIN * (columns + 1))) / columns;
+    return (
+      (SCREEN_WIDTH - GRID_PADDING * 2 - CARD_MARGIN * (columns + 1)) / columns
+    );
   }, [columns]);
 
   // 🧠 Categories mémoisées pour performance
@@ -209,16 +231,19 @@ export const VirtualizedChannelGrid: React.FC<VirtualizedChannelGridProps> = ({
         const favoriteSet = new Set(favorites);
         filtered = channels.filter(channel => favoriteSet.has(channel.id));
       } else {
-        filtered = channels.filter(channel => channel.category === selectedCategory);
+        filtered = channels.filter(
+          channel => channel.category === selectedCategory,
+        );
       }
     }
 
     // Recherche textuelle
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
-      filtered = filtered.filter(channel => 
-        channel.name.toLowerCase().includes(query) ||
-        (channel.category && channel.category.toLowerCase().includes(query))
+      filtered = filtered.filter(
+        channel =>
+          channel.name.toLowerCase().includes(query) ||
+          (channel.category && channel.category.toLowerCase().includes(query)),
       );
     }
 
@@ -232,14 +257,14 @@ export const VirtualizedChannelGrid: React.FC<VirtualizedChannelGridProps> = ({
       const row = filteredChannels.slice(i, i + columns);
       // Completer rangée incomplete avec éléments vides si besoin
       while (row.length < columns) {
-        row.push({ 
-          id: `empty_${i}_${row.length}`, 
-          name: '', 
-          url: '', 
+        row.push({
+          id: `empty_${i}_${row.length}`,
+          name: '',
+          url: '',
           logo: '',
           category: '',
-          isEmpty: true 
-        } as Channel & { isEmpty: boolean });
+          isEmpty: true,
+        } as Channel & {isEmpty: boolean});
       }
       rows.push(row);
     }
@@ -247,15 +272,21 @@ export const VirtualizedChannelGrid: React.FC<VirtualizedChannelGridProps> = ({
   }, [filteredChannels, columns]);
 
   // 🎯 Callbacks optimisés
-  const handleChannelSelect = useCallback((channel: Channel) => {
-    if (!(channel as any).isEmpty) {
-      onChannelSelect(channel);
-    }
-  }, [onChannelSelect]);
+  const handleChannelSelect = useCallback(
+    (channel: Channel) => {
+      if (!(channel as any).isEmpty) {
+        onChannelSelect(channel);
+      }
+    },
+    [onChannelSelect],
+  );
 
-  const handleToggleFavorite = useCallback((channelId: string) => {
-    onToggleFavorite(channelId);
-  }, [onToggleFavorite]);
+  const handleToggleFavorite = useCallback(
+    (channelId: string) => {
+      onToggleFavorite(channelId);
+    },
+    [onToggleFavorite],
+  );
 
   // 🚀 Fonctions VirtualizedList optimisées
   const getItem = useCallback((data: Channel[][], index: number) => {
@@ -266,38 +297,57 @@ export const VirtualizedChannelGrid: React.FC<VirtualizedChannelGridProps> = ({
     return data.length;
   }, []);
 
-  const getItemLayout = useCallback((data: any, index: number) => ({
-    length: ROW_HEIGHT,
-    offset: ROW_HEIGHT * index,
-    index,
-  }), []);
+  const getItemLayout = useCallback(
+    (data: any, index: number) => ({
+      length: ROW_HEIGHT,
+      offset: ROW_HEIGHT * index,
+      index,
+    }),
+    [],
+  );
 
-  const renderRow = useCallback(({ item: rowData, index }: { item: Channel[]; index: number }) => {
-    return (
-      <GridRow
-        rowData={rowData}
-        rowIndex={index}
-        currentChannel={currentChannel}
-        favorites={favorites}
-        isDarkMode={isDarkMode}
-        cardWidth={cardWidth}
-        onChannelSelect={handleChannelSelect}
-        onToggleFavorite={handleToggleFavorite}
-      />
-    );
-  }, [currentChannel, favorites, isDarkMode, cardWidth, handleChannelSelect, handleToggleFavorite]);
+  const renderRow = useCallback(
+    ({item: rowData, index}: {item: Channel[]; index: number}) => {
+      return (
+        <GridRow
+          rowData={rowData}
+          rowIndex={index}
+          currentChannel={currentChannel}
+          favorites={favorites}
+          isDarkMode={isDarkMode}
+          cardWidth={cardWidth}
+          onChannelSelect={handleChannelSelect}
+          onToggleFavorite={handleToggleFavorite}
+        />
+      );
+    },
+    [
+      currentChannel,
+      favorites,
+      isDarkMode,
+      cardWidth,
+      handleChannelSelect,
+      handleToggleFavorite,
+    ],
+  );
 
   const keyExtractor = useCallback((item: Channel[], index: number) => {
     return `row_${index}_${item[0]?.id || 'empty'}`;
   }, []);
 
   // 📊 Stats de performance
-  console.log(`🚀 VirtualizedChannelGrid - ${filteredChannels.length} chaînes en ${gridData.length} rangées`);
+  console.log(
+    `🚀 VirtualizedChannelGrid - ${filteredChannels.length} chaînes en ${gridData.length} rangées`,
+  );
 
   return (
     <View style={[styles.container, isDarkMode && styles.containerDark]}>
       {/* 🔍 Barre de recherche */}
-      <View style={[styles.searchContainer, isDarkMode && styles.searchContainerDark]}>
+      <View
+        style={[
+          styles.searchContainer,
+          isDarkMode && styles.searchContainerDark,
+        ]}>
         <TextInput
           style={[styles.searchInput, isDarkMode && styles.searchInputDark]}
           placeholder="Rechercher une chaîne..."
@@ -311,7 +361,11 @@ export const VirtualizedChannelGrid: React.FC<VirtualizedChannelGridProps> = ({
       </View>
 
       {/* 📂 Barre catégories horizontale */}
-      <View style={[styles.categoriesContainer, isDarkMode && styles.categoriesContainerDark]}>
+      <View
+        style={[
+          styles.categoriesContainer,
+          isDarkMode && styles.categoriesContainerDark,
+        ]}>
         <VirtualizedList
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -319,14 +373,18 @@ export const VirtualizedChannelGrid: React.FC<VirtualizedChannelGridProps> = ({
           initialNumToRender={5}
           windowSize={8}
           maxToRenderPerBatch={3}
-          getItemCount={(data) => data.length}
+          getItemCount={data => data.length}
           getItem={(data, index) => data[index]}
-          keyExtractor={(item) => `cat_${item}`}
-          renderItem={({ item: category }) => {
+          keyExtractor={item => `cat_${item}`}
+          renderItem={({item: category}) => {
             const isSelected = selectedCategory === category;
-            const displayName = category === 'all' ? 'Toutes' : 
-                              category === 'favorites' ? 'Favoris' : category;
-            
+            const displayName =
+              category === 'all'
+                ? 'Toutes'
+                : category === 'favorites'
+                ? 'Favoris'
+                : category;
+
             return (
               <TouchableOpacity
                 style={[
@@ -334,16 +392,14 @@ export const VirtualizedChannelGrid: React.FC<VirtualizedChannelGridProps> = ({
                   isDarkMode && styles.categoryButtonDark,
                   isSelected && styles.categoryButtonSelected,
                 ]}
-                onPress={() => setSelectedCategory(category)}
-              >
+                onPress={() => setSelectedCategory(category)}>
                 <Text
                   style={[
                     styles.categoryButtonText,
                     isDarkMode && styles.categoryButtonTextDark,
                     isSelected && styles.categoryButtonTextSelected,
                   ]}
-                  numberOfLines={1}
-                >
+                  numberOfLines={1}>
                   {displayName}
                 </Text>
               </TouchableOpacity>
@@ -370,15 +426,21 @@ export const VirtualizedChannelGrid: React.FC<VirtualizedChannelGridProps> = ({
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyIcon}>📺</Text>
-            <Text style={[styles.emptyText, isDarkMode && styles.emptyTextDark]}>
-              {searchQuery ? 'Aucune chaîne trouvée' : 'Aucune chaîne disponible'}
+            <Text
+              style={[styles.emptyText, isDarkMode && styles.emptyTextDark]}>
+              {searchQuery
+                ? 'Aucune chaîne trouvée'
+                : 'Aucune chaîne disponible'}
             </Text>
           </View>
         }
         ListFooterComponent={
-          <View style={[styles.footerStats, isDarkMode && styles.footerStatsDark]}>
-            <Text style={[styles.statsText, isDarkMode && styles.statsTextDark]}>
-              📊 {filteredChannels.length.toLocaleString()} chaînes • {gridData.length} rangées
+          <View
+            style={[styles.footerStats, isDarkMode && styles.footerStatsDark]}>
+            <Text
+              style={[styles.statsText, isDarkMode && styles.statsTextDark]}>
+              📊 {filteredChannels.length.toLocaleString()} chaînes •{' '}
+              {gridData.length} rangées
             </Text>
           </View>
         }
@@ -485,7 +547,7 @@ const styles = StyleSheet.create({
     margin: CARD_MARGIN / 2,
     elevation: 3,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.1,
     shadowRadius: 4,
     alignItems: 'center',
@@ -499,7 +561,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#007AFF',
   },
-  
+
   logoContainer: {
     position: 'relative',
     alignItems: 'center',

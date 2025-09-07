@@ -7,8 +7,4 @@ import Playlist from './Playlist';
 import Channel from './Channel';
 import Category from './Category';
 
-export {
-  Playlist,
-  Channel,
-  Category
-};
+export {Playlist, Channel, Category};

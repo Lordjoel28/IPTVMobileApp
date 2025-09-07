@@ -7,8 +7,8 @@
  * - Cache optimisé pour IPTV logos
  */
 
-import React, { useState, useEffect } from 'react';
-import { Image, ImageStyle, ImageSourcePropType } from 'react-native';
+import React, {useState, useEffect} from 'react';
+import {Image, ImageStyle, ImageSourcePropType} from 'react-native';
 
 interface SmartImageProps {
   uri: string;
@@ -37,7 +37,7 @@ const SmartImage: React.FC<SmartImageProps> = ({
   onError,
   onFinalError,
   resizeMode = 'contain',
-  fadeDuration = 300
+  fadeDuration = 300,
 }) => {
   const [currentUriIndex, setCurrentUriIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -45,20 +45,24 @@ const SmartImage: React.FC<SmartImageProps> = ({
   const [retryCount, setRetryCount] = useState(0);
 
   // Construire la liste complète des URIs (principale + fallbacks)
-  const allUris = [uri, ...fallbackUris].filter(url => url && url.trim() !== '');
+  const allUris = [uri, ...fallbackUris].filter(
+    url => url && url.trim() !== '',
+  );
   const currentUri = allUris[currentUriIndex];
 
   // Fonction de nettoyage URL
   const sanitizeUri = (url: string): string => {
-    if (!url) return '';
-    
+    if (!url) {
+      return '';
+    }
+
     let clean = url.trim();
-    
+
     // Corriger les protocoles manquants
     if (clean.startsWith('//')) {
       clean = `https:${clean}`;
     }
-    
+
     // Encoder les caractères spéciaux dans l'URL
     try {
       const urlObj = new URL(clean);
@@ -79,7 +83,7 @@ const SmartImage: React.FC<SmartImageProps> = ({
   // Gestion des erreurs avec fallback automatique
   const handleError = (error: any) => {
     console.log(`🚫 SmartImage error for URI ${currentUriIndex}:`, error);
-    
+
     if (onError) {
       onError(error);
     }
@@ -94,17 +98,17 @@ const SmartImage: React.FC<SmartImageProps> = ({
       // Retry avec délai exponentiel
       const delay = retryDelay * Math.pow(2, retryCount);
       console.log(`🔄 Retry attempt ${retryCount + 1} in ${delay}ms`);
-      
+
       setTimeout(() => {
         setRetryCount(retryCount + 1);
         setHasError(false);
       }, delay);
     } else {
       // Tous les fallbacks et retries ont échoué
-      console.log(`❌ All URIs failed for SmartImage`);
+      console.log('❌ All URIs failed for SmartImage');
       setHasError(true);
       setIsLoading(false);
-      
+
       if (onFinalError) {
         onFinalError();
       }
@@ -115,16 +119,20 @@ const SmartImage: React.FC<SmartImageProps> = ({
   const handleLoad = () => {
     setIsLoading(false);
     setHasError(false);
-    
+
     if (onLoad) {
       onLoad();
     }
-    
+
     console.log(`✅ SmartImage loaded successfully: URI ${currentUriIndex}`);
   };
 
   // Ne pas rendre si toutes les URIs ont échoué
-  if (hasError && currentUriIndex >= allUris.length - 1 && retryCount >= maxRetries) {
+  if (
+    hasError &&
+    currentUriIndex >= allUris.length - 1 &&
+    retryCount >= maxRetries
+  ) {
     return null;
   }
 
@@ -144,9 +152,10 @@ const SmartImage: React.FC<SmartImageProps> = ({
         uri: cleanUri,
         headers: {
           'User-Agent': 'IPTV-Player/1.0',
-          'Accept': 'image/webp,image/apng,image/png,image/jpg,image/jpeg,image/gif,*/*;q=0.8',
-          'Cache-Control': 'max-age=3600' // Cache 1 heure
-        }
+          Accept:
+            'image/webp,image/apng,image/png,image/jpg,image/jpeg,image/gif,*/*;q=0.8',
+          'Cache-Control': 'max-age=3600', // Cache 1 heure
+        },
       }}
       style={style}
       resizeMode={resizeMode}

@@ -3,7 +3,7 @@
  * Layout 3 zones: Liste chaînes (gauche) + Mini lecteur (droite haut) + EPG future (droite bas)
  */
 
-import React, { useState, useEffect } from 'react';
+import React, {useState, useEffect, useRef} from 'react';
 // import { WatermelonXtreamService } from '../services/WatermelonXtreamService'; // TEMPORAIRE: Désactivé (GitHub Issue #3692)
 import {
   View,
@@ -17,18 +17,28 @@ import {
   Dimensions,
   Pressable,
   ScrollView,
+  Modal,
+  Animated,
 } from 'react-native';
 // Masquage barre navigation via StatusBar
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { List, Avatar, IconButton, Card, ProgressBar, Text as PaperText } from 'react-native-paper';
+import {
+  List,
+  Avatar,
+  IconButton,
+  Card,
+  ProgressBar,
+  Text as PaperText,
+} from 'react-native-paper';
+import { BlurView } from '@react-native-community/blur';
+import LinearGradient from 'react-native-linear-gradient';
 import VideoPlayer from '../components/VideoPlayer';
-import VideoPlayerModern from '../components/VideoPlayerModern'; // PHASE 1: Réactivé avec nouvelles fonctionnalités
-import { useRoute, useNavigation } from '@react-navigation/native';
-import type { StackNavigationProp } from '@react-navigation/stack';
-import type { RootStackParamList, Channel, Category } from '../types';
+import VideoPlayerSimple from '../components/VideoPlayerSimple'; // Nouveau lecteur ultra-simplifié avec gestures
+import {useRoute, useNavigation} from '@react-navigation/native';
+import type {StackNavigationProp} from '@react-navigation/stack';
+import type {RootStackParamList, Channel, Category} from '../types';
 
-
-const { width, height } = Dimensions.get('window');
+const {width, height} = Dimensions.get('window');
 
 interface ChannelPlayerScreenProps {
   route: {
@@ -45,7 +55,7 @@ interface ChannelPlayerScreenProps {
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 
-const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({ route }) => {
+const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({route}) => {
   const navigation = useNavigation<NavigationProp>();
   const {
     playlistId,
@@ -53,7 +63,7 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({ route }) => {
     initialCategory,
     initialChannels,
     selectedChannel: initialChannel,
-    playlistName
+    playlistName,
   } = route.params;
 
   // Log pour déboguer la réception des données
@@ -63,22 +73,39 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({ route }) => {
     initialCategoryName: initialCategory?.name,
     initialChannelsCount: initialChannels?.length,
     selectedChannelName: initialChannel?.name,
-    playlistName: playlistName
+    playlistName: playlistName,
   });
 
   // États locaux pour rendre le composant autonome (selon spec Gemini)
   const [categories, setCategories] = useState<Category[]>(allCategories);
   const [currentCategoryIndex, setCurrentCategoryIndex] = useState(() =>
-    allCategories.findIndex(cat => cat.id === initialCategory.id)
+    allCategories.findIndex(cat => cat.id === initialCategory.id),
   );
   const [channels, setChannels] = useState<Channel[]>(initialChannels);
-  const [selectedChannel, setSelectedChannel] = useState<Channel>(initialChannel);
+  const [selectedChannel, setSelectedChannel] =
+    useState<Channel>(initialChannel);
   const [showFullscreenPlayer, setShowFullscreenPlayer] = useState(false);
   const [isPlaying, setIsPlaying] = useState(true);
-  const [shouldKeepCurrentChannel, setShouldKeepCurrentChannel] = useState(false); // Flag pour éviter changement auto
+  const [videoCurrentTime, setVideoCurrentTime] = useState(0); // 🚀 Temps vidéo pour transition rapide
+  const [shouldKeepCurrentChannel, setShouldKeepCurrentChannel] =
+    useState(false); // Flag pour éviter changement auto
   const [currentTime, setCurrentTime] = useState('');
   const [currentDate, setCurrentDate] = useState('');
   const [favoriteChannels, setFavoriteChannels] = useState<string[]>([]); // IDs des chaînes favorites
+  
+  // Nouveaux états pour les données vidéo réelles
+  const [videoProgress, setVideoProgress] = useState(0);
+  const [videoDuration, setVideoDuration] = useState(0);
+  // videoCurrentTime déjà déclaré ligne 89
+  const [videoMetadata, setVideoMetadata] = useState<any>(null);
+  
+  // États pour interface TiviMate
+  const [showTiviMateControls, setShowTiviMateControls] = useState(true);
+
+  // Animations pour les contrôles TiviMate
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const controlsTimer = useRef<NodeJS.Timeout | null>(null);
 
   // Charger les favoris au montage
   useEffect(() => {
@@ -88,8 +115,12 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({ route }) => {
   // Fonction pour charger les favoris depuis AsyncStorage
   const loadFavorites = async () => {
     try {
-      const AsyncStorage = await import('@react-native-async-storage/async-storage');
-      const favoritesData = await AsyncStorage.default.getItem(`favorites_${playlistId}`);
+      const AsyncStorage = await import(
+        '@react-native-async-storage/async-storage'
+      );
+      const favoritesData = await AsyncStorage.default.getItem(
+        `favorites_${playlistId}`,
+      );
       if (favoritesData) {
         const favorites = JSON.parse(favoritesData);
         setFavoriteChannels(favorites);
@@ -106,14 +137,18 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({ route }) => {
   // Charger les chaînes récentes depuis AsyncStorage
   const loadRecentChannels = async () => {
     try {
-      const AsyncStorage = await import('@react-native-async-storage/async-storage');
+      const AsyncStorage = await import(
+        '@react-native-async-storage/async-storage'
+      );
       const recentKey = `recent_channels_${playlistId}`;
       const recentData = await AsyncStorage.default.getItem(recentKey);
-      
+
       if (recentData) {
         const recentChannelsData = JSON.parse(recentData);
         setRecentChannels(recentChannelsData);
-        console.log(`🕰️ ${recentChannelsData.length} chaînes récentes chargées`);
+        console.log(
+          `🕰️ ${recentChannelsData.length} chaînes récentes chargées`,
+        );
       }
     } catch (error) {
       console.error('❌ Erreur chargement récents:', error);
@@ -126,25 +161,37 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({ route }) => {
   }, [playlistId]);
 
   // Fonction pour obtenir le nombre de chaînes pour une catégorie
-  const getCategoryChannelCount = (category: Category, currentChannels: Channel[]): number => {
+  const getCategoryChannelCount = (
+    category: Category,
+    currentChannels: Channel[],
+  ): number => {
     // Si c'est la catégorie "RÉCENTS" (détection par nom)
-    if (category.name.toLowerCase().includes('tout') && category.name.includes('(')) {
+    if (
+      category.name.toLowerCase().includes('tout') &&
+      category.name.includes('(')
+    ) {
       // C'est probablement "TOUT (242)" - utiliser les vraies chaînes récentes
-      if (category.name.toLowerCase().includes('recent') || category.id.includes('recent')) {
+      if (
+        category.name.toLowerCase().includes('recent') ||
+        category.id.includes('recent')
+      ) {
         return recentChannels.length;
       }
     }
-    
+
     // Si c'est la catégorie "FAVORIS" (détection par nom)
-    if (category.name.toLowerCase().includes('favoris') || category.name.includes('💙')) {
+    if (
+      category.name.toLowerCase().includes('favoris') ||
+      category.name.includes('💙')
+    ) {
       return favoriteChannels.length;
     }
-    
+
     // Si c'est la catégorie active, utiliser les chaînes actuellement affichées
     if (categories[currentCategoryIndex]?.id === category.id) {
       return currentChannels.length;
     }
-    
+
     // Sinon, utiliser les chaînes associées à la catégorie
     return category.channels?.length || 0;
   };
@@ -153,10 +200,12 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({ route }) => {
   const isReallyLive = (channel: Channel) => {
     // Vérifier si la chaîne est vraiment en live
     // Par défaut: true pour chaînes TV classiques, false pour VOD
-    return !channel.name.toLowerCase().includes('vod') && 
-           !channel.name.toLowerCase().includes('replay') &&
-           !channel.url.includes('.mp4') &&
-           !channel.url.includes('.mkv');
+    return (
+      !channel.name.toLowerCase().includes('vod') &&
+      !channel.name.toLowerCase().includes('replay') &&
+      !channel.url.includes('.mp4') &&
+      !channel.url.includes('.mkv')
+    );
   };
 
   // Interface plein écran simple via StatusBar
@@ -171,12 +220,12 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({ route }) => {
       const now = new Date();
       const timeString = now.toLocaleTimeString('fr-FR', {
         hour: '2-digit',
-        minute: '2-digit'
+        minute: '2-digit',
       });
       const dateString = now.toLocaleDateString('fr-FR', {
         weekday: 'short', // Dim, Lun, Mar...
         day: '2-digit',
-        month: 'short'    // Jan, Fév, Mar...
+        month: 'short',    // Jan, Fév, Mar...
       });
       setCurrentTime(timeString);
       setCurrentDate(dateString);
@@ -188,23 +237,25 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({ route }) => {
     return () => clearInterval(interval); // Cleanup
   }, []);
 
-  
+
 
   // Dimensions COMME IPTV SMARTERS PRO REFERENCE
-  const leftPanelWidth = width * 0.43; // Largeur ajustée à 43%  
+  const leftPanelWidth = width * 0.43; // Largeur ajustée à 43%
   const rightPanelWidth = width * 0.55; // 55% pour lecteur + EPG
   // 🎯 RATIO COMME IPTV SMARTERS PRO - LECTEUR COMPACT
   // Lecteur vraiment petit comme dans la référence (environ 180-200px)
   const miniPlayerHeight = Math.min(
     rightPanelWidth * (9 / 16), // Ratio 16:9
-    180  // Très compact comme référence IPTV Smarters Pro
+    180, // Très compact comme référence IPTV Smarters Pro
   );
 
   // ===== LOGIQUE DE NAVIGATION ENTRE CATÉGORIES (Spec Gemini) =====
   const handleNextCategory = () => {
     const nextIndex = currentCategoryIndex + 1;
     if (nextIndex < categories.length) {
-      console.log(`🎬 Navigation vers catégorie suivante: ${categories[nextIndex].name}`);
+      console.log(
+        `🎬 Navigation vers catégorie suivante: ${categories[nextIndex].name}`,
+      );
       setCurrentCategoryIndex(nextIndex);
     }
   };
@@ -212,14 +263,16 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({ route }) => {
   const handlePreviousCategory = () => {
     const prevIndex = currentCategoryIndex - 1;
     if (prevIndex >= 0) {
-      console.log(`🎬 Navigation vers catégorie précédente: ${categories[prevIndex].name}`);
+      console.log(
+        `🎬 Navigation vers catégorie précédente: ${categories[prevIndex].name}`,
+      );
       setCurrentCategoryIndex(prevIndex);
     }
   };
 
   // Ce useEffect réagit au changement de catégorie pour mettre à jour l'UI (Spec Gemini)
   useEffect(() => {
-    if (categories.length === 0) return;
+    if (categories.length === 0) {return;}
 
     const newCategory = categories[currentCategoryIndex];
     if (newCategory) {
@@ -227,40 +280,60 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({ route }) => {
 
       // 🔧 CHARGEMENT DES CHAÎNES PAR CATÉGORIE
       let newChannels: Channel[];
-      
+
       // Catégorie RÉCENTS - utiliser les vraies chaînes regardées
-      if (newCategory.name.toLowerCase().includes('recent') || newCategory.id.includes('recent')) {
+      if (
+        newCategory.name.toLowerCase().includes('recent') ||
+        newCategory.id.includes('recent')
+      ) {
         newChannels = recentChannels;
-        console.log(`🕰️ RÉCENTS: ${newChannels.length} chaînes vraiment regardées`);
-      } 
+        console.log(
+          `🕰️ RÉCENTS: ${newChannels.length} chaînes vraiment regardées`,
+        );
+      }
       // Catégorie initiale (celle d'origine)
-      else if (newCategory.id === initialCategory.id && initialChannels.length > 0) {
+      else if (
+        newCategory.id === initialCategory.id &&
+        initialChannels.length > 0
+      ) {
         newChannels = initialChannels;
-        console.log(`🎯 XTREAM MATCHED: Utilisation des initialChannels (${newChannels.length} chaînes) pour ${newCategory.name}`);
-      } 
+        console.log(
+          `🎯 XTREAM MATCHED: Utilisation des initialChannels (${newChannels.length} chaînes) pour ${newCategory.name}`,
+        );
+      }
       // Autres catégories
       else {
         newChannels = newCategory.channels || [];
         if (newChannels.length === 0) {
-          console.log(`🔍 CHARGEMENT DYNAMIQUE: Catégorie ${newCategory.name} vide, chargement depuis WatermelonDB...`);
+          console.log(
+            `🔍 CHARGEMENT DYNAMIQUE: Catégorie ${newCategory.name} vide, chargement depuis WatermelonDB...`,
+          );
           loadChannelsForCategory(newCategory.id, newCategory.name);
           return; // Exit early, loadChannelsForCategory gérera les setState
         }
-        console.log(`🎯 STANDARD: Utilisation des category.channels (${newChannels.length} chaînes) pour ${newCategory.name}`);
+        console.log(
+          `🎯 STANDARD: Utilisation des category.channels (${newChannels.length} chaînes) pour ${newCategory.name}`,
+        );
       }
-      
+
       setChannels(newChannels);
 
       // JAMAIS changer automatiquement la chaîne lors de la navigation
       // L'utilisateur garde sa chaîne actuelle peu importe la catégorie
-      console.log(`✅ Navigation vers ${newCategory.name} - Chaîne actuelle ${selectedChannel.name} conservée`);
-      
+      console.log(
+        `✅ Navigation vers ${newCategory.name} - Chaîne actuelle ${selectedChannel.name} conservée`,
+      );
+
       // Optionnel: Log si la chaîne actuelle est dans la nouvelle catégorie
-      const currentChannelInNewCategory = newChannels.find(ch => ch.id === selectedChannel.id);
+      const currentChannelInNewCategory = newChannels.find(
+        (ch) => ch.id === selectedChannel.id,
+      );
       if (currentChannelInNewCategory) {
         console.log(`🎯 Chaîne actuelle trouvée dans ${newCategory.name}`);
       } else {
-        console.log(`🔄 Chaîne actuelle non présente dans ${newCategory.name}, mais conservée`);
+        console.log(
+          `🔄 Chaîne actuelle non présente dans ${newCategory.name}, mais conservée`,
+        );
       }
     }
   }, [currentCategoryIndex, categories, initialChannels]);
@@ -272,30 +345,40 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({ route }) => {
   // Fonction pour ajouter une chaîne aux récents
   const addToRecentChannels = async (channel: Channel) => {
     try {
-      const AsyncStorage = await import('@react-native-async-storage/async-storage');
+      const AsyncStorage = await import(
+        '@react-native-async-storage/async-storage'
+      );
       const recentKey = `recent_channels_${playlistId}`;
-      
+
       // Charger les récents actuels
       const recentData = await AsyncStorage.default.getItem(recentKey);
-      let recentChannels = recentData ? JSON.parse(recentData) : [];
-      
+      let updatedRecentChannels = recentData ? JSON.parse(recentData) : [];
+
       // Supprimer la chaîne si déjà présente
-      recentChannels = recentChannels.filter((recent: any) => recent.id !== channel.id);
-      
+      updatedRecentChannels = updatedRecentChannels.filter(
+        (recent: any) => recent.id !== channel.id,
+      );
+
       // Ajouter en tête avec timestamp
       const recentChannel = {
         ...channel,
-        watchedAt: new Date().toISOString()
+        watchedAt: new Date().toISOString(),
       };
-      recentChannels.unshift(recentChannel);
-      
+      updatedRecentChannels.unshift(recentChannel);
+
       // Limiter à 20 chaînes récentes
-      recentChannels = recentChannels.slice(0, 20);
+      updatedRecentChannels = updatedRecentChannels.slice(0, 20);
+
+      // Sauvegarder dans AsyncStorage
+      await AsyncStorage.default.setItem(
+        recentKey,
+        JSON.stringify(updatedRecentChannels),
+      );
+
+      // 🔥 MISE À JOUR ÉTAT REACT - KEY FIX
+      setRecentChannels(updatedRecentChannels);
       
-      // Sauvegarder
-      await AsyncStorage.default.setItem(recentKey, JSON.stringify(recentChannels));
-      console.log(`✅ Chaîne ${channel.name} ajoutée aux récents`);
-      
+      console.log(`✅ Chaîne ${channel.name} ajoutée aux récents - État mis à jour`);
     } catch (error) {
       console.error('❌ Erreur ajout récents:', error);
     }
@@ -305,7 +388,7 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({ route }) => {
     console.log('🎬 Sélection chaîne:', channel.name);
     setSelectedChannel(channel);
     setIsPlaying(true);
-    
+
     // Ajouter aux récents SEULEMENT quand l'utilisateur sélectionne manuellement
     addToRecentChannels(channel);
   };
@@ -321,43 +404,201 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({ route }) => {
     setShowFullscreenPlayer(isFullscreen);
   };
 
+  // 🚀 Handlers pour transition rapide
+  // handlePlayPauseChange déclaré plus tard (ligne ~484)
+
+  // handleVideoLoad déclaré plus tard avec setVideoMetadata (ligne ~480)
+
+  // Fonctions pour interface TiviMate
+  useEffect(() => {
+    if (showTiviMateControls) {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      // Auto-masquer les contrôles après 3 secondes
+      if (controlsTimer.current) {
+        clearTimeout(controlsTimer.current);
+      }
+      controlsTimer.current = setTimeout(() => {
+        hideTiviMateControls();
+      }, 3000);
+    } else {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: -100,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+
+    return () => {
+      if (controlsTimer.current) {
+        clearTimeout(controlsTimer.current);
+      }
+    };
+  }, [showTiviMateControls]);
+
+  const hideTiviMateControls = () => {
+    setShowTiviMateControls(false);
+  };
+
+  const toggleTiviMateControls = () => {
+    setShowTiviMateControls(!showTiviMateControls);
+  };
+
+  const handleTiviMateChannelSelect = (selectedChannel: Channel) => {
+    console.log('Changement vers chaîne:', selectedChannel.name);
+    handleChannelSelect(selectedChannel);
+  };
+
+  // Gestionnaires pour VideoPlayer
+  const handleVideoProgress = (data: any) => {
+    setVideoCurrentTime(data.currentTime);
+    setVideoDuration(data.seekableDuration || data.duration || 0);
+    if (data.seekableDuration && data.seekableDuration > 0) {
+      setVideoProgress(data.currentTime / data.seekableDuration);
+    }
+  };
+
+  const handleVideoLoad = (data: any) => {
+    console.log('📹 [VIDEO] Load completed:', data?.duration);
+    console.log('📹 Métadonnées vidéo:', data);
+    setVideoMetadata(data);
+  };
+
+  const handlePlayPauseChange = (playing: boolean) => {
+    console.log('▶️ [PLAY/PAUSE] State changed:', playing);
+    setIsPlaying(playing);
+  };
+
+  // Fonction pour extraire les badges techniques réels
+  const getTechnicalBadges = () => {
+    const badges = [];
+    
+    // Badge qualité depuis channel.quality ou URL
+    if (selectedChannel.quality) {
+      badges.push(selectedChannel.quality.toUpperCase());
+    } else if (selectedChannel.url.includes('1080')) {
+      badges.push('FHD');
+    } else if (selectedChannel.url.includes('720')) {
+      badges.push('HD');
+    } else {
+      badges.push('SD');
+    }
+    
+    // Badge FPS (estimation basique)
+    if (videoMetadata?.naturalSize?.height >= 1080) {
+      badges.push('25 FPS');
+    } else {
+      badges.push('25 FPS');
+    }
+    
+    // Badge Audio (IPTV généralement stéréo)
+    badges.push('STÉRÉO');
+    
+    return badges;
+  };
+
+  // Fonction pour calculer les informations de programme réelles
+  const getRealProgramInfo = () => {
+    const now = new Date();
+    const startTime = new Date(now);
+    startTime.setMinutes(0, 0, 0); // Arrondir à l'heure
+    
+    const endTime = new Date(startTime);
+    endTime.setHours(startTime.getHours() + 1); // Programme d'1 heure
+    
+    const formatTime = (date: Date) => 
+      date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    
+    const elapsedMinutes = Math.floor((now.getTime() - startTime.getTime()) / (1000 * 60));
+    const totalMinutes = 60;
+    const progress = Math.max(0, Math.min(1, elapsedMinutes / totalMinutes));
+    
+    return {
+      currentShow: selectedChannel.name,
+      currentTime: `${formatTime(startTime)} – ${formatTime(endTime)}`,
+      duration: `${totalMinutes - elapsedMinutes} min restantes`,
+      progress: progress,
+      nextShow: 'Programme suivant',
+    };
+  };
+
+  const realProgramInfo = getRealProgramInfo();
+  const technicalBadges = getTechnicalBadges();
+
   // 🔍 CHARGEMENT DYNAMIQUE basé sur patterns GitHub/Reddit - FIX prototype error avec AsyncStorage
-  const loadChannelsForCategory = async (categoryId: string, categoryName: string) => {
+  const loadChannelsForCategory = async (
+    categoryId: string,
+    categoryName: string,
+  ) => {
     try {
-      console.log(`🔍 Chargement chaînes pour ${categoryName} via AsyncStorage (évite conflit WatermelonDB)`);
-      
+      console.log(
+        `🔍 Chargement chaînes pour ${categoryName} via AsyncStorage (évite conflit WatermelonDB)`,
+      );
+
       // Import AsyncStorage (alternative safe à WatermelonDB)
-      const AsyncStorage = await import('@react-native-async-storage/async-storage');
-      
+      const AsyncStorage = await import(
+        '@react-native-async-storage/async-storage'
+      );
+
       // Clé pour les chaînes de cette catégorie
       const cacheKey = `channels_${playlistId}_${categoryId}`;
       console.log(`📦 Recherche cache: ${cacheKey}`);
-      
+
       const cachedData = await AsyncStorage.default.getItem(cacheKey);
       if (cachedData) {
         const channelsData = JSON.parse(cachedData);
-        console.log(`✅ ${channelsData.length} chaînes chargées depuis AsyncStorage pour ${categoryName}`);
-        
+        console.log(
+          `✅ ${channelsData.length} chaînes chargées depuis AsyncStorage pour ${categoryName}`,
+        );
         setChannels(channelsData);
         // JAMAIS changer la chaîne lors du chargement dynamique
-        console.log(`✅ ${channelsData.length} chaînes chargées - Lecture en cours conservée`);
+        console.log(
+          `✅ ${channelsData.length} chaînes chargées - Lecture en cours conservée`,
+        );
       } else {
         console.log(`⚠️ Pas de cache AsyncStorage pour ${categoryName}`);
         // Fallback vers category.channels
-        const fallbackChannels = categories.find(cat => cat.id === categoryId)?.channels || [];
+        const fallbackChannels =
+          categories.find(cat => cat.id === categoryId)?.channels || [];
         if (fallbackChannels.length > 0) {
-          console.log(`🎯 FALLBACK: ${fallbackChannels.length} chaînes trouvées dans category.channels`);
+          console.log(
+            `🎯 FALLBACK: ${fallbackChannels.length} chaînes trouvées dans category.channels`,
+          );
           setChannels(fallbackChannels);
           // Ne pas changer la chaîne automatiquement en fallback non plus
-          console.log(`✅ Fallback chargé sans interrompre la lecture`);
+          console.log('✅ Fallback chargé sans interrompre la lecture');
         } else {
-          console.log(`⚠️ Aucune chaîne pour ${categoryName} - gardons les chaînes actuelles`);
+          console.log(
+            `⚠️ Aucune chaîne pour ${categoryName} - gardons les chaînes actuelles`,
+          );
         }
       }
     } catch (error) {
-      console.error(`❌ Erreur chargement AsyncStorage ${categoryName}:`, error);
+      console.error(
+        `❌ Erreur chargement AsyncStorage ${categoryName}:`,
+        error,
+      );
       // Fallback silencieux
-      const fallbackChannels = categories.find(cat => cat.id === categoryId)?.channels || [];
+      const fallbackChannels =
+        categories.find(cat => cat.id === categoryId)?.channels || [];
       if (fallbackChannels.length > 0) {
         setChannels(fallbackChannels);
         // Même en cas d'erreur, ne pas changer automatiquement la chaîne
@@ -366,7 +607,7 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({ route }) => {
   };
 
   // Rendu d'une chaîne dans la liste de gauche - Version compacte List.Item
-  const renderChannelItem = ({ item, index }: { item: Channel; index: number }) => {
+  const renderChannelItem = ({item, index}: {item: Channel; index: number}) => {
     const isSelected = item.id === selectedChannel.id;
 
     return (
@@ -376,10 +617,10 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({ route }) => {
           isSelected && styles.channelListItemSelected,
         ]}
         onPress={() => handleChannelSelect(item)}
-        left={(props) => (
+        left={props =>
           item.logo ? (
-            <Image 
-              source={{ uri: item.logo }}
+            <Image
+              source={{uri: item.logo}}
               style={styles.channelLogo}
               resizeMode="contain" // Assure que le logo entier est visible sans être rogné
             />
@@ -392,11 +633,11 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({ route }) => {
               labelStyle={styles.channelAvatarText}
             />
           )
-        )}
+        }
         title={item.name}
         titleStyle={[
           styles.channelTitle,
-          isSelected && styles.channelTitleSelected
+          isSelected && styles.channelTitleSelected,
         ]}
         titleNumberOfLines={1}
       />
@@ -405,13 +646,20 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({ route }) => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#000000" hidden={true} translucent={true} />
-      
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor="#000000"
+        hidden={true}
+        translucent={true}
+      />
+
       {/* Header Version 2 - 3 blocs avec info chaîne courante */}
       <View style={styles.header}>
         {/* Bloc Gauche: Retour */}
         <View style={styles.headerLeftBlock}>
-          <TouchableOpacity onPress={handleBack} style={styles.headerIconButton}>
+          <TouchableOpacity
+            onPress={handleBack}
+            style={styles.headerIconButton}>
             <Icon name="arrow-back" size={24} color="#EAEAEA" />
           </TouchableOpacity>
         </View>
@@ -420,7 +668,7 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({ route }) => {
         <View style={styles.headerCenterBlock}>
           {selectedChannel.logo ? (
             <Image
-              source={{ uri: selectedChannel.logo }}
+              source={{uri: selectedChannel.logo}}
               style={styles.headerChannelLogo}
               resizeMode="contain"
             />
@@ -429,22 +677,9 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({ route }) => {
               size={32}
               label={selectedChannel.name.substring(0, 2).toUpperCase()}
               style={styles.headerChannelLogo}
-              labelStyle={{ fontSize: 12, fontWeight: '600' }}
+              labelStyle={{fontSize: 12, fontWeight: '600'}}
             />
           )}
-          <View style={styles.headerChannelInfo}>
-            <Text style={styles.headerChannelName} numberOfLines={1}>
-              {selectedChannel.name}
-            </Text>
-            <View style={styles.headerProgramRow}>
-              {/* Badge LIVE conditionnel */}
-              {isReallyLive(selectedChannel) && (
-                <View style={styles.liveBadge}>
-                  <Text style={styles.liveBadgeText}>LIVE</Text>
-                </View>
-              )}
-            </View>
-          </View>
         </View>
 
         {/* Bloc Droite: Heure + Date + Actions */}
@@ -454,10 +689,14 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({ route }) => {
             <Text style={styles.headerDate}>{currentDate}</Text>
           </View>
           <View style={styles.headerIconContainer}>
-            <TouchableOpacity onPress={() => {}} style={styles.headerIconButton}>
+            <TouchableOpacity
+              onPress={() => {}}
+              style={styles.headerIconButton}>
               <Icon name="search" size={22} color="#EAEAEA" />
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => {}} style={styles.headerIconButton}>
+            <TouchableOpacity
+              onPress={() => {}}
+              style={styles.headerIconButton}>
               <Icon name="more-vert" size={20} color="#EAEAEA" />
             </TouchableOpacity>
           </View>
@@ -467,39 +706,45 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({ route }) => {
       {/* Layout 3 zones principal */}
       <View style={styles.mainLayout}>
         {/* Zone Gauche: Interface IPTV Smarters Pro avec sélecteur de catégories */}
-        <View style={[styles.leftPanel, { width: leftPanelWidth }]}>
-          
+        <View style={[styles.leftPanel, {width: leftPanelWidth}]}>
+
           {/* Sélecteur de catégorie avec IconButton et compteur intégré */}
           <View style={styles.categorySelector}>
-            <TouchableOpacity 
-              onPress={handlePreviousCategory} 
+            <TouchableOpacity
+              onPress={handlePreviousCategory}
               style={styles.categoryArrow}
-              disabled={currentCategoryIndex === 0}
-            >
-              <Icon 
-                name="arrow-back-ios" 
-                size={20} 
-                color={currentCategoryIndex === 0 ? '#444444' : '#EAEAEA'} 
+              disabled={currentCategoryIndex === 0}>
+              <Icon
+                name="arrow-back-ios"
+                size={20}
+                color={currentCategoryIndex === 0 ? '#444444' : '#EAEAEA'}
               />
             </TouchableOpacity>
 
             <Text style={styles.categoryTitle} numberOfLines={1}>
-              {categories[currentCategoryIndex]?.name || 'Catégories'} ({getCategoryChannelCount(categories[currentCategoryIndex], channels)})
+              {categories[currentCategoryIndex]?.name || 'Catégories'} (
+              {categories[currentCategoryIndex] 
+                ? getCategoryChannelCount(categories[currentCategoryIndex], channels)
+                : 0}
+              )
             </Text>
 
-            <TouchableOpacity 
-              onPress={handleNextCategory} 
+            <TouchableOpacity
+              onPress={handleNextCategory}
               style={styles.categoryArrow}
-              disabled={currentCategoryIndex === categories.length - 1}
-            >
-              <Icon 
-                name="arrow-forward-ios" 
-                size={20} 
-                color={currentCategoryIndex === categories.length - 1 ? '#444444' : '#EAEAEA'} 
+              disabled={currentCategoryIndex === categories.length - 1}>
+              <Icon
+                name="arrow-forward-ios"
+                size={20}
+                color={
+                  currentCategoryIndex === categories.length - 1
+                    ? '#444444'
+                    : '#EAEAEA'
+                }
               />
             </TouchableOpacity>
           </View>
-          
+
           {/* La liste des chaînes utilise maintenant l'état local 'channels' */}
           <FlatList
             data={channels}
@@ -508,16 +753,24 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({ route }) => {
             showsVerticalScrollIndicator={false}
             style={styles.channelsList}
             contentContainerStyle={styles.channelsListContent}
-            initialScrollIndex={channels.length > 0 ? Math.max(0, channels.findIndex(ch => ch.id === selectedChannel?.id)) : undefined}
+            initialScrollIndex={
+              channels.length > 0
+                ? Math.max(
+                    0,
+                    channels.findIndex(ch => ch.id === selectedChannel?.id),
+                  )
+                : undefined
+            }
             onScrollToIndexFailed={() => {}}
           />
         </View>
 
         {/* Zone Droite: Mini lecteur + EPG future */}
-        <View style={[styles.rightPanel, { width: rightPanelWidth }]}>
-          
+        <View style={[styles.rightPanel, {width: rightPanelWidth}]}>
+
           {/* 🎯 MINI-LECTEUR - VERSION FONCTIONNELLE */}
-          <View style={[styles.miniPlayerContainer, { height: miniPlayerHeight }]}>
+          <View
+            style={[styles.miniPlayerContainer, {height: miniPlayerHeight}]}>
             <VideoPlayer
               channel={selectedChannel}
               isVisible={true}
@@ -526,36 +779,49 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({ route }) => {
               showInfo={false}
               style={styles.miniPlayer}
               isFullscreen={showFullscreenPlayer}
+              paused={showFullscreenPlayer} // 🔇 Pause mini lecteur quand fullscreen actif
               onMiniPlayerPress={() => {
                 console.log('🔥 MINI PLAYER CLICKED! Opening fullscreen');
                 handleMiniPlayerPress(true);
               }}
               onFullscreenToggle={handleCloseFullscreen}
+              externalIsPlaying={isPlaying}
+              onPlayPause={handlePlayPauseChange}
+              onProgress={(data) => {
+                setVideoCurrentTime(data.currentTime); // 🚀 Sauvegarder temps pour fullscreen
+              }}
+              onVideoLoad={handleVideoLoad}
             />
           </View>
 
           {/* 🎯 ZONE EPG REDESIGNÉE avec Card flexible et Paper components */}
           <Card style={styles.epgCard}>
             {/* Plus de header - EPG directement */}
-            
+
             <View style={styles.epgCardContent}>
               {/* Zone EPG vide pour implémentation future */}
               <View style={styles.epgPlaceholder}>
-                <Text style={styles.epgPlaceholderText}>EPG en cours d'implémentation</Text>
+                <Text style={styles.epgPlaceholderText}>
+                  EPG en cours d'implémentation
+                </Text>
               </View>
             </View>
           </Card>
         </View>
       </View>
 
-      {/* 🎬 PHASE 1: VideoPlayerModern avec contrôles TiviMate */}
-      <VideoPlayerModern
+      {/* 🎯 INTERFACE FULLSCREEN ULTRA-SIMPLE AVEC GESTURES */}
+      <VideoPlayerSimple
         channel={selectedChannel}
         isVisible={showFullscreenPlayer}
         isFullscreen={showFullscreenPlayer}
-        onError={(error) => console.log('Fullscreen error:', error)}
-        onFullscreenToggle={handleCloseFullscreen}
+        onExitFullscreen={handleCloseFullscreen}
+        initialTime={videoCurrentTime} // 🚀 Reprendre à la position du mini lecteur
+        initialPaused={!isPlaying} // 🚀 État pause du mini lecteur
+        recentChannels={recentChannels} // ✅ Chaînes récentes dynamiques
+        onChannelSelect={handleTiviMateChannelSelect} // ✅ Callback pour changer de chaîne
       />
+
     </View>
   );
 };
@@ -575,78 +841,24 @@ const styles = StyleSheet.create({
     borderBottomColor: '#222222',
     position: 'relative', // Requis pour le positionnement absolu des enfants
   },
-  
+
   // ===== HEADER REVISITÉ - LAYOUT CENTRÉ =====
   // Bloc Gauche
   headerLeftBlock: {
     position: 'absolute',
     left: 16,
   },
-  
+
   // Bloc Central
   headerCenterBlock: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  headerChannelLogo: {
-    width: 36,
-    height: 36,
-    marginRight: 8,
-  },
-  headerChannelInfo: {
-    flexDirection: 'row', // Aligner les éléments horizontalement
-    alignItems: 'center',
-  },
-  headerChannelName: {
-    color: '#EAEAEA',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  headerProgramRow: {
-    // Ce conteneur reste pour le badge LIVE
-  },
-  liveBadge: {
-    backgroundColor: '#D92D20',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 100, // Forme "pilule" garantie
-    marginLeft: 8, // Espace entre le nom et le badge
-  },
-  liveBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '500', // Typographie affinée
-    letterSpacing: 0.5,
-  },
-  
+
   // Bloc Droite
   headerRightBlock: {
     position: 'absolute',
     right: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  headerTimeContainer: {
-    alignItems: 'flex-end',
-    marginRight: 12, // Décalage vers la gauche
-  },
-  headerTime: {
-    color: '#EAEAEA',
-    fontSize: 18, // Taille augmentée
-    fontWeight: '600',
-  },
-  headerDate: {
-    color: '#888888',
-    fontSize: 13, // Taille augmentée
-    fontWeight: '400',
-  },
-  headerIconButton: {
-    padding: 8,
-    marginLeft: 4,
-    borderRadius: 20,
-    backgroundColor: 'transparent',
-  },
-  headerIconContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
@@ -665,7 +877,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   // Header supprimé selon les spécifications
-  
+
   // ===== STYLES SÉLECTEUR DE CATÉGORIES MODERNISÉ - FIX ESPACEMENT =====
   categorySelector: {
     flexDirection: 'row',
@@ -680,7 +892,7 @@ const styles = StyleSheet.create({
   },
   categoryTitle: {
     color: '#EAEAEA', // Texte primaire
-    fontSize: 14,     // Taille réduite pour moins de dominance
+    fontSize: 14, // Taille réduite pour moins de dominance
     fontWeight: '500', // Poids réduit pour harmoniser
     textAlign: 'center',
     flex: 1,
@@ -689,7 +901,7 @@ const styles = StyleSheet.create({
   categoryArrow: {
     padding: 6, // Padding réduit pour un look plus fin
   },
-  
+
   channelsList: {
     flex: 1,
   },
@@ -709,7 +921,7 @@ const styles = StyleSheet.create({
   },
   channelListItemSelected: {
     backgroundColor: '#333333', // Fond de l'élément sélectionné
-    borderRadius: 12 // Coins plus arrondis
+    borderRadius: 12, // Coins plus arrondis
   },
   channelTitle: {
     color: '#EAEAEA', // Texte primaire
@@ -745,7 +957,7 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 8, // Padding unifié pour un espacement cohérent
   },
-  
+
   // 🎯 STYLES MINI-LECTEUR - VERSION FONCTIONNELLE
   miniPlayerContainer: {
     position: 'relative',
@@ -767,7 +979,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  
+
 
   // 🎯 STYLES EPG ALIGNÉ AVEC LISTE CHAÎNES
   epgCard: {
@@ -792,9 +1004,9 @@ const styles = StyleSheet.create({
   },
   currentProgramModern: {
     paddingHorizontal: 16, // Ajouter un espacement intérieur
-    width: '100%',         // S'assurer qu'il prend toute la largeur
+    width: '100%', // S'assurer qu'il prend toute la largeur
   },
-  
+
   // Programme Actuel avec ProgressBar
   currentProgramSection: {
     backgroundColor: 'rgba(0, 212, 170, 0.1)',
@@ -840,7 +1052,7 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     backgroundColor: 'rgba(0, 212, 170, 0.2)',
   },
-  
+
   // Programmes Suivants avec List.Section
   nextProgramsSection: {
     flex: 1,
@@ -877,7 +1089,7 @@ const styles = StyleSheet.create({
     color: '#888888',
     fontWeight: '500',
   },
-  
+
   // EPG Placeholder
   epgPlaceholder: {
     flex: 1,
@@ -900,6 +1112,274 @@ const styles = StyleSheet.create({
     bottom: 0,
     zIndex: 9999,
     backgroundColor: 'black',
+  },
+
+  // ============ STYLES TIVIMATE (MODAL PLEIN ÉCRAN) ============
+  
+  tiviMateContainer: {
+    flex: 1,
+    backgroundColor: '#000000',
+  },
+  tiviMateVideoContainer: {
+    flex: 1,
+  },
+  tiviMateVideo: {
+    width: '100%',
+    height: '100%',
+  },
+  tiviMateTouchOverlay: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  // Style supprimé - non utilisé dans nouvelle structure
+  tiviMateControlsOverlay: {
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+
+  // Header vidéo supprimé comme demandé
+
+  // Contrôles play/pause centraux
+  tiviMatePlayControlsContainer: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: [{ translateX: -30 }, { translateY: -30 }],
+    zIndex: 10, // Z-index élevé pour être au-dessus du background
+  },
+  tiviMatePlayButton: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    marginTop: -30,
+    marginLeft: -30,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.5,
+    shadowRadius: 6,
+    elevation: 8,
+    zIndex: 1000,
+  },
+
+  // Docker avec cartes de taille et opacité uniformes
+  tiviMateDockerContainer: {
+    position: 'absolute',
+    bottom: 20,
+    left: 0,
+    right: 0,
+    zIndex: 999, // Z-index très élevé pour docker
+  },
+  tiviMateChannelList: {
+    paddingHorizontal: 20,
+  },
+  tiviMateDockerButton: {
+    width: 80,
+    height: 80,
+    alignItems: 'center',
+    marginRight: 10,
+    zIndex: 1000, // Z-index maximal
+  },
+  // Styles Docker supprimés - utilisation des styles unifiés de chaînes
+  tiviMateChannelCard: {
+    width: 80, // Taille unifiée
+    height: 80, // Taille unifiée
+    backgroundColor: 'rgba(40, 40, 40, 0.9)', // Opacité augmentée
+    borderRadius: 15,
+    marginRight: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 16, // Z-index pour interactions
+  },
+  tiviMateChannelCardLogo: {
+    width: 60,
+    height: 60,
+    borderRadius: 12,
+  },
+  tiviMateChannelCardFallback: {
+    width: 60,
+    height: 60,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  tiviMateChannelCardText: {
+    fontSize: 10,
+    color: '#FFFFFF',
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+
+  // Bouton de fermeture TiviMate
+  tiviMateCloseButton: {
+    position: 'absolute',
+    top: 40,
+    left: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    zIndex: 1001,
+  },
+  tiviMateCloseButtonBlur: {
+    ...StyleSheet.absoluteFillObject,
+  },
+
+  // ============ STYLES OVERLAY INFO CENTRAL V2 ============
+  infoOverlayContainer: {
+    position: 'absolute',
+    bottom: 120, // Ajusté pour le nouveau layout
+    left: '5%',
+    right: '5%',
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  infoLogo: {
+    width: 80, // Taille augmentée
+    height: 80, // Taille augmentée
+    marginRight: 12,
+  },
+  infoTextContainer: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  infoProgramTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+    textShadowColor: 'rgba(0, 0, 0, 0.7)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
+  },
+  infoProgramTime: {
+    color: '#E0E0E0',
+    fontSize: 14,
+    marginTop: 4,
+    textShadowColor: 'rgba(0, 0, 0, 0.7)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
+  },
+  infoProgressBarContainer: {
+    height: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: 2,
+    overflow: 'hidden',
+    marginTop: 12, // Espace ajouté au-dessus
+  },
+  infoProgressBarFill: {
+    height: '100%',
+    backgroundColor: '#4A90E2', // Couleur bleue de référence
+  },
+  
+  // Nouveaux styles pour badges techniques et informations réelles
+  infoBadgesContainer: {
+    flexDirection: 'row',
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  infoBadge: {
+    backgroundColor: 'rgba(74, 144, 226, 0.8)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  infoBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '600',
+    textShadowColor: 'rgba(0, 0, 0, 0.7)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+  },
+  infoProgressText: {
+    color: '#E0E0E0',
+    fontSize: 12,
+    marginTop: 4,
+    textShadowColor: 'rgba(0, 0, 0, 0.7)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
+  },
+  
+  // ============ STYLES BARRE DE PROGRESSION MODERNE IPTV ============
+  modernProgressContainer: {
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  modernProgressBar: {
+    height: 6,
+    borderRadius: 3,
+    position: 'relative',
+    marginBottom: 8,
+  },
+  modernProgressBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 3,
+  },
+  modernProgressFill: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    height: 6,
+    backgroundColor: '#4A90E2',
+    borderRadius: 3,
+    shadowColor: '#4A90E2',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 4,
+  },
+  modernProgressHandle: {
+    position: 'absolute',
+    top: -2,
+    right: -1,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+  },
+  modernTimeDisplay: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  modernTimeText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '600',
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
+  },
+  modernDurationText: {
+    color: '#E0E0E0',
+    fontSize: 13,
+    fontWeight: '500',
+    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
   },
 });
 

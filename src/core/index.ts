@@ -4,35 +4,32 @@
  */
 
 // Service Container (DI Engine)
-export { 
-  ServiceContainer, 
-  container, 
-  Injectable, 
-  useService 
+export {
+  ServiceContainer,
+  container,
+  Injectable,
+  useService,
 } from './ServiceContainer';
 
-export type { 
-  IServiceContainer, 
-  ServiceDefinition, 
-  ServiceConstructor, 
-  ServiceFactory 
+export type {
+  IServiceContainer,
+  ServiceDefinition,
+  ServiceConstructor,
+  ServiceFactory,
 } from './ServiceContainer';
 
 // Service Registry (Configuration centralisée)
-export { 
-  ServiceRegistry, 
-  ServiceNames, 
-  getService, 
-  useRegistryService 
+export {
+  ServiceRegistry,
+  ServiceNames,
+  getService,
+  useRegistryService,
 } from './ServiceRegistry';
 
-export type { ServiceName } from './ServiceRegistry';
+export type {ServiceName} from './ServiceRegistry';
 
 // Service Migration (Compatibilité Singleton → DI)
-export { 
-  ServiceMigration, 
-  useMigratedService 
-} from './ServiceMigration';
+export {ServiceMigration, useMigratedService} from './ServiceMigration';
 
 /**
  * Initialisation rapide du système DI
@@ -40,13 +37,16 @@ export {
  */
 export function initializeServiceArchitecture(): void {
   console.log('🏗️ Initializing Modern Service Architecture...');
-  
+
   // Import ServiceMigration dynamiquement pour éviter les problèmes circulaires
   try {
-    const { ServiceMigration: SM } = require('./ServiceMigration');
+    const {ServiceMigration: SM} = require('./ServiceMigration');
     SM.initialize();
     console.log('✅ Service Architecture ready');
   } catch (error) {
-    console.error('❌ Failed to initialize Service Architecture:', error.message);
+    console.error(
+      '❌ Failed to initialize Service Architecture:',
+      error.message,
+    );
   }
 }

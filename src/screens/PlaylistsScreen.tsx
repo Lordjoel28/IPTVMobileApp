@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   View,
   Text,
@@ -13,10 +13,10 @@ import {
 } from 'react-native';
 import DocumentPicker from 'react-native-document-picker';
 // AppManager removed - will be replaced by DI services
-import { Playlist } from '../types';
-import { usePlaylistSelection } from '../hooks/usePlaylistSelection';
+import {Playlist} from '../types';
+import {usePlaylistSelection} from '../hooks/usePlaylistSelection';
 // AppContext removed - using UIStore instead
-import { useUIStore } from '../stores/UIStore';
+import {useUIStore} from '../stores/UIStore';
 
 const PlaylistsScreen: React.FC = () => {
   // AppManager removed - will be replaced by DI services + Zustand
@@ -27,13 +27,14 @@ const PlaylistsScreen: React.FC = () => {
   const [newPlaylistUrl, setNewPlaylistUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const isDarkMode = useColorScheme() === 'dark';
-  
+
   // 🎬 Hook pour l'animation de sélection de playlist
-  const { selectPlaylistWithAnimation, initializePlaylistService } = usePlaylistSelection();
-  
-  // 🔄 Hook pour la gestion globale de l'app 
+  const {selectPlaylistWithAnimation, initializePlaylistService} =
+    usePlaylistSelection();
+
+  // 🔄 Hook pour la gestion globale de l'app
   // Replaced AppContext with UIStore
-  const { closeAllModals } = useUIStore();
+  const {closeAllModals} = useUIStore();
 
   useEffect(() => {
     loadPlaylists();
@@ -82,13 +83,19 @@ const PlaylistsScreen: React.FC = () => {
       await appManager.addPlaylist(newPlaylistName.trim(), {
         url: newPlaylistUrl.trim(),
       });
-      
+
       setShowAddModal(false);
       await loadPlaylists();
-      Alert.alert('✅ Succès', `Playlist "${newPlaylistName}" ajoutée avec succès`);
+      Alert.alert(
+        '✅ Succès',
+        `Playlist "${newPlaylistName}" ajoutée avec succès`,
+      );
     } catch (error) {
       console.error('❌ Erreur ajout playlist URL:', error);
-      Alert.alert('Erreur', 'Impossible d\'ajouter la playlist depuis cette URL');
+      Alert.alert(
+        'Erreur',
+        "Impossible d'ajouter la playlist depuis cette URL",
+      );
     } finally {
       setIsLoading(false);
     }
@@ -102,7 +109,7 @@ const PlaylistsScreen: React.FC = () => {
 
     try {
       setIsLoading(true);
-      
+
       const result = await DocumentPicker.pickSingle({
         type: [DocumentPicker.types.allFiles],
         copyTo: 'documentDirectory',
@@ -113,7 +120,7 @@ const PlaylistsScreen: React.FC = () => {
         // For now, we'll show an alert that this feature is not yet implemented
         Alert.alert(
           'Fonctionnalité à venir',
-          'L\'ajout de fichiers locaux sera disponible dans une prochaine version.'
+          "L'ajout de fichiers locaux sera disponible dans une prochaine version.",
         );
       }
     } catch (error) {
@@ -129,7 +136,10 @@ const PlaylistsScreen: React.FC = () => {
 
   const handleUpdatePlaylist = async (playlist: Playlist) => {
     if (!playlist.url) {
-      Alert.alert('Information', 'Cette playlist locale ne peut pas être mise à jour');
+      Alert.alert(
+        'Information',
+        'Cette playlist locale ne peut pas être mise à jour',
+      );
       return;
     }
 
@@ -151,21 +161,24 @@ const PlaylistsScreen: React.FC = () => {
       // 🚀 FERMER TOUS LES MODALS D'ABORD !
       console.log('🔄 Fermeture de tous les modals avant animation...');
       closeAllModals();
-      
+
       // Petit délai pour s'assurer que les modals se ferment
       await new Promise(resolve => setTimeout(resolve, 100));
-      
+
       // 🎬 Puis déclencher l'animation
-      const selectedPlaylist = await selectPlaylistWithAnimation(playlist.id, playlist.name);
-      
+      const selectedPlaylist = await selectPlaylistWithAnimation(
+        playlist.id,
+        playlist.name,
+
       if (selectedPlaylist) {
-        console.log(`✅ Playlist "${selectedPlaylist.name}" sélectionnée avec succès`);
-        
+        console.log(
+          `✅ Playlist "${selectedPlaylist.name}" sélectionnée avec succès`,
+
         // Aussi mettre à jour l'AppManager pour cohérence
         await appManager.selectPlaylist(playlist.id);
-        
+
         // Navigation exemple (si vous avez la navigation):
-        // navigation.navigate('ChannelList', { 
+        // navigation.navigate('ChannelList', {
         //   playlistId: playlist.id,
         //   playlistName: playlist.name,
         //   channels: selectedPlaylist.channels,
@@ -176,7 +189,10 @@ const PlaylistsScreen: React.FC = () => {
       }
     } catch (error) {
       console.error('❌ Erreur sélection playlist:', error);
-      Alert.alert('Erreur', 'Une erreur est survenue lors du chargement de la playlist');
+      Alert.alert(
+        'Erreur',
+        'Une erreur est survenue lors du chargement de la playlist',
+      );
     }
   };
 
@@ -185,7 +201,7 @@ const PlaylistsScreen: React.FC = () => {
       'Confirmer la suppression',
       `Êtes-vous sûr de vouloir supprimer la playlist "${playlist.name}" ?`,
       [
-        { text: 'Annuler', style: 'cancel' },
+        {text: 'Annuler', style: 'cancel'},
         {
           text: 'Supprimer',
           style: 'destructive',
@@ -193,25 +209,28 @@ const PlaylistsScreen: React.FC = () => {
             try {
               await appManager.deletePlaylist(playlist.id);
               await loadPlaylists();
-              Alert.alert('✅ Supprimée', `Playlist "${playlist.name}" supprimée`);
+              Alert.alert(
+                '✅ Supprimée',
+                `Playlist "${playlist.name}" supprimée`,
+              );
             } catch (error) {
               console.error('❌ Erreur suppression playlist:', error);
               Alert.alert('Erreur', 'Impossible de supprimer la playlist');
             }
           },
         },
-      ]
+      ],
     );
   };
 
-  const renderPlaylistItem = ({ item }: { item: Playlist }) => (
-    <TouchableOpacity 
+  const renderPlaylistItem = ({item}: {item: Playlist}) => (
+    <TouchableOpacity
       style={[styles.playlistCard, isDarkMode && styles.playlistCardDark]}
       onPress={() => handleSelectPlaylist(item)}
-      activeOpacity={0.7}
-    >
+      activeOpacity={0.7}>
       <View style={styles.playlistHeader}>
-        <Text style={[styles.playlistName, isDarkMode && styles.playlistNameDark]}>
+        <Text
+          style={[styles.playlistName, isDarkMode && styles.playlistNameDark]}>
           {item.name}
         </Text>
         <View style={styles.playlistBadge}>
@@ -220,17 +239,27 @@ const PlaylistsScreen: React.FC = () => {
           </Text>
         </View>
       </View>
-      
+
       <View style={styles.playlistInfo}>
-        <Text style={[styles.playlistDetails, isDarkMode && styles.playlistDetailsDark]}>
+        <Text
+          style={[
+            styles.playlistDetails,
+            isDarkMode && styles.playlistDetailsDark,
+          ]}>
           {item.isLocal ? '📄 Fichier local' : '🌐 URL distante'}
         </Text>
-        <Text style={[styles.playlistDate, isDarkMode && styles.playlistDateDark]}>
+        <Text
+          style={[styles.playlistDate, isDarkMode && styles.playlistDateDark]}>
           Ajoutée le {new Date(item.dateAdded).toLocaleDateString('fr-FR')}
         </Text>
         {item.lastUpdated !== item.dateAdded && (
-          <Text style={[styles.playlistDate, isDarkMode && styles.playlistDateDark]}>
-            Mise à jour le {new Date(item.lastUpdated).toLocaleDateString('fr-FR')}
+          <Text
+            style={[
+              styles.playlistDate,
+              isDarkMode && styles.playlistDateDark,
+            ]}>
+            Mise à jour le{' '}
+            {new Date(item.lastUpdated).toLocaleDateString('fr-FR')}
           </Text>
         )}
       </View>
@@ -239,22 +268,20 @@ const PlaylistsScreen: React.FC = () => {
         {item.url && (
           <TouchableOpacity
             style={[styles.actionButton, styles.updateButton]}
-            onPress={(e) => {
+            onPress={e => {
               e.stopPropagation(); // Empêcher le clic sur la carte
               handleUpdatePlaylist(item);
-            }}
-          >
+            }}>
             <Text style={styles.actionButtonText}>🔄 MAJ</Text>
           </TouchableOpacity>
         )}
-        
+
         <TouchableOpacity
           style={[styles.actionButton, styles.deleteButton]}
-          onPress={(e) => {
+          onPress={e => {
             e.stopPropagation(); // Empêcher le clic sur la carte
             handleDeletePlaylist(item);
-          }}
-        >
+          }}>
           <Text style={styles.actionButtonText}>🗑️</Text>
         </TouchableOpacity>
       </View>
@@ -265,7 +292,8 @@ const PlaylistsScreen: React.FC = () => {
     <View style={[styles.container, isDarkMode && styles.containerDark]}>
       {/* Header */}
       <View style={[styles.header, isDarkMode && styles.headerDark]}>
-        <Text style={[styles.headerTitle, isDarkMode && styles.headerTitleDark]}>
+        <Text
+          style={[styles.headerTitle, isDarkMode && styles.headerTitleDark]}>
           📋 Mes Playlists ({playlists.length})
         </Text>
         <TouchableOpacity style={styles.addButton} onPress={handleAddPlaylist}>
@@ -277,24 +305,33 @@ const PlaylistsScreen: React.FC = () => {
       <FlatList
         data={playlists}
         renderItem={renderPlaylistItem}
-        keyExtractor={(item) => item.id}
+        keyExtractor={item => item.id}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={[styles.emptyTitle, isDarkMode && styles.emptyTitleDark]}>
+            <Text
+              style={[styles.emptyTitle, isDarkMode && styles.emptyTitleDark]}>
               📋 Aucune playlist
             </Text>
-            <Text style={[styles.emptyText, isDarkMode && styles.emptyTextDark]}>
-              Ajoutez votre première playlist pour commencer à regarder des chaînes IPTV.
+            <Text
+              style={[styles.emptyText, isDarkMode && styles.emptyTextDark]}>
+              Ajoutez votre première playlist pour commencer à regarder des
+              chaînes IPTV.
             </Text>
-            <TouchableOpacity style={styles.emptyButton} onPress={handleAddPlaylist}>
-              <Text style={styles.emptyButtonText}>➕ Ajouter une playlist</Text>
+            <TouchableOpacity
+              style={styles.emptyButton}
+              onPress={handleAddPlaylist}>
+              <Text style={styles.emptyButtonText}>
+                ➕ Ajouter une playlist
+              </Text>
             </TouchableOpacity>
           </View>
         }
-        contentContainerStyle={playlists.length === 0 ? styles.emptyList : undefined}
+        contentContainerStyle={
+          playlists.length === 0 ? styles.emptyList : undefined
+        }
       />
 
       {/* Add Playlist Modal */}
@@ -302,14 +339,18 @@ const PlaylistsScreen: React.FC = () => {
         visible={showAddModal}
         animationType="slide"
         transparent={true}
-        onRequestClose={() => setShowAddModal(false)}
-      >
+        onRequestClose={() => setShowAddModal(false)}>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, isDarkMode && styles.modalContentDark]}>
-            <Text style={[styles.modalTitle, isDarkMode && styles.modalTitleDark]}>
+          <View
+            style={[
+              styles.modalContent,
+              isDarkMode && styles.modalContentDark,
+            ]}>
+            <Text
+              style={[styles.modalTitle, isDarkMode && styles.modalTitleDark]}>
               ➕ Ajouter une Playlist
             </Text>
-            
+
             <TextInput
               style={[styles.input, isDarkMode && styles.inputDark]}
               placeholder="Nom de la playlist"
@@ -317,7 +358,7 @@ const PlaylistsScreen: React.FC = () => {
               value={newPlaylistName}
               onChangeText={setNewPlaylistName}
             />
-            
+
             <TextInput
               style={[styles.input, isDarkMode && styles.inputDark]}
               placeholder="URL M3U/M3U8 (optionnel)"
@@ -331,26 +372,23 @@ const PlaylistsScreen: React.FC = () => {
             <View style={styles.modalActions}>
               <TouchableOpacity
                 style={[styles.modalButton, styles.modalButtonSecondary]}
-                onPress={() => setShowAddModal(false)}
-              >
+                onPress={() => setShowAddModal(false)}>
                 <Text style={styles.modalButtonTextSecondary}>Annuler</Text>
               </TouchableOpacity>
-              
+
               <TouchableOpacity
                 style={styles.modalButton}
                 onPress={handleAddFromUrl}
-                disabled={isLoading}
-              >
+                disabled={isLoading}>
                 <Text style={styles.modalButtonText}>
                   {isLoading ? '⏳' : '🌐'} URL
                 </Text>
               </TouchableOpacity>
-              
+
               <TouchableOpacity
                 style={styles.modalButton}
                 onPress={handleAddFromFile}
-                disabled={isLoading}
-              >
+                disabled={isLoading}>
                 <Text style={styles.modalButtonText}>
                   {isLoading ? '⏳' : '📄'} Fichier
                 </Text>
@@ -410,7 +448,7 @@ const styles = StyleSheet.create({
     padding: 15,
     elevation: 2,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: {width: 0, height: 1},
     shadowOpacity: 0.2,
     shadowRadius: 2,
   },

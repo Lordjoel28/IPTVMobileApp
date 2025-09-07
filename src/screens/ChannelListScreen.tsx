@@ -1,10 +1,9 @@
-
 /**
  * 📺 Channel List Screen - Affichage des chaînes importées
  * Navigation après import M3U réussi
  */
 
-import React, { useState, useEffect } from 'react';
+import React, {useState, useEffect} from 'react';
 import {
   View,
   Text,
@@ -12,10 +11,12 @@ import {
   ActivityIndicator,
   Alert,
   StatusBar,
+  TouchableOpacity,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import { VirtualizedChannelList } from '../components/VirtualizedChannelList';
-import type { Channel } from '../types';
+import Icon from 'react-native-vector-icons/MaterialIcons';
+import {VirtualizedChannelList} from '../components/VirtualizedChannelList';
+import type {Channel} from '../types';
 
 interface ChannelListScreenProps {
   route?: {
@@ -34,16 +35,15 @@ interface ChannelItemProps {
   onPress: (channel: Channel) => void;
 }
 
-const ChannelItem: React.FC<ChannelItemProps> = ({ channel, onPress }) => (
-  <TouchableOpacity 
+const ChannelItem: React.FC<ChannelItemProps> = ({channel, onPress}) => (
+  <TouchableOpacity
     style={styles.channelItem}
     onPress={() => onPress(channel)}
-    activeOpacity={0.7}
-  >
+    activeOpacity={0.7}>
     <View style={styles.channelIcon}>
       <Icon name="tv" size={24} color="#4A90E2" />
     </View>
-    
+
     <View style={styles.channelInfo}>
       <Text style={styles.channelName} numberOfLines={1}>
         {channel.name}
@@ -59,14 +59,17 @@ const ChannelItem: React.FC<ChannelItemProps> = ({ channel, onPress }) => (
         )}
       </View>
     </View>
-    
+
     <TouchableOpacity style={styles.favoriteButton}>
       <Icon name="favorite-border" size={20} color="#666" />
     </TouchableOpacity>
   </TouchableOpacity>
 );
 
-const ChannelListScreen: React.FC<ChannelListScreenProps> = ({ route, navigation }) => {
+const ChannelListScreen: React.FC<ChannelListScreenProps> = ({
+  route,
+  navigation,
+}) => {
   const [channels, setChannels] = useState<Channel[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -83,13 +86,15 @@ const ChannelListScreen: React.FC<ChannelListScreenProps> = ({ route, navigation
   const loadChannels = async () => {
     try {
       setLoading(true);
-      
+
       // Récupérer les chaînes depuis les paramètres ou IPTVService
       const channelsFromParams = route?.params?.channels;
-      
+
       if (channelsFromParams && channelsFromParams.length > 0) {
         setChannels(channelsFromParams);
-        console.log(`📺 Chaînes chargées depuis params: ${channelsFromParams.length}`);
+        console.log(
+          `📺 Chaînes chargées depuis params: ${channelsFromParams.length}`,
+        );
       } else {
         // TODO: Récupérer depuis IPTVService si pas de paramètres
         console.log('⚠️ Aucune chaîne dans les paramètres');
@@ -106,11 +111,13 @@ const ChannelListScreen: React.FC<ChannelListScreenProps> = ({ route, navigation
   const handleChannelPress = (channel: Channel) => {
     console.log('🎬 Ouverture chaîne:', channel.name);
     setCurrentChannel(channel);
-    
+
     // TODO: Navigation vers VideoPlayer
     Alert.alert(
       '📺 Chaîne sélectionnée',
-      `Nom: ${channel.name}\nURL: ${channel.url}\nCatégorie: ${channel.category || 'N/A'}`
+      `Nom: ${channel.name}\nURL: ${channel.url}\nCatégorie: ${
+        channel.category || 'N/A'
+      }`,
     );
   };
 
@@ -151,38 +158,45 @@ const ChannelListScreen: React.FC<ChannelListScreenProps> = ({ route, navigation
 
   if (loading) {
     return (
-      <LinearGradient 
-        colors={['#1a1a2e', '#16213e', '#0f3460']} 
-        style={styles.container}
-      >
-        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      <LinearGradient
+        colors={['#1a1a2e', '#16213e', '#0f3460']}
+        style={styles.container}>
+        <StatusBar
+          barStyle="light-content"
+          backgroundColor="transparent"
+          translucent
+        />
         {renderLoadingState()}
       </LinearGradient>
     );
   }
 
   return (
-    <LinearGradient 
-      colors={['#1a1a2e', '#16213e', '#0f3460']} 
-      style={styles.container}
-    >
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
-      
+    <LinearGradient
+      colors={['#1a1a2e', '#16213e', '#0f3460']}
+      style={styles.container}>
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor="transparent"
+        translucent
+      />
+
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={handleBack}>
           <Icon name="arrow-back" size={24} color="#FFFFFF" />
         </TouchableOpacity>
-        
+
         <View style={styles.headerInfo}>
           <Text style={styles.headerTitle} numberOfLines={1}>
             {playlistName}
           </Text>
           <Text style={styles.headerSubtitle}>
-            {channels.length} chaîne{channels.length > 1 ? 's' : ''} disponible{channels.length > 1 ? 's' : ''}
+            {channels.length} chaîne{channels.length > 1 ? 's' : ''} disponible
+            {channels.length > 1 ? 's' : ''}
           </Text>
         </View>
-        
+
         <TouchableOpacity style={styles.searchButton}>
           <Icon name="search" size={24} color="#FFFFFF" />
         </TouchableOpacity>

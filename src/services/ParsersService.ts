@@ -3,9 +3,9 @@
  * Parser M3U ultra-optimisé avec pool d'objets et chunking non-bloquant
  */
 
-import type { Channel } from '../types';
-// 🚀 Import du parser streaming ultra-rapide TiviMate-level  
-import { streamingParser } from './parsers/StreamingM3UParser';
+import type {Channel} from '../types';
+// 🚀 Import du parser streaming ultra-rapide TiviMate-level
+import {streamingParser} from './parsers/StreamingM3UParser';
 
 export interface ParseOptions {
   useUltraOptimized?: boolean;
@@ -13,7 +13,7 @@ export interface ParseOptions {
   yieldControl?: boolean;
   poolSize?: number;
   // 🚀 NOUVELLES OPTIONS STREAMING ULTRA-RAPIDES
-  useStreamingParser?: boolean;  // Activer parser streaming TiviMate-level
+  useStreamingParser?: boolean; // Activer parser streaming TiviMate-level
   enableProgressCallbacks?: boolean; // Callbacks progress temps réel
   onProgress?: (progress: ParseProgress) => void; // Callback progress
   onStatusChange?: (status: string, details?: string) => void; // Callback status
@@ -28,9 +28,9 @@ export interface ParseOptions {
 export interface ParseProgress {
   channelsParsed: number;
   totalLines: number;
-  progress: number;          // 0-100
+  progress: number; // 0-100
   memoryUsageMB: number;
-  parseSpeed: number;        // channels/sec
+  parseSpeed: number; // channels/sec
   estimatedTimeLeft: number; // seconds
 }
 
@@ -62,7 +62,7 @@ export class ParsersService {
   private stats = {
     totalParsed: 0,
     totalTime: 0,
-    avgChannelsPerSecond: 0
+    avgChannelsPerSecond: 0,
   };
 
   // 🆕 Singleton pattern instance
@@ -70,7 +70,9 @@ export class ParsersService {
 
   constructor() {
     this.initializePool();
-    console.log('🚀 ParsersService initialized - Ultra-optimized M3U parser ready');
+    console.log(
+      '🚀 ParsersService initialized - Ultra-optimized M3U parser ready',
+    );
   }
 
   // 🆕 Support pour injection de dépendances (DI)
@@ -100,26 +102,39 @@ export class ParsersService {
    * Parser M3U avec sélection automatique du parser optimal
    * 🚀 ENRICHI avec support streaming parser ultra-rapide
    */
-  async parseM3U(content: string, options: ParseOptions = {}): Promise<ParseResult> {
+  async parseM3U(
+    content: string,
+    options: ParseOptions = {},
+  ): Promise<ParseResult> {
     const startTime = Date.now();
-    
+
     // Estimer nombre de chaînes pour sélectionner le parser
     const estimatedChannels = (content.match(/#EXTINF:/g) || []).length;
     const contentSizeMB = content.length / 1024 / 1024;
-    
-    console.log(`🔍 Parsing M3U: ~${estimatedChannels} chaînes, ${contentSizeMB.toFixed(2)}MB`);
+
+    console.log(
+      `🔍 Parsing M3U: ~${estimatedChannels} chaînes, ${contentSizeMB.toFixed(
+        2,
+      )}MB`,
+    );
 
     let channels: Channel[];
-    
+
     // 🎯 STRATÉGIE ULTRA-AGGRESSIVE - Performance maximale dès 1K chaînes
     if (options.useStreamingParser && estimatedChannels >= 1000) {
-      console.log('🚀🚀 STREAMING PARSER - TiviMate-level performance (seuil 1K)');
-      console.log(`📊 ${estimatedChannels} chaînes détectées → Parser streaming activé`);
+      console.log(
+        '🚀🚀 STREAMING PARSER - TiviMate-level performance (seuil 1K)',
+      );
+      console.log(
+        `📊 ${estimatedChannels} chaînes détectées → Parser streaming activé`,
+      );
       channels = await this.parseStreamingUltraFast(content, options);
     }
     // Fallback intelligent selon taille
     else if (estimatedChannels >= 10000) {
-      console.log('🚀 UltraOptimized parser (very high volume) - Fallback streaming');
+      console.log(
+        '🚀 UltraOptimized parser (very high volume) - Fallback streaming',
+      );
       channels = await this.parseUltraOptimized(content, options);
     } else if (estimatedChannels >= 2000) {
       console.log('⚡ UltraOptimized parser (high volume)');
@@ -128,7 +143,9 @@ export class ParsersService {
       console.log('⚡ Optimized parser (medium volume)');
       channels = await this.parseOptimized(content, options);
     } else {
-      console.log('📝 Traditional parser (low volume - optimal for small playlists)');
+      console.log(
+        '📝 Traditional parser (low volume - optimal for small playlists)',
+      );
       channels = await this.parseTraditional(content);
     }
 
@@ -138,7 +155,9 @@ export class ParsersService {
     // Mettre à jour stats globales
     this.stats.totalParsed += channels.length;
     this.stats.totalTime += parseTime;
-    this.stats.avgChannelsPerSecond = Math.round((this.stats.totalParsed / this.stats.totalTime) * 1000);
+    this.stats.avgChannelsPerSecond = Math.round(
+      (this.stats.totalParsed / this.stats.totalTime) * 1000,
+    );
 
     const result: ParseResult = {
       channels,
@@ -148,11 +167,13 @@ export class ParsersService {
         channelsPerSecond,
         poolEfficiency: this.calculatePoolEfficiency(),
         cacheEfficiency: this.calculateCacheEfficiency(),
-        memoryUsage: this.estimateMemoryUsage()
-      }
+        memoryUsage: this.estimateMemoryUsage(),
+      },
     };
 
-    console.log(`✅ Parsing completed: ${channels.length} chaînes en ${parseTime}ms (${channelsPerSecond} ch/s)`);
+    console.log(
+      `✅ Parsing completed: ${channels.length} chaînes en ${parseTime}ms (${channelsPerSecond} ch/s)`,
+    );
     return result;
   }
 
@@ -160,32 +181,34 @@ export class ParsersService {
    * Parser Ultra-Optimisé avec chunking non-bloquant
    * Migration directe de UltraOptimizedM3UParser.js
    */
-  private async parseUltraOptimized(content: string, options: ParseOptions): Promise<Channel[]> {
+  private async parseUltraOptimized(
+    content: string,
+    options: ParseOptions,
+  ): Promise<Channel[]> {
     const chunkSize = options.chunkSize || 25000;
     const lines = content.split('\n');
     const channels: Channel[] = [];
-    
+
     // Réinitialiser pool pour parsing volumineux
     this.initializePool(Math.min(chunkSize, this.poolMaxSize));
-    
+
     let currentChannel: Partial<Channel> | null = null;
     let processedLines = 0;
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
-      
+
       if (line.startsWith('#EXTINF:')) {
         // Obtenir objet du pool
         currentChannel = this.getFromPool();
-        
+
         // Parser ligne EXTINF avec optimisations
         this.parseExtinfLineOptimized(line, currentChannel);
-        
       } else if (line && !line.startsWith('#') && currentChannel) {
         // URL de chaîne
         currentChannel.url = line;
         currentChannel.id = this.generateChannelId(currentChannel.name!, line);
-        
+
         // Ajouter au résultat et retourner au pool
         channels.push(currentChannel as Channel);
         this.returnToPool(currentChannel);
@@ -199,30 +222,36 @@ export class ParsersService {
       }
     }
 
-    console.log(`🚀 Ultra-optimized parsing: ${channels.length} chaînes, pool efficiency: ${this.calculatePoolEfficiency()}%`);
+    console.log(
+      `🚀 Ultra-optimized parsing: ${
+        channels.length
+      } chaînes, pool efficiency: ${this.calculatePoolEfficiency()}%`,
+    );
     return channels;
   }
 
   /**
    * Parser Optimisé avec pool d'objets
    */
-  private async parseOptimized(content: string, options: ParseOptions): Promise<Channel[]> {
+  private async parseOptimized(
+    content: string,
+    options: ParseOptions,
+  ): Promise<Channel[]> {
     const lines = content.split('\n');
     const channels: Channel[] = [];
-    
+
     let currentChannel: Partial<Channel> | null = null;
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
-      
+
       if (line.startsWith('#EXTINF:')) {
         currentChannel = this.getFromPool();
         this.parseExtinfLineOptimized(line, currentChannel);
-        
       } else if (line && !line.startsWith('#') && currentChannel) {
         currentChannel.url = line;
         currentChannel.id = this.generateChannelId(currentChannel.name!, line);
-        
+
         channels.push(currentChannel as Channel);
         this.returnToPool(currentChannel);
         currentChannel = null;
@@ -254,7 +283,9 @@ export class ParsersService {
 
         // Extraire attributs
         const logoMatch = info.match(/tvg-logo="([^"]+)"/);
-        if (logoMatch) currentChannel.logo = logoMatch[1];
+        if (logoMatch) {
+          currentChannel.logo = logoMatch[1];
+        }
 
         const groupMatch = info.match(/group-title="([^"]+)"/);
         if (groupMatch) {
@@ -263,18 +294,23 @@ export class ParsersService {
         }
 
         const tvgIdMatch = info.match(/tvg-id="([^"]+)"/);
-        if (tvgIdMatch) currentChannel.tvgId = tvgIdMatch[1];
+        if (tvgIdMatch) {
+          currentChannel.tvgId = tvgIdMatch[1];
+        }
 
         const languageMatch = info.match(/tvg-language="([^"]+)"/);
-        if (languageMatch) currentChannel.language = languageMatch[1];
+        if (languageMatch) {
+          currentChannel.language = languageMatch[1];
+        }
 
         const countryMatch = info.match(/tvg-country="([^"]+)"/);
-        if (countryMatch) currentChannel.country = countryMatch[1];
-
+        if (countryMatch) {
+          currentChannel.country = countryMatch[1];
+        }
       } else if (line && !line.startsWith('#') && currentChannel.name) {
         currentChannel.url = line;
         currentChannel.id = this.generateChannelId(currentChannel.name, line);
-        
+
         channels.push(currentChannel as Channel);
         currentChannel = {};
       }
@@ -288,44 +324,54 @@ export class ParsersService {
    * 🚀 PARSER STREAMING ULTRA-RAPIDE pour 100K+ chaînes
    * Intégration du StreamingM3UParser dans l'architecture existante
    */
-  private async parseStreamingUltraFast(content: string, options: ParseOptions): Promise<Channel[]> {
+  private async parseStreamingUltraFast(
+    content: string,
+    options: ParseOptions,
+  ): Promise<Channel[]> {
     console.log('🚀🚀 Starting STREAMING parser (TiviMate-level performance)');
-    
+
     try {
       // Configuration streaming optimisée
       const streamingOptions = {
         chunkSize: options.streamingOptions?.maxMemoryMB ? 20000 : 15000,
         yieldInterval: options.streamingOptions?.yieldInterval || 8000,
         maxMemoryMB: options.streamingOptions?.maxMemoryMB || 200,
-        enableSQLiteStream: options.streamingOptions?.enableSQLiteStream || false,
-        ...options.streamingOptions
+        enableSQLiteStream:
+          options.streamingOptions?.enableSQLiteStream || false,
+        ...options.streamingOptions,
       };
 
       // Parsing streaming avec callbacks progress
       const parseResult = await streamingParser.parseStreamAsync(
         content,
         streamingOptions,
-        options.onProgress // Progress callback direct
+        options.onProgress, // Progress callback direct
       );
 
       // Callbacks status pour feedback utilisateur
       if (options.onStatusChange) {
         options.onStatusChange(
-          `✅ Import streaming terminé`, 
-          `${parseResult.totalChannels} chaînes en ${Math.round(parseResult.parseTimeMs/1000)}s`
+          '✅ Import streaming terminé',
+          `${parseResult.totalChannels} chaînes en ${Math.round(
+            parseResult.parseTimeMs / 1000,
+          )}s`,
         );
       }
 
       // Convertir résultat streaming vers format ParsersService
       // Le StreamingParser retourne un résultat différent, on l'adapte
-      const channels: Channel[] = await this.convertStreamingResult(content, parseResult);
+      const channels: Channel[] = await this.convertStreamingResult(
+        content,
+        parseResult,
+      );
 
-      console.log(`🎉 STREAMING parser completed: ${channels.length} chaînes (${parseResult.avgChannelsPerSecond} ch/s)`);
+      console.log(
+        `🎉 STREAMING parser completed: ${channels.length} chaînes (${parseResult.avgChannelsPerSecond} ch/s)`,
+      );
       return channels;
-
     } catch (error) {
       console.error('❌ Streaming parser failed:', error);
-      
+
       // Fallback sur parser optimisé existant
       console.log('🔄 Falling back to UltraOptimized parser');
       return await this.parseUltraOptimized(content, options);
@@ -336,25 +382,31 @@ export class ParsersService {
    * 🔄 Convertir résultat streaming vers format compatible existant
    * Permet intégration transparente avec l'app existante
    */
-  private async convertStreamingResult(content: string, streamingResult: any): Promise<Channel[]> {
+  private async convertStreamingResult(
+    content: string,
+    streamingResult: any,
+  ): Promise<Channel[]> {
     // Pour l'instant, on re-parse avec le parser optimisé existant
     // Mais avec les bénéfices du preprocessing streaming
-    
+
     // Dans une version future, on pourrait stocker les channels du streaming directement
     return await this.parseUltraOptimized(content, {
       useUltraOptimized: true,
       chunkSize: 15000,
-      yieldControl: true
+      yieldControl: true,
     });
   }
 
   /**
    * Parser ligne EXTINF optimisé avec string interning
    */
-  private parseExtinfLineOptimized(line: string, channel: Partial<Channel>): void {
+  private parseExtinfLineOptimized(
+    line: string,
+    channel: Partial<Channel>,
+  ): void {
     // Machine à états optimisée (switch numérique)
     const info = line.substring(8);
-    
+
     // Nom de chaîne
     const nameMatch = info.match(/,(.+)$/);
     if (nameMatch) {
@@ -363,7 +415,9 @@ export class ParsersService {
 
     // Attributs avec string interning pour les valeurs fréquentes
     const logoMatch = info.match(/tvg-logo="([^"]+)"/);
-    if (logoMatch) channel.logo = logoMatch[1];
+    if (logoMatch) {
+      channel.logo = logoMatch[1];
+    }
 
     const groupMatch = info.match(/group-title="([^"]+)"/);
     if (groupMatch) {
@@ -373,13 +427,19 @@ export class ParsersService {
     }
 
     const tvgIdMatch = info.match(/tvg-id="([^"]+)"/);
-    if (tvgIdMatch) channel.tvgId = tvgIdMatch[1];
+    if (tvgIdMatch) {
+      channel.tvgId = tvgIdMatch[1];
+    }
 
     const languageMatch = info.match(/tvg-language="([^"]+)"/);
-    if (languageMatch) channel.language = this.internString(languageMatch[1]);
+    if (languageMatch) {
+      channel.language = this.internString(languageMatch[1]);
+    }
 
     const countryMatch = info.match(/tvg-country="([^"]+)"/);
-    if (countryMatch) channel.country = this.internString(countryMatch[1]);
+    if (countryMatch) {
+      channel.country = this.internString(countryMatch[1]);
+    }
   }
 
   /**
@@ -400,7 +460,7 @@ export class ParsersService {
       this.clearObject(obj);
       return obj;
     }
-    
+
     // Pool épuisé, créer nouvel objet
     console.warn('⚠️ Pool exhausted, creating new object');
     return {};
@@ -472,7 +532,9 @@ export class ParsersService {
    * Calculer efficacité du pool
    */
   private calculatePoolEfficiency(): number {
-    if (this.poolMaxSize === 0) return 0;
+    if (this.poolMaxSize === 0) {
+      return 0;
+    }
     return Math.round((this.poolUsed / this.poolMaxSize) * 100);
   }
 
@@ -481,7 +543,9 @@ export class ParsersService {
    */
   private calculateCacheEfficiency(): number {
     const total = this.stringCacheHits + this.stringCacheMisses;
-    if (total === 0) return 0;
+    if (total === 0) {
+      return 0;
+    }
     return Math.round((this.stringCacheHits / total) * 100);
   }
 
@@ -503,18 +567,18 @@ export class ParsersService {
       pool: {
         size: this.channelPool.length,
         used: this.poolUsed,
-        efficiency: this.calculatePoolEfficiency()
+        efficiency: this.calculatePoolEfficiency(),
       },
       stringCache: {
         size: this.stringCache.size,
         hits: this.stringCacheHits,
         misses: this.stringCacheMisses,
-        efficiency: this.calculateCacheEfficiency()
+        efficiency: this.calculateCacheEfficiency(),
       },
       memory: {
         estimated: this.estimateMemoryUsage(),
-        unit: 'MB'
-      }
+        unit: 'MB',
+      },
     };
   }
 
@@ -531,5 +595,5 @@ export class ParsersService {
   }
 }
 
-// Export singleton instance  
+// Export singleton instance
 export const parsersService = new ParsersService();

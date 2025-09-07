@@ -3,21 +3,27 @@
  * Composant de test pour vérifier que les services fonctionnent
  */
 
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { ServiceMigration, ServiceNames, getService } from '../core';
-import type { ServiceName } from '../core';
+import React, {useState, useEffect} from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+} from 'react-native';
+import {ServiceMigration, ServiceNames, getService} from '../core';
+import type {ServiceName} from '../core';
 
 interface ServiceTestProps {
   visible?: boolean;
 }
 
-export const ServiceTest: React.FC<ServiceTestProps> = ({ visible = false }) => {
+export const ServiceTest: React.FC<ServiceTestProps> = ({visible = false}) => {
   const [testResults, setTestResults] = useState<{
     passed: string[];
     failed: string[];
-  }>({ passed: [], failed: [] });
-  
+  }>({passed: [], failed: []});
+
   const [migrationStatus, setMigrationStatus] = useState<any>(null);
   const [testing, setTesting] = useState(false);
 
@@ -30,7 +36,7 @@ export const ServiceTest: React.FC<ServiceTestProps> = ({ visible = false }) => 
 
   const runServiceTests = async () => {
     setTesting(true);
-    
+
     try {
       // Obtient le statut de la migration
       const status = ServiceMigration.getMigrationStatus();
@@ -39,15 +45,14 @@ export const ServiceTest: React.FC<ServiceTestProps> = ({ visible = false }) => 
       // Test tous les services
       const results = await ServiceMigration.validateAllServices();
       setTestResults(results);
-      
     } catch (error) {
       console.error('Service tests failed:', error);
       setTestResults({
         passed: [],
-        failed: ['Global test failure: ' + error.message]
+        failed: ['Global test failure: ' + error.message],
       });
     }
-    
+
     setTesting(false);
   };
 
@@ -55,18 +60,18 @@ export const ServiceTest: React.FC<ServiceTestProps> = ({ visible = false }) => 
     try {
       const service = await getService(serviceName);
       console.log(`✅ Service ${serviceName} works:`, service);
-      
+
       // Met à jour les résultats
       setTestResults(prev => ({
         passed: [...prev.passed.filter(s => s !== serviceName), serviceName],
-        failed: prev.failed.filter(s => s !== serviceName)
+        failed: prev.failed.filter(s => s !== serviceName),
       }));
     } catch (error) {
       console.error(`❌ Service ${serviceName} failed:`, error);
-      
+
       setTestResults(prev => ({
         passed: prev.passed.filter(s => s !== serviceName),
-        failed: [...prev.failed.filter(s => s !== serviceName), serviceName]
+        failed: [...prev.failed.filter(s => s !== serviceName), serviceName],
       }));
     }
   };
@@ -78,10 +83,9 @@ export const ServiceTest: React.FC<ServiceTestProps> = ({ visible = false }) => 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>🏗️ Service Architecture Test</Text>
-      
+
       {/* Layout 2 colonnes */}
       <View style={styles.columnsContainer}>
-        
         {/* Colonne gauche */}
         <View style={styles.column}>
           {/* Migration Status */}
@@ -103,17 +107,25 @@ export const ServiceTest: React.FC<ServiceTestProps> = ({ visible = false }) => 
 
           {/* Test Results */}
           <View style={styles.compactSection}>
-            <Text style={styles.compactSectionTitle}>✅ Passed ({testResults.passed.length})</Text>
-            {testResults.passed.slice(0, 5).map((service) => (
-              <Text key={service} style={styles.compactService}>• {service}</Text>
+            <Text style={styles.compactSectionTitle}>
+              ✅ Passed ({testResults.passed.length})
+            </Text>
+            {testResults.passed.slice(0, 5).map(service => (
+              <Text key={service} style={styles.compactService}>
+                • {service}
+              </Text>
             ))}
           </View>
 
           {/* Failed Results */}
           <View style={styles.compactSection}>
-            <Text style={styles.compactSectionTitle}>❌ Failed ({testResults.failed.length})</Text>
-            {testResults.failed.slice(0, 3).map((service) => (
-              <Text key={service} style={styles.compactFailedService}>• {service}</Text>
+            <Text style={styles.compactSectionTitle}>
+              ❌ Failed ({testResults.failed.length})
+            </Text>
+            {testResults.failed.slice(0, 3).map(service => (
+              <Text key={service} style={styles.compactFailedService}>
+                • {service}
+              </Text>
             ))}
           </View>
         </View>
@@ -123,38 +135,47 @@ export const ServiceTest: React.FC<ServiceTestProps> = ({ visible = false }) => 
           {/* Remaining Passed Services */}
           <View style={styles.compactSection}>
             <Text style={styles.compactSectionTitle}>✅ More Passed</Text>
-            {testResults.passed.slice(5).map((service) => (
-              <Text key={service} style={styles.compactService}>• {service}</Text>
+            {testResults.passed.slice(5).map(service => (
+              <Text key={service} style={styles.compactService}>
+                • {service}
+              </Text>
             ))}
           </View>
 
           {/* Individual Service Tests - Compact */}
           <View style={styles.compactSection}>
             <Text style={styles.compactSectionTitle}>Quick Tests</Text>
-            {Object.values(ServiceNames).slice(0, 4).map((serviceName) => (
-              <TouchableOpacity
-                key={serviceName}
-                style={[
-                  styles.compactServiceButton,
-                  testResults.passed.includes(serviceName) && styles.compactPassedButton,
-                  testResults.failed.includes(serviceName) && styles.compactFailedButton,
-                ]}
-                onPress={() => testSpecificService(serviceName as ServiceName)}
-              >
-                <Text style={styles.compactServiceButtonText}>
-                  {serviceName}
-                </Text>
-              </TouchableOpacity>
-            ))}
+            {Object.values(ServiceNames)
+              .slice(0, 4)
+              .map(serviceName => (
+                <TouchableOpacity
+                  key={serviceName}
+                  style={[
+                    styles.compactServiceButton,
+                    testResults.passed.includes(serviceName) &&
+                      styles.compactPassedButton,
+                    testResults.failed.includes(serviceName) &&
+                      styles.compactFailedButton,
+                  ]}
+                  onPress={() =>
+                    testSpecificService(serviceName as ServiceName)
+                  }>
+                  <Text style={styles.compactServiceButtonText}>
+                    {serviceName}
+                  </Text>
+                </TouchableOpacity>
+              ))}
           </View>
 
           {/* Actions */}
           <View style={styles.compactSection}>
             <TouchableOpacity
-              style={[styles.compactActionButton, testing && styles.disabledButton]}
+              style={[
+                styles.compactActionButton,
+                testing && styles.disabledButton,
+              ]}
               onPress={runServiceTests}
-              disabled={testing}
-            >
+              disabled={testing}>
               <Text style={styles.compactActionButtonText}>
                 {testing ? '⏳ Testing...' : '🔄 Run All'}
               </Text>

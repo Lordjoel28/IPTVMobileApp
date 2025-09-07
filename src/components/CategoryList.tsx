@@ -1,17 +1,17 @@
 import React from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
+import {View, Text, FlatList, TouchableOpacity, StyleSheet} from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 // PlaylistContext remplacé par PlaylistStore
-import { usePlaylist } from '../stores/PlaylistStore';
+import {usePlaylist} from '../stores/PlaylistStore';
 
 const CategoryList: React.FC = () => {
-  const { categories, selectedCategory, selectCategory } = usePlaylist();
-  
+  const {categories, selectedCategory, selectCategory} = usePlaylist();
+
   console.log('🔍 CATEGORY LIST - Rendu avec catégories:', categories.length);
   console.log('🔍 CATEGORY LIST - Détail catégories:', categories);
   console.log('🔍 CATEGORY LIST - Catégorie sélectionnée:', selectedCategory);
-  
+
   // Forcer un re-render si pas de catégories
   if (!categories || categories.length === 0) {
     console.log('❌ CATEGORY LIST - AUCUNE CATÉGORIE À AFFICHER !');
@@ -28,55 +28,79 @@ const CategoryList: React.FC = () => {
 
   const getCategoryIcon = (categoryName: string) => {
     const name = categoryName.toLowerCase();
-    if (name.includes('sport')) return 'sports-soccer';
-    if (name.includes('news') || name.includes('actualité')) return 'article';
-    if (name.includes('movie') || name.includes('film') || name.includes('cinema')) return 'movie';
-    if (name.includes('music') || name.includes('musique')) return 'music-note';
-    if (name.includes('kids') || name.includes('enfant')) return 'child-care';
-    if (name.includes('documentary') || name.includes('documentaire')) return 'description';
-    if (name.includes('entertainment') || name.includes('divertissement')) return 'theaters';
-    if (name.includes('générale') || name.includes('general')) return 'tv';
+    if (name.includes('sport')) {
+      return 'sports-soccer';
+    }
+    if (name.includes('news') || name.includes('actualité')) {
+      return 'article';
+    }
+    if (
+      name.includes('movie') ||
+      name.includes('film') ||
+      name.includes('cinema')
+    ) {
+      return 'movie';
+    }
+    if (name.includes('music') || name.includes('musique')) {
+      return 'music-note';
+    }
+    if (name.includes('kids') || name.includes('enfant')) {
+      return 'child-care';
+    }
+    if (name.includes('documentary') || name.includes('documentaire')) {
+      return 'description';
+    }
+    if (name.includes('entertainment') || name.includes('divertissement')) {
+      return 'theaters';
+    }
+    if (name.includes('générale') || name.includes('general')) {
+      return 'tv';
+    }
     return 'menu'; // Icône par défaut
   };
 
-  const renderCategoryItem = ({ item }: { item: { name: string; count: number } }) => {
+  const renderCategoryItem = ({
+    item,
+  }: {
+    item: {name: string; count: number};
+  }) => {
     const isSelected = selectedCategory === item.name;
     const icon = getCategoryIcon(item.name);
-    
+
     return (
       <TouchableOpacity
         style={[styles.navItem, isSelected && styles.navItemActive]}
         onPress={() => selectCategory(item.name)}
-        activeOpacity={0.8}
-      >
+        activeOpacity={0.8}>
         <LinearGradient
-          colors={isSelected 
-            ? ['rgba(33, 150, 243, 0.3)', 'rgba(33, 150, 243, 0.1)']
-            : ['rgba(255, 255, 255, 0.08)', 'rgba(255, 255, 255, 0.04)']
+          colors={
+            isSelected
+              ? ['rgba(33, 150, 243, 0.3)', 'rgba(33, 150, 243, 0.1)']
+              : ['rgba(255, 255, 255, 0.08)', 'rgba(255, 255, 255, 0.04)']
           }
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.navItemGradient}
-        >
+          start={{x: 0, y: 0}}
+          end={{x: 1, y: 1}}
+          style={styles.navItemGradient}>
           <View style={styles.navItemContent}>
-            <Icon 
-              name={icon} 
-              size={18} 
-              color={isSelected ? '#2196F3' : '#FFFFFF'} 
+            <Icon
+              name={icon}
+              size={18}
+              color={isSelected ? '#2196F3' : '#FFFFFF'}
               style={styles.categoryIcon}
             />
-            <Text 
-              style={[styles.categoryName, isSelected && styles.categoryNameActive]}
-              numberOfLines={2}
-            >
+            <Text
+              style={[
+                styles.categoryName,
+                isSelected && styles.categoryNameActive,
+              ]}
+              numberOfLines={2}>
               {item.name}
             </Text>
             <LinearGradient
               colors={['rgba(33, 150, 243, 0.8)', 'rgba(33, 150, 243, 0.6)']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.categoryCountContainer}
-            >
+              start={{x: 0, y: 0}}
+              end={{x: 1, y: 1}}
+              style={styles.categoryCountContainer}>
               <Text style={styles.categoryCount}>{item.count}</Text>
             </LinearGradient>
           </View>
@@ -91,10 +115,10 @@ const CategoryList: React.FC = () => {
         <Icon name="menu" size={20} color="#FFFFFF" />
         <Text style={styles.sectionTitle}>Catégories</Text>
       </View>
-      
+
       <FlatList
         data={categories}
-        keyExtractor={(item) => item.name}
+        keyExtractor={item => item.name}
         renderItem={renderCategoryItem}
         showsVerticalScrollIndicator={false}
         style={styles.categoryList}

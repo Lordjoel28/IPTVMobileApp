@@ -3,8 +3,8 @@
  * Vérification compatibilité avec architecture existante
  */
 
-import { parsersService } from '../services/ParsersService';
-import { playlistService } from '../services/PlaylistService';
+import {parsersService} from '../services/ParsersService';
+import {playlistService} from '../services/PlaylistService';
 
 // Test data : petit M3U pour validation
 const testM3UContent = `#EXTM3U
@@ -31,24 +31,28 @@ export async function testParsersServiceIntegration() {
     // Test parser standard (existant)
     const standardResult = await parsersService.parseM3U(testM3UContent, {
       useUltraOptimized: true,
-      chunkSize: 1000
+      chunkSize: 1000,
     });
 
-    console.log(`✅ Standard parser: ${standardResult.channels.length} channels`);
+    console.log(
+      `✅ Standard parser: ${standardResult.channels.length} channels`,
+    );
 
     // Test parser streaming (nouveau)
     const streamingResult = await parsersService.parseM3U(testM3UContent, {
       useStreamingParser: true,
       streamingOptions: {
         maxMemoryMB: 50,
-        yieldInterval: 1000
+        yieldInterval: 1000,
       },
-      onProgress: (progress) => {
+      onProgress: progress => {
         console.log(`Progress: ${progress.progress}%`);
-      }
+      },
     });
 
-    console.log(`✅ Streaming parser: ${streamingResult.channels.length} channels`);
+    console.log(
+      `✅ Streaming parser: ${streamingResult.channels.length} channels`,
+    );
 
     // Vérification compatibilité
     if (standardResult.channels.length === streamingResult.channels.length) {
@@ -58,7 +62,6 @@ export async function testParsersServiceIntegration() {
       console.log('❌ Test 1 FAILED: Channel count mismatch');
       return false;
     }
-
   } catch (error) {
     console.error('❌ Test 1 ERROR:', error);
     return false;
@@ -77,29 +80,33 @@ export async function testPlaylistServiceStreaming() {
     let statusCallbacks = 0;
 
     const result = await playlistService.parseM3UWithStreaming(
-      TEST_URLS.small, 
+      TEST_URLS.small,
       'Test Playlist',
       {
-        onProgress: (progress) => {
+        onProgress: progress => {
           progressCallbacks++;
           console.log(`📊 Progress: ${progress.channelsParsed} channels`);
         },
         onStatusChange: (status, details) => {
           statusCallbacks++;
           console.log(`📢 Status: ${status} - ${details}`);
-        }
-      }
+        },
+      },
     );
 
-    console.log(`✅ Streaming import completed: ${result.channels.length} channels`);
-    console.log(`📊 Callbacks: ${progressCallbacks} progress, ${statusCallbacks} status`);
+    console.log(
+      `✅ Streaming import completed: ${result.channels.length} channels`,
+    );
+    console.log(
+      `📊 Callbacks: ${progressCallbacks} progress, ${statusCallbacks} status`,
+    );
 
     // Vérifications
     const testsOk = [
       result.channels.length > 0,
       result.parseTime > 0,
       progressCallbacks > 0,
-      statusCallbacks > 0
+      statusCallbacks > 0,
     ];
 
     if (testsOk.every(t => t)) {
@@ -109,7 +116,6 @@ export async function testPlaylistServiceStreaming() {
       console.log('❌ Test 2 FAILED: Some streaming features not working');
       return false;
     }
-
   } catch (error) {
     console.error('❌ Test 2 ERROR:', error);
     return false;
@@ -125,7 +131,9 @@ export async function testModernFlowCompatibility() {
   try {
     // Test méthode parseM3U existante (ne doit pas casser)
     const standardResult = await playlistService.parseM3U(testM3UContent);
-    console.log(`✅ Standard parseM3U still works: ${standardResult.channels.length} channels`);
+    console.log(
+      `✅ Standard parseM3U still works: ${standardResult.channels.length} channels`,
+    );
 
     // Vérifier que parsersService.getStats() marche toujours
     const stats = parsersService.getStats();
@@ -134,7 +142,7 @@ export async function testModernFlowCompatibility() {
     const compatibilityOk = [
       standardResult.channels.length > 0,
       stats.pool !== undefined,
-      stats.memory !== undefined
+      stats.memory !== undefined,
     ];
 
     if (compatibilityOk.every(t => t)) {
@@ -144,7 +152,6 @@ export async function testModernFlowCompatibility() {
       console.log('❌ Test 3 FAILED: Compatibility issues detected');
       return false;
     }
-
   } catch (error) {
     console.error('❌ Test 3 ERROR:', error);
     return false;
@@ -163,19 +170,26 @@ export async function testPerformanceAndFallback() {
     // Test avec option streaming sur petit dataset (doit fallback)
     const result = await parsersService.parseM3U(testM3UContent, {
       useStreamingParser: true, // Demande streaming
-      useUltraOptimized: true   // Mais fallback si pas assez de chaînes
+      useUltraOptimized: true, // Mais fallback si pas assez de chaînes
     });
 
     const duration = Date.now() - startTime;
     console.log(`⏱️ Parse completed in ${duration}ms`);
-    console.log(`📊 Performance: ${Math.round(result.channels.length / duration * 1000)} channels/second`);
+    console.log(
+      `📊 Performance: ${Math.round(
+        (result.channels.length / duration) * 1000,
+      )} channels/second`,
+    );
 
     // Test fallback mechanism
     try {
       // Test avec URL invalide (doit déclencher fallback)
-      const fallbackResult = await parsersService.parseM3U('INVALID_M3U_CONTENT', {
-        useStreamingParser: true
-      });
+      const fallbackResult = await parsersService.parseM3U(
+        'INVALID_M3U_CONTENT',
+        {
+          useStreamingParser: true,
+        },
+      );
       console.log('✅ Fallback mechanism working');
     } catch (fallbackError) {
       console.log('✅ Error handling working:', fallbackError.message);
@@ -188,7 +202,6 @@ export async function testPerformanceAndFallback() {
       console.log('❌ Test 4 FAILED: Performance or fallback issues');
       return false;
     }
-
   } catch (error) {
     console.error('❌ Test 4 ERROR:', error);
     return false;
@@ -202,10 +215,10 @@ export async function runIntegrationTests() {
   console.log('🚀 Starting Streaming Parser Integration Tests...\n');
 
   const tests = [
-    { name: 'ParsersService Integration', fn: testParsersServiceIntegration },
-    { name: 'PlaylistService Streaming', fn: testPlaylistServiceStreaming },
-    { name: 'Modern Flow Compatibility', fn: testModernFlowCompatibility },
-    { name: 'Performance & Fallback', fn: testPerformanceAndFallback },
+    {name: 'ParsersService Integration', fn: testParsersServiceIntegration},
+    {name: 'PlaylistService Streaming', fn: testPlaylistServiceStreaming},
+    {name: 'Modern Flow Compatibility', fn: testModernFlowCompatibility},
+    {name: 'Performance & Fallback', fn: testPerformanceAndFallback},
   ];
 
   let passed = 0;
@@ -231,7 +244,7 @@ export async function runIntegrationTests() {
   console.log('📊 INTEGRATION TEST RESULTS:');
   console.log(`✅ Passed: ${passed}`);
   console.log(`❌ Failed: ${failed}`);
-  console.log(`📈 Success Rate: ${Math.round(passed / tests.length * 100)}%`);
+  console.log(`📈 Success Rate: ${Math.round((passed / tests.length) * 100)}%`);
 
   if (failed === 0) {
     console.log('\n🎉 ALL INTEGRATION TESTS PASSED!');
@@ -250,5 +263,5 @@ export const streamingParserTests = {
   testParsersServiceIntegration,
   testPlaylistServiceStreaming,
   testModernFlowCompatibility,
-  testPerformanceAndFallback
+  testPerformanceAndFallback,
 };

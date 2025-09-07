@@ -4,7 +4,7 @@
  * Architecture inspirée IPTV Smarters Pro avec queuing intelligent
  */
 
-import { XtreamChannel } from './StreamingXtreamService';
+import {XtreamChannel} from './StreamingXtreamService';
 
 export interface WorkerTask {
   id: string;
@@ -35,7 +35,9 @@ class TaskQueue {
 
   enqueue(task: WorkerTask): void {
     this.tasks.set(task.id, task);
-    console.log(`📋 Task queued: ${task.id} (${task.type}) - Priority: ${task.priority}`);
+    console.log(
+      `📋 Task queued: ${task.id} (${task.type}) - Priority: ${task.priority}`,
+    );
   }
 
   dequeue(): WorkerTask | null {
@@ -60,7 +62,7 @@ class TaskQueue {
   }
 
   getTasksByPriority(): Record<string, number> {
-    const counts = { CRITICAL: 0, HIGH: 0, NORMAL: 0, LOW: 0 };
+    const counts = {CRITICAL: 0, HIGH: 0, NORMAL: 0, LOW: 0};
     for (const task of this.tasks.values()) {
       counts[task.priority]++;
     }
@@ -91,19 +93,26 @@ class PerformanceMonitor {
   }
 
   getAverageTaskTime(): number {
-    if (this.taskTimes.length === 0) return 0;
+    if (this.taskTimes.length === 0) {
+      return 0;
+    }
     return this.taskTimes.reduce((a, b) => a + b, 0) / this.taskTimes.length;
   }
 
   getAverageMemoryUsage(): number {
-    if (this.memorySnapshots.length === 0) return 0;
-    return this.memorySnapshots.reduce((a, b) => a + b, 0) / this.memorySnapshots.length;
+    if (this.memorySnapshots.length === 0) {
+      return 0;
+    }
+    return (
+      this.memorySnapshots.reduce((a, b) => a + b, 0) /
+      this.memorySnapshots.length
+    );
   }
 
   isPerformanceDegraded(): boolean {
     const avgTime = this.getAverageTaskTime();
     const avgMemory = this.getAverageMemoryUsage();
-    
+
     // Seuils pour devices mobiles
     return avgTime > 2000 || avgMemory > 400 * 1024 * 1024; // 2s ou 400MB
   }
@@ -126,7 +135,7 @@ class BackgroundWorkerService {
     tasksRunning: 0,
     averageTaskTime: 0,
     memoryUsage: 0,
-    cpuUsage: 0
+    cpuUsage: 0,
   };
   private isRunning = false;
 
@@ -134,8 +143,10 @@ class BackgroundWorkerService {
    * 🚀 Start background processing
    */
   start(): void {
-    if (this.isRunning) return;
-    
+    if (this.isRunning) {
+      return;
+    }
+
     this.isRunning = true;
     console.log('🔄 Background Worker Service started');
     this.processTaskLoop();
@@ -167,7 +178,7 @@ class BackgroundWorkerService {
     this.stats.tasksRunning = this.runningTasks.size;
     this.stats.averageTaskTime = this.performanceMonitor.getAverageTaskTime();
     this.stats.memoryUsage = this.performanceMonitor.getAverageMemoryUsage();
-    return { ...this.stats };
+    return {...this.stats};
   }
 
   /**
@@ -179,7 +190,7 @@ class BackgroundWorkerService {
         // Check if we should throttle based on performance
         const shouldThrottle = this.performanceMonitor.shouldThrottle();
         const maxConcurrent = shouldThrottle ? 1 : 2;
-        
+
         // Process tasks if under concurrency limit
         if (this.runningTasks.size < maxConcurrent) {
           const task = this.taskQueue.dequeue();
@@ -191,7 +202,6 @@ class BackgroundWorkerService {
         // Adaptive delay based on performance
         const delay = shouldThrottle ? 100 : 50; // Slower when throttling
         await this.sleep(delay);
-
       } catch (error) {
         console.error('🔥 Background worker loop error:', error);
         await this.sleep(1000); // Longer delay on error
@@ -205,10 +215,10 @@ class BackgroundWorkerService {
   private async executeTask(task: WorkerTask): Promise<void> {
     const startTime = performance.now();
     this.runningTasks.add(task.id);
-    
+
     try {
       console.log(`🚀 Executing task: ${task.id} (${task.type})`);
-      
+
       let result: any;
       switch (task.type) {
         case 'NORMALIZE_CHANNELS':
@@ -230,7 +240,6 @@ class BackgroundWorkerService {
 
       console.log(`✅ Task completed: ${task.id} in ${Math.round(duration)}ms`);
       task.onComplete?.(result);
-
     } catch (error) {
       console.error(`❌ Task failed: ${task.id}`, error);
       task.onError?.(error as Error);
@@ -243,14 +252,16 @@ class BackgroundWorkerService {
   /**
    * 📺 Normalize channels task - Heavy processing
    */
-  private async normalizeChannelsTask(task: WorkerTask): Promise<XtreamChannel[]> {
+  private async normalizeChannelsTask(
+    task: WorkerTask,
+  ): Promise<XtreamChannel[]> {
     const channels = task.data.channels as XtreamChannel[];
     const batchSize = task.data.batchSize || 100;
     const normalizedChannels: XtreamChannel[] = [];
 
     for (let i = 0; i < channels.length; i += batchSize) {
       const batch = channels.slice(i, i + batchSize);
-      
+
       // Process batch
       for (const channel of batch) {
         const normalized = this.normalizeChannel(channel, task.data.serverUrl);
@@ -259,7 +270,10 @@ class BackgroundWorkerService {
 
       // Progress reporting
       const progress = Math.round(((i + batchSize) / channels.length) * 100);
-      task.onProgress?.(progress, `Normalized ${i + batchSize}/${channels.length} channels`);
+      task.onProgress?.(
+        progress,
+        `Normalized ${i + batchSize}/${channels.length} channels`,
+      );
 
       // Yield to main thread
       await this.sleep(1);
@@ -282,12 +296,12 @@ class BackgroundWorkerService {
 
     for (let i = 0; i < channels.length; i++) {
       const channel = channels[i];
-      
+
       if (channel.category_id && !categoryMap.has(channel.category_id)) {
         categoryMap.set(channel.category_id, {
           id: channel.category_id,
           name: this.normalizeCategoryName(channel.category_name),
-          channelCount: 0
+          channelCount: 0,
         });
       }
 
@@ -300,7 +314,10 @@ class BackgroundWorkerService {
       // Progress every 1000 channels
       if (i % 1000 === 0) {
         const progress = Math.round((i / channels.length) * 100);
-        task.onProgress?.(progress, `Processed ${i}/${channels.length} for categories`);
+        task.onProgress?.(
+          progress,
+          `Processed ${i}/${channels.length} for categories`,
+        );
         await this.sleep(1);
       }
     }
@@ -311,13 +328,15 @@ class BackgroundWorkerService {
   /**
    * 🔍 Build search index task
    */
-  private async buildSearchIndexTask(task: WorkerTask): Promise<Map<string, string[]>> {
+  private async buildSearchIndexTask(
+    task: WorkerTask,
+  ): Promise<Map<string, string[]>> {
     const channels = task.data.channels as XtreamChannel[];
     const searchIndex = new Map<string, string[]>();
 
     for (let i = 0; i < channels.length; i++) {
       const channel = channels[i];
-      
+
       // Build searchable terms
       const terms = this.extractSearchTerms(channel);
       terms.forEach(term => {
@@ -342,18 +361,23 @@ class BackgroundWorkerService {
   // UTILITY METHODS
   // ================================
 
-  private normalizeChannel(channel: XtreamChannel, serverUrl: string): XtreamChannel {
+  private normalizeChannel(
+    channel: XtreamChannel,
+    serverUrl: string,
+  ): XtreamChannel {
     return {
       ...channel,
       name: this.normalizeChannelName(channel.name),
       stream_icon: this.normalizeLogoUrl(channel.stream_icon, serverUrl),
-      category_name: this.normalizeCategoryName(channel.category_name)
+      category_name: this.normalizeCategoryName(channel.category_name),
     };
   }
 
   private normalizeChannelName(name: string): string {
-    if (!name) return 'Unknown Channel';
-    
+    if (!name) {
+      return 'Unknown Channel';
+    }
+
     return name
       .trim()
       .replace(/[<>]/g, '') // Remove dangerous chars
@@ -362,8 +386,10 @@ class BackgroundWorkerService {
   }
 
   private normalizeCategoryName(categoryName: string): string {
-    if (!categoryName || categoryName.trim() === '') return 'Uncategorized';
-    
+    if (!categoryName || categoryName.trim() === '') {
+      return 'Uncategorized';
+    }
+
     return categoryName
       .trim()
       .replace(/[<>]/g, '')
@@ -385,10 +411,10 @@ class BackgroundWorkerService {
     try {
       const serverUri = new URL(serverUrl);
       const baseUrl = `${serverUri.protocol}//${serverUri.host}`;
-      
-      return trimmed.startsWith('/') ? 
-        `${baseUrl}${trimmed}` : 
-        `${baseUrl}/${trimmed}`;
+
+      return trimmed.startsWith('/')
+        ? `${baseUrl}${trimmed}`
+        : `${baseUrl}/${trimmed}`;
     } catch (e) {
       return '';
     }
@@ -396,7 +422,7 @@ class BackgroundWorkerService {
 
   private extractSearchTerms(channel: XtreamChannel): string[] {
     const terms: string[] = [];
-    
+
     // Channel name terms
     if (channel.name) {
       const words = channel.name.toLowerCase().split(/\s+/);
@@ -418,7 +444,7 @@ class BackgroundWorkerService {
     if (global.gc) {
       global.gc();
     }
-    
+
     // Record memory usage
     const usage = this.getMemoryUsage();
     this.performanceMonitor.recordMemoryUsage(usage);

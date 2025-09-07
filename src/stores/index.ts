@@ -4,14 +4,14 @@
  */
 
 // Export des stores individuels
-export { usePlaylistStore } from './PlaylistStore';
-export { useUserStore } from './UserStore';
-export { useThemeStore } from './ThemeStore';
+export {usePlaylistStore} from './PlaylistStore';
+export {useUserStore} from './UserStore';
+export {useThemeStore} from './ThemeStore';
 
 // Types
-export type { PlaylistStoreState } from './PlaylistStore';
-export type { UserStoreState } from './UserStore';
-export type { ThemeStoreState } from './ThemeStore';
+export type {PlaylistStoreState} from './PlaylistStore';
+export type {UserStoreState} from './UserStore';
+export type {ThemeStoreState} from './ThemeStore';
 
 /**
  * Hook combiné pour accéder à tous les stores si nécessaire

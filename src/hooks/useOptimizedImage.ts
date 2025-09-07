@@ -3,8 +3,12 @@
  * Intégration avec ImageCacheService pour 100K+ chaînes
  */
 
-import { useState, useEffect, useMemo } from 'react';
-import { imageCacheService, type CachedImageInfo, type ImageLoadOptions } from '../services/ImageCacheService';
+import {useState, useEffect, useMemo} from 'react';
+import {
+  imageCacheService,
+  type CachedImageInfo,
+  type ImageLoadOptions,
+} from '../services/ImageCacheService';
 
 interface OptimizedImageResult {
   imageInfo: CachedImageInfo | null;
@@ -19,8 +23,8 @@ interface OptimizedImageResult {
  * 🚀 Hook principal pour images optimisées avec cache intelligent
  */
 export const useOptimizedImage = (
-  uri: string | null | undefined, 
-  options: ImageLoadOptions = {}
+  uri: string | null | undefined,
+  options: ImageLoadOptions = {},
 ): OptimizedImageResult => {
   const [imageInfo, setImageInfo] = useState<CachedImageInfo | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -28,21 +32,24 @@ export const useOptimizedImage = (
   const [retryCount, setRetryCount] = useState(0);
 
   // Mémoise les options pour éviter re-renders inutiles
-  const memoizedOptions = useMemo(() => ({
-    priority: options.priority || 'normal' as const,
-    quality: options.quality || 'medium' as const,
-    timeout: options.timeout || 8000,
-    fallback: options.fallback !== false,
-    width: options.width,
-    height: options.height
-  }), [
-    options.priority, 
-    options.quality, 
-    options.timeout, 
-    options.fallback, 
-    options.width, 
-    options.height
-  ]);
+  const memoizedOptions = useMemo(
+    () => ({
+      priority: options.priority || ('normal' as const),
+      quality: options.quality || ('medium' as const),
+      timeout: options.timeout || 8000,
+      fallback: options.fallback !== false,
+      width: options.width,
+      height: options.height,
+    }),
+    [
+      options.priority,
+      options.quality,
+      options.timeout,
+      options.fallback,
+      options.width,
+      options.height,
+    ],
+  );
 
   // Fonction retry
   const retry = () => {
@@ -65,8 +72,11 @@ export const useOptimizedImage = (
       setError(null);
 
       try {
-        const info = await imageCacheService.loadOptimizedImage(uri, memoizedOptions);
-        
+        const info = await imageCacheService.loadOptimizedImage(
+          uri,
+          memoizedOptions,
+        );
+
         if (!cancelled) {
           setImageInfo(info);
           setIsLoading(false);
@@ -94,7 +104,7 @@ export const useOptimizedImage = (
     isLoading,
     error,
     isCached: imageInfo?.cached || false,
-    retry
+    retry,
   };
 };
 
@@ -106,36 +116,39 @@ export const useImagePreloader = () => {
   const [preloadStats, setPreloadStats] = useState({
     total: 0,
     loaded: 0,
-    errors: 0
+    errors: 0,
   });
 
   const preloadImages = async (
-    uris: string[], 
-    options: { 
-      batchSize?: number, 
-      priority?: 'low' | 'normal' | 'high',
-      onProgress?: (stats: { total: number, loaded: number, errors: number }) => void
-    } = {}
+    uris: string[],
+    options: {
+      batchSize?: number;
+      priority?: 'low' | 'normal' | 'high';
+      onProgress?: (stats: {
+        total: number;
+        loaded: number;
+        errors: number;
+      }) => void;
+    } = {},
   ) => {
-    if (uris.length === 0) return;
+    if (uris.length === 0) {return;}
 
     setIsPreloading(true);
-    setPreloadStats({ total: uris.length, loaded: 0, errors: 0 });
+    setPreloadStats({total: uris.length, loaded: 0, errors: 0});
 
     try {
       await imageCacheService.preloadImages(uris, {
         batchSize: options.batchSize,
-        priority: options.priority
+        priority: options.priority,
       });
 
       // Mettre à jour stats finales
-      const finalStats = { total: uris.length, loaded: uris.length, errors: 0 };
+      const finalStats = {total: uris.length, loaded: uris.length, errors: 0};
       setPreloadStats(finalStats);
       options.onProgress?.(finalStats);
-
     } catch (error) {
       console.warn('Erreur préchargement:', error);
-      setPreloadStats(prev => ({ ...prev, errors: prev.errors + 1 }));
+      setPreloadStats(prev => ({...prev, errors: prev.errors + 1}));
     } finally {
       setIsPreloading(false);
     }
@@ -154,7 +167,7 @@ export const useImagePreloader = () => {
     preloadImages,
     preloadIntelligent,
     isPreloading,
-    preloadStats
+    preloadStats,
   };
 };
 
@@ -182,7 +195,7 @@ export const useCacheStats = () => {
   return {
     stats,
     refreshStats,
-    clearCache
+    clearCache,
   };
 };
 
@@ -193,16 +206,19 @@ export const useCacheStats = () => {
 export const useChannelImage = (
   logoUri: string | null | undefined,
   channelId: string,
-  priority: 'low' | 'normal' | 'high' = 'normal'
+  priority: 'low' | 'normal' | 'high' = 'normal',
 ) => {
-  const options: ImageLoadOptions = useMemo(() => ({
-    priority,
-    width: 56,
-    height: 56,
-    quality: 'medium' as const,
-    timeout: priority === 'high' ? 10000 : 5000,
-    fallback: true
-  }), [priority]);
+  const options: ImageLoadOptions = useMemo(
+    () => ({
+      priority,
+      width: 56,
+      height: 56,
+      quality: 'medium' as const,
+      timeout: priority === 'high' ? 10000 : 5000,
+      fallback: true,
+    }),
+    [priority],
+  );
 
   const imageResult = useOptimizedImage(logoUri, options);
 
@@ -210,22 +226,23 @@ export const useChannelImage = (
   const imageProps = useMemo(() => {
     if (!logoUri) {
       return {
-        source: { uri: '' },
-        style: { width: 56, height: 56 },
+        source: {uri: ''},
+        style: {width: 56, height: 56},
         resizeMode: 'contain' as const,
-        fallback: true
+        fallback: true,
       };
     }
 
-    return imageCacheService.getOptimizedImageProps(logoUri, 
-      { width: 56, height: 56 }, 
-      options
+    return imageCacheService.getOptimizedImageProps(
+      logoUri,
+      {width: 56, height: 56},
+      options,
     );
   }, [logoUri, options]);
 
   return {
     ...imageResult,
     imageProps,
-    channelId
+    channelId,
   };
 };

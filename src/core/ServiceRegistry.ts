@@ -3,19 +3,19 @@
  * Configuration DI pour tous les services de l'application
  */
 
-import { container } from './ServiceContainer';
+import {container} from './ServiceContainer';
 
 // Imports des services existants
-import { CacheService } from '../services/CacheService';
-import { StorageService } from '../services/StorageService';
-import { PlaylistService } from '../services/PlaylistService';
-import { SearchService } from '../services/SearchService';
-import { CategoryService } from '../services/CategoryService';
-import { ImageCacheService } from '../services/ImageCacheService';
-import { ParsersService } from '../services/ParsersService';
-import { IPTVService } from '../services/IPTVService';
-import { UserManager } from '../services/users/UserManager';
-import { SearchManager } from '../services/search/SearchManager';
+import {CacheService} from '../services/CacheService';
+import {StorageService} from '../services/StorageService';
+import {PlaylistService} from '../services/PlaylistService';
+import {SearchService} from '../services/SearchService';
+import {CategoryService} from '../services/CategoryService';
+import {ImageCacheService} from '../services/ImageCacheService';
+import {ParsersService} from '../services/ParsersService';
+import {IPTVService} from '../services/IPTVService';
+import {UserManager} from '../services/users/UserManager';
+import {SearchManager} from '../services/search/SearchManager';
 
 /**
  * Noms des services pour l'injection de dépendances
@@ -25,43 +25,46 @@ export const ServiceNames = {
   STORAGE: 'storage',
   CACHE: 'cache',
   IMAGE_CACHE: 'imageCache',
-  
+
   // Services métier
   PLAYLIST: 'playlist',
   SEARCH: 'search',
   CATEGORY: 'category',
   PARSERS: 'parsers',
   IPTV: 'iptv',
-  
+
   // Managers
   USER_MANAGER: 'userManager',
   SEARCH_MANAGER: 'searchManager',
 } as const;
 
-export type ServiceName = typeof ServiceNames[keyof typeof ServiceNames];
+export type ServiceName = (typeof ServiceNames)[keyof typeof ServiceNames];
 
 /**
  * Configuration du Service Registry
  * Enregistre tous les services avec leurs dépendances
  */
 export class ServiceRegistry {
-  
   /**
    * Initialise tous les services dans l'ordre des dépendances
    */
   static initialize(): void {
     console.log('🏗️ Initializing Service Registry with DI...');
-    
+
     // 1. Services de base (sans dépendances)
     this.registerBaseServices();
-    
+
     // 2. Services métier (avec dépendances sur les services de base)
     this.registerBusinessServices();
-    
+
     // 3. Managers complexes (avec dépendances multiples)
     this.registerManagerServices();
-    
-    console.log('✅ Service Registry initialized with', container.has.length, 'services');
+
+    console.log(
+      '✅ Service Registry initialized with',
+      container.has.length,
+      'services',
+    );
   }
 
   /**
@@ -72,23 +75,23 @@ export class ServiceRegistry {
     container.register(ServiceNames.STORAGE, {
       factory: () => StorageService.createFromDI(),
       singleton: true,
-      lazy: true
+      lazy: true,
     });
 
     // Cache Service - Dépend du Storage
     container.register(ServiceNames.CACHE, {
-      factory: (storage) => CacheService.createFromDI(),
+      factory: storage => CacheService.createFromDI(),
       dependencies: [ServiceNames.STORAGE],
       singleton: true,
-      lazy: true
+      lazy: true,
     });
 
     // Image Cache Service - Dépend du Cache
     container.register(ServiceNames.IMAGE_CACHE, {
-      factory: (cache) => ImageCacheService.createFromDI(),
+      factory: cache => ImageCacheService.createFromDI(),
       dependencies: [ServiceNames.CACHE],
       singleton: true,
-      lazy: true
+      lazy: true,
     });
   }
 
@@ -98,18 +101,18 @@ export class ServiceRegistry {
   private static registerBusinessServices(): void {
     // Parsers Service - Pour parser les M3U
     container.register(ServiceNames.PARSERS, {
-      factory: (cache) => ParsersService.createFromDI(),
+      factory: cache => ParsersService.createFromDI(),
       dependencies: [ServiceNames.CACHE],
       singleton: true,
-      lazy: true
+      lazy: true,
     });
 
     // Category Service - Gestion des catégories
     container.register(ServiceNames.CATEGORY, {
-      factory: (storage) => CategoryService.createFromDI(),
+      factory: storage => CategoryService.createFromDI(),
       dependencies: [ServiceNames.STORAGE],
       singleton: true,
-      lazy: true
+      lazy: true,
     });
 
     // Playlist Service - Gestion des playlists
@@ -117,23 +120,27 @@ export class ServiceRegistry {
       factory: (storage, parsers) => PlaylistService.createFromDI(),
       dependencies: [ServiceNames.STORAGE, ServiceNames.PARSERS],
       singleton: true,
-      lazy: true
+      lazy: true,
     });
 
     // Search Service - Recherche de base
     container.register(ServiceNames.SEARCH, {
-      factory: (cache) => SearchService.createFromDI(),
+      factory: cache => SearchService.createFromDI(),
       dependencies: [ServiceNames.CACHE],
       singleton: true,
-      lazy: true
+      lazy: true,
     });
 
     // IPTV Service - Service principal IPTV
     container.register(ServiceNames.IPTV, {
       factory: (playlist, search, category) => IPTVService.createFromDI(),
-      dependencies: [ServiceNames.PLAYLIST, ServiceNames.SEARCH, ServiceNames.CATEGORY],
+      dependencies: [
+        ServiceNames.PLAYLIST,
+        ServiceNames.SEARCH,
+        ServiceNames.CATEGORY,
+      ],
       singleton: true,
-      lazy: true
+      lazy: true,
     });
   }
 
@@ -143,10 +150,10 @@ export class ServiceRegistry {
   private static registerManagerServices(): void {
     // User Manager - Gestion des utilisateurs
     container.register(ServiceNames.USER_MANAGER, {
-      factory: (storage) => UserManager.createFromDI(),
+      factory: storage => UserManager.createFromDI(),
       dependencies: [ServiceNames.STORAGE],
       singleton: true,
-      lazy: true
+      lazy: true,
     });
 
     // Search Manager - Recherche avancée
@@ -154,7 +161,7 @@ export class ServiceRegistry {
       factory: (search, cache) => SearchManager.createFromDI(),
       dependencies: [ServiceNames.SEARCH, ServiceNames.CACHE],
       singleton: true,
-      lazy: true
+      lazy: true,
     });
   }
 
@@ -201,4 +208,4 @@ export function useRegistryService<T>(serviceName: ServiceName): T | null {
 }
 
 // Import du hook depuis ServiceContainer
-import { useService } from './ServiceContainer';
+import {useService} from './ServiceContainer';

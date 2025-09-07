@@ -3,18 +3,18 @@
  * Modèle pour les chaînes IPTV - OPTIMISÉ pour 25K+ records
  */
 
-import { Model } from '@nozbe/watermelondb';
-import { field, date, readonly, relation } from '@nozbe/watermelondb/decorators';
-import type { Associations } from '@nozbe/watermelondb/Model';
+import {Model} from '@nozbe/watermelondb';
+import {field, date, readonly, relation} from '@nozbe/watermelondb/decorators';
+import type {Associations} from '@nozbe/watermelondb/Model';
 
 export default class Channel extends Model {
   static table = 'channels';
-  
+
   static associations: Associations = {
-    playlist: { type: 'belongs_to', key: 'playlist_id' },
-    category: { type: 'belongs_to', key: 'category_id' },
-    favorites: { type: 'has_many', foreignKey: 'channel_id' },
-    watch_history: { type: 'has_many', foreignKey: 'channel_id' }
+    playlist: {type: 'belongs_to', key: 'playlist_id'},
+    category: {type: 'belongs_to', key: 'category_id'},
+    favorites: {type: 'has_many', foreignKey: 'channel_id'},
+    watch_history: {type: 'has_many', foreignKey: 'channel_id'},
   };
 
   // Champs de base
@@ -24,18 +24,18 @@ export default class Channel extends Model {
   @field('stream_url') streamUrl!: string;
   @field('logo_url') logoUrl?: string;
   @field('group_title') groupTitle?: string;
-  
+
   // Champs TVG (Electronic Program Guide)
   @field('tvg_id') tvgId?: string;
   @field('tvg_name') tvgName?: string;
   @field('tvg_logo') tvgLogo?: string;
-  
+
   // Métadonnées
   @field('language') language?: string;
   @field('country') country?: string;
   @field('quality') quality?: string;
   @field('stream_type') streamType?: string; // 'live' | 'movie' | 'series'
-  
+
   // Champs Xtream Codes spécifiques
   @field('num') num?: number;
   @field('stream_id') streamId?: string;
@@ -43,12 +43,12 @@ export default class Channel extends Model {
   @field('epg_channel_id') epgChannelId?: string;
   @field('added') added?: string;
   @field('is_adult') isAdult?: boolean;
-  
+
   // Métadonnées d'utilisation
   @field('is_favorite') isFavorite!: boolean;
   @date('last_watched') lastWatched?: Date;
   @field('watch_count') watchCount!: number;
-  
+
   @readonly @date('created_at') createdAt!: Date;
   @readonly @date('updated_at') updatedAt!: Date;
 
@@ -66,10 +66,14 @@ export default class Channel extends Model {
   }
 
   get isHD(): boolean {
-    if (!this.quality) return false;
-    return this.quality.toUpperCase().includes('HD') || 
-           this.quality.toUpperCase().includes('FHD') ||
-           this.quality.toUpperCase().includes('4K');
+    if (!this.quality) {
+      return false;
+    }
+    return (
+      this.quality.toUpperCase().includes('HD') ||
+      this.quality.toUpperCase().includes('FHD') ||
+      this.quality.toUpperCase().includes('4K')
+    );
   }
 
   get categoryName(): string {
@@ -81,7 +85,12 @@ export default class Channel extends Model {
     if (this.streamType === 'live' && this.streamId) {
       // Format: http://server:port/username/password/streamId
       const playlist = this.playlist.observe().getValue();
-      if (playlist && playlist.server && playlist.username && playlist.password) {
+      if (
+        playlist &&
+        playlist.server &&
+        playlist.username &&
+        playlist.password
+      ) {
         return `${playlist.server}/${playlist.username}/${playlist.password}/${this.streamId}`;
       }
     }

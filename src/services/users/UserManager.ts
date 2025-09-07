@@ -5,7 +5,7 @@
  */
 
 import StorageAdapter from '../../storage/StorageAdapter';
-import { Channel } from '../parsers/UltraOptimizedM3UParser';
+import {Channel} from '../parsers/UltraOptimizedM3UParser';
 
 export interface User {
   id: string;
@@ -49,7 +49,7 @@ export interface UserStats {
   favoriteChannels: number;
   sessionsCount: number;
   lastChannelWatched?: string;
-  topCategories: { [category: string]: number };
+  topCategories: {[category: string]: number};
 }
 
 export interface Session {
@@ -84,7 +84,7 @@ export interface UserManagerStats {
  */
 class PinHashService {
   private static readonly SALT_ROUNDS = 10;
-  
+
   /**
    * Hash PIN avec salt (simulation bcrypt)
    */
@@ -95,7 +95,7 @@ class PinHashService {
     const hash = btoa(`${pin}_${salt}_${this.SALT_ROUNDS}`);
     return `${salt}:${hash}`;
   }
-  
+
   /**
    * Vérifier PIN
    */
@@ -155,21 +155,21 @@ export class UserManager {
    * Initialisation avec chargement utilisateurs
    */
   async initialize(): Promise<void> {
-    if (this.isInitialized) return;
+    if (this.isInitialized) {return;}
     if (this.isInitializing) {
       console.log('⏳ UserManager already initializing, waiting...');
       return; // Éviter l'attente active qui peut créer des problèmes
     }
 
     this.isInitializing = true;
-    
+
     try {
       console.log('🔄 Initializing UserManager...');
-      
+
       // Charger utilisateurs existants
-      const userIds = await this.storage.get('user_ids') || [];
+      const userIds = (await this.storage.get('user_ids')) || [];
       console.log(`📋 Found ${userIds.length} existing user(s)`);
-      
+
       for (const userId of userIds) {
         const user = await this.storage.get(`user_${userId}`);
         if (user) {
@@ -185,7 +185,7 @@ export class UserManager {
       }
 
       // Charger sessions actives
-      const activeSessions = await this.storage.get('active_sessions') || [];
+      const activeSessions = (await this.storage.get('active_sessions')) || [];
       for (const sessionData of activeSessions) {
         if (this.isSessionValid(sessionData)) {
           this.sessions.set(sessionData.userId, sessionData);
@@ -195,13 +195,13 @@ export class UserManager {
       // Charger stats
       const savedStats = await this.storage.get('user_stats');
       if (savedStats) {
-        this.stats = { ...this.stats, ...savedStats };
+        this.stats = {...this.stats, ...savedStats};
       }
 
       this.updateStats();
       this.isInitialized = true;
       this.isInitializing = false;
-      
+
       console.log('✅ UserManager initialized:', this.getStats());
     } catch (error) {
       console.error('❌ UserManager initialization failed:', error);
@@ -217,7 +217,7 @@ export class UserManager {
     name: string,
     type: 'admin' | 'standard' | 'child',
     pin: string,
-    avatar: string = 'default'
+    avatar: string = 'default',
   ): Promise<User> {
     await this.initialize();
 
@@ -248,15 +248,16 @@ export class UserManager {
       dateCreated: new Date().toISOString(),
       lastLogin: '',
       preferences: this.getDefaultPreferences(type),
-      restrictions: type === 'child' ? this.getDefaultChildRestrictions() : undefined,
-      stats: this.getDefaultStats()
+      restrictions:
+        type === 'child' ? this.getDefaultChildRestrictions() : undefined,
+      stats: this.getDefaultStats(),
     };
 
     // Sauvegarder
     await this.saveUser(user);
-    
+
     console.log(`👤 User created: ${name} (${type})`);
-    return { ...user, pin: '' }; // Ne pas retourner le PIN hashé
+    return {...user, pin: ''}; // Ne pas retourner le PIN hashé
   }
 
   /**
@@ -268,39 +269,38 @@ export class UserManager {
     try {
       const user = this.users.get(userId);
       if (!user) {
-        return { success: false, error: 'Utilisateur non trouvé' };
+        return {success: false, error: 'Utilisateur non trouvé'};
       }
 
       // Vérifier restrictions horaires
       if (!this.isAccessAllowed(user)) {
-        return { success: false, error: 'Accès non autorisé à cette heure' };
+        return {success: false, error: 'Accès non autorisé à cette heure'};
       }
 
       // Vérifier PIN
       const pinValid = await PinHashService.verifyPin(pin, user.pin);
       if (!pinValid) {
-        return { success: false, error: 'PIN incorrect' };
+        return {success: false, error: 'PIN incorrect'};
       }
 
       // Créer session
       const session = await this.createSession(user);
-      
+
       // Mettre à jour stats utilisateur
       user.lastLogin = new Date().toISOString();
       user.stats.sessionsCount++;
       await this.saveUser(user);
 
       console.log(`🔐 User authenticated: ${user.name}`);
-      
+
       return {
         success: true,
-        user: { ...user, pin: '' }, // Masquer PIN
-        session
+        user: {...user, pin: ''}, // Masquer PIN
+        session,
       };
-
     } catch (error) {
       console.error('Authentication failed:', error);
-      return { success: false, error: 'Erreur d\'authentification' };
+      return {success: false, error: "Erreur d'authentification"};
     }
   }
 
@@ -310,7 +310,7 @@ export class UserManager {
   async logout(userId?: string): Promise<boolean> {
     try {
       const targetUserId = userId || this.currentSession?.userId;
-      if (!targetUserId) return false;
+      if (!targetUserId) {return false;}
 
       // Terminer session
       const session = this.sessions.get(targetUserId);
@@ -325,7 +325,7 @@ export class UserManager {
       }
 
       await this.saveActiveSessions();
-      
+
       console.log(`👋 User logged out: ${targetUserId}`);
       return true;
     } catch (error) {
@@ -343,7 +343,7 @@ export class UserManager {
     }
 
     const user = this.users.get(this.currentSession.userId);
-    return user ? { ...user, pin: '' } : null;
+    return user ? {...user, pin: ''} : null;
   }
 
   /**
@@ -351,10 +351,10 @@ export class UserManager {
    */
   async getAllUsers(): Promise<User[]> {
     await this.initialize();
-    
+
     return Array.from(this.users.values()).map(user => ({
       ...user,
-      pin: '' // Masquer PINs
+      pin: '', // Masquer PINs
     }));
   }
 
@@ -376,15 +376,15 @@ export class UserManager {
       }
 
       // Appliquer mises à jour
-      const updatedUser = { ...user, ...updates };
-      
+      const updatedUser = {...user, ...updates};
+
       // Validation
       if (updatedUser.name && updatedUser.name.trim().length < 2) {
         throw new Error('Le nom doit contenir au moins 2 caractères');
       }
 
       await this.saveUser(updatedUser);
-      
+
       console.log(`📝 User updated: ${updatedUser.name}`);
       return true;
     } catch (error) {
@@ -401,12 +401,13 @@ export class UserManager {
 
     try {
       const user = this.users.get(userId);
-      if (!user) return false;
+      if (!user) {return false;}
 
       // Vérifier qu'il reste au moins un admin
       if (user.type === 'admin') {
-        const adminCount = Array.from(this.users.values())
-          .filter(u => u.type === 'admin').length;
+        const adminCount = Array.from(this.users.values()).filter(
+          u => u.type === 'admin',
+        ).length;
         if (adminCount <= 1) {
           throw new Error('Impossible de supprimer le dernier administrateur');
         }
@@ -415,13 +416,13 @@ export class UserManager {
       // Supprimer utilisateur
       this.users.delete(userId);
       await this.storage.delete(`user_${userId}`);
-      
+
       // Terminer sessions actives
       await this.logout(userId);
-      
+
       // Mettre à jour index
       await this.updateUserIndex();
-      
+
       console.log(`🗑️ User deleted: ${user.name}`);
       return true;
     } catch (error) {
@@ -435,15 +436,15 @@ export class UserManager {
    */
   async addToFavorites(userId: string, channel: Channel): Promise<boolean> {
     try {
-      const favorites = await this.storage.get(`favorites_${userId}`) || [];
-      
+      const favorites = (await this.storage.get(`favorites_${userId}`)) || [];
+
       // Éviter doublons
       const exists = favorites.find((fav: Channel) => fav.id === channel.id);
-      if (exists) return true;
+      if (exists) {return true;}
 
       favorites.push(channel);
       await this.storage.set(`favorites_${userId}`, favorites);
-      
+
       // Mettre à jour stats utilisateur
       const user = this.users.get(userId);
       if (user) {
@@ -463,7 +464,7 @@ export class UserManager {
    */
   async getFavorites(userId: string): Promise<Channel[]> {
     try {
-      return await this.storage.get(`favorites_${userId}`) || [];
+      return (await this.storage.get(`favorites_${userId}`)) || [];
     } catch (error) {
       console.error('Get favorites failed:', error);
       return [];
@@ -475,29 +476,32 @@ export class UserManager {
    */
   async addToHistory(userId: string, channel: Channel): Promise<boolean> {
     try {
-      const history = await this.storage.get(`history_${userId}`) || [];
-      
+      const history = (await this.storage.get(`history_${userId}`)) || [];
+
       // Supprimer si déjà présent
-      const filtered = history.filter((item: any) => item.channel.id !== channel.id);
-      
+      const filtered = history.filter(
+        (item: any) => item.channel.id !== channel.id,
+      );
+
       // Ajouter en début
       filtered.unshift({
         channel,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
-      
+
       // Limiter taille
       const user = this.users.get(userId);
       const limit = user?.preferences.recentChannelsLimit || 20;
       const trimmed = filtered.slice(0, limit);
-      
+
       await this.storage.set(`history_${userId}`, trimmed);
-      
+
       // Mettre à jour stats
       if (user) {
         user.stats.lastChannelWatched = channel.id;
         const category = channel.category || 'Unknown';
-        user.stats.topCategories[category] = (user.stats.topCategories[category] || 0) + 1;
+        user.stats.topCategories[category] =
+          (user.stats.topCategories[category] || 0) + 1;
         await this.saveUser(user);
       }
 
@@ -513,7 +517,7 @@ export class UserManager {
    */
   async getHistory(userId: string, limit?: number): Promise<any[]> {
     try {
-      const history = await this.storage.get(`history_${userId}`) || [];
+      const history = (await this.storage.get(`history_${userId}`)) || [];
       return limit ? history.slice(0, limit) : history;
     } catch (error) {
       console.error('Get history failed:', error);
@@ -526,7 +530,7 @@ export class UserManager {
    */
   getStats(): UserManagerStats {
     this.updateStats();
-    return { ...this.stats };
+    return {...this.stats};
   }
 
   /**
@@ -535,7 +539,7 @@ export class UserManager {
 
   private async createDefaultAdminUser(): Promise<void> {
     console.log('👤 Creating default admin user');
-    
+
     // Créer directement sans passer par createUser() pour éviter la récursion
     const userId = this.generateUserId();
     const hashedPin = await PinHashService.hashPin('0000');
@@ -550,7 +554,7 @@ export class UserManager {
       lastLogin: '',
       preferences: this.getDefaultPreferences('admin'),
       restrictions: undefined,
-      stats: this.getDefaultStats()
+      stats: this.getDefaultStats(),
     };
 
     // Sauvegarder directement
@@ -563,38 +567,44 @@ export class UserManager {
       userId: user.id,
       startTime: Date.now(),
       lastActivity: Date.now(),
-      isActive: true
+      isActive: true,
     };
 
     this.sessions.set(user.id, session);
     this.currentSession = session;
-    
+
     await this.saveActiveSessions();
-    
+
     return session;
   }
 
   private isSessionValid(session: Session): boolean {
-    if (!session.isActive) return false;
-    
+    if (!session.isActive) {return false;}
+
     // Session expire après 8 heures d'inactivité
     const maxIdleTime = 8 * 60 * 60 * 1000; // 8h en ms
     const idleTime = Date.now() - session.lastActivity;
-    
+
     return idleTime < maxIdleTime;
   }
 
   private isAccessAllowed(user: User): boolean {
-    if (user.type === 'admin') return true;
-    if (!user.restrictions?.timeRestrictions) return true;
+    if (user.type === 'admin') {return true;}
+    if (!user.restrictions?.timeRestrictions) {return true;}
 
     const now = new Date();
     const currentDay = now.getDay();
-    const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+    const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now
+      .getMinutes()
+      .toString()
+      .padStart(2, '0')}`;
 
     for (const restriction of user.restrictions.timeRestrictions) {
       if (restriction.dayOfWeek === currentDay) {
-        if (currentTime >= restriction.startTime && currentTime <= restriction.endTime) {
+        if (
+          currentTime >= restriction.startTime &&
+          currentTime <= restriction.endTime
+        ) {
           return true;
         }
       }
@@ -615,8 +625,9 @@ export class UserManager {
   }
 
   private async saveActiveSessions(): Promise<void> {
-    const activeSessions = Array.from(this.sessions.values())
-      .filter(session => session.isActive);
+    const activeSessions = Array.from(this.sessions.values()).filter(
+      session => session.isActive,
+    );
     await this.storage.set('active_sessions', activeSessions);
   }
 
@@ -624,7 +635,9 @@ export class UserManager {
     return `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  private getDefaultPreferences(type: 'admin' | 'standard' | 'child'): UserPreferences {
+  private getDefaultPreferences(
+    type: 'admin' | 'standard' | 'child',
+  ): UserPreferences {
     return {
       theme: 'dark',
       language: 'fr',
@@ -632,7 +645,7 @@ export class UserManager {
       defaultQuality: 'auto',
       favoriteCategories: [],
       recentChannelsLimit: type === 'child' ? 10 : 20,
-      parentalPinRequired: type === 'child'
+      parentalPinRequired: type === 'child',
     };
   }
 
@@ -642,16 +655,16 @@ export class UserManager {
       maxContentRating: 'PG-13',
       timeRestrictions: [
         // Accès limité en semaine (après école)
-        { dayOfWeek: 1, startTime: '16:00', endTime: '20:00' }, // Lundi
-        { dayOfWeek: 2, startTime: '16:00', endTime: '20:00' }, // Mardi
-        { dayOfWeek: 3, startTime: '16:00', endTime: '20:00' }, // Mercredi
-        { dayOfWeek: 4, startTime: '16:00', endTime: '20:00' }, // Jeudi
-        { dayOfWeek: 5, startTime: '16:00', endTime: '20:00' }, // Vendredi
+        {dayOfWeek: 1, startTime: '16:00', endTime: '20:00'}, // Lundi
+        {dayOfWeek: 2, startTime: '16:00', endTime: '20:00'}, // Mardi
+        {dayOfWeek: 3, startTime: '16:00', endTime: '20:00'}, // Mercredi
+        {dayOfWeek: 4, startTime: '16:00', endTime: '20:00'}, // Jeudi
+        {dayOfWeek: 5, startTime: '16:00', endTime: '20:00'}, // Vendredi
         // Weekend plus permissif
-        { dayOfWeek: 6, startTime: '08:00', endTime: '21:00' }, // Samedi
-        { dayOfWeek: 0, startTime: '08:00', endTime: '20:00' }  // Dimanche
+        {dayOfWeek: 6, startTime: '08:00', endTime: '21:00'}, // Samedi
+        {dayOfWeek: 0, startTime: '08:00', endTime: '20:00'}, // Dimanche
       ],
-      sessionTimeLimit: 120 // 2 heures max
+      sessionTimeLimit: 120, // 2 heures max
     };
   }
 
@@ -660,19 +673,23 @@ export class UserManager {
       totalWatchTime: 0,
       favoriteChannels: 0,
       sessionsCount: 0,
-      topCategories: {}
+      topCategories: {},
     };
   }
 
   private updateStats(): void {
     this.stats.totalUsers = this.users.size;
     this.stats.activeUsers = this.sessions.size;
-    this.stats.adminUsers = Array.from(this.users.values())
-      .filter(u => u.type === 'admin').length;
-    this.stats.childUsers = Array.from(this.users.values())
-      .filter(u => u.type === 'child').length;
-    this.stats.totalSessions = Array.from(this.users.values())
-      .reduce((total, user) => total + user.stats.sessionsCount, 0);
+    this.stats.adminUsers = Array.from(this.users.values()).filter(
+      u => u.type === 'admin',
+    ).length;
+    this.stats.childUsers = Array.from(this.users.values()).filter(
+      u => u.type === 'child',
+    ).length;
+    this.stats.totalSessions = Array.from(this.users.values()).reduce(
+      (total, user) => total + user.stats.sessionsCount,
+      0,
+    );
   }
 
   private resetStats(): void {
@@ -682,7 +699,7 @@ export class UserManager {
       adminUsers: 0,
       childUsers: 0,
       totalSessions: 0,
-      averageSessionTime: 0
+      averageSessionTime: 0,
     };
   }
 
@@ -694,7 +711,7 @@ export class UserManager {
     for (const userId of this.sessions.keys()) {
       await this.logout(userId);
     }
-    
+
     this.users.clear();
     this.sessions.clear();
     this.currentSession = null;

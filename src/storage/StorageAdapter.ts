@@ -53,7 +53,7 @@ class MemoryLRUCache {
     if (this.cache.size >= this.maxSize && !this.cache.has(key)) {
       this.evictLRU();
     }
-    
+
     this.cache.set(key, value);
     this.accessOrder.set(key, ++this.accessCounter);
   }
@@ -61,14 +61,14 @@ class MemoryLRUCache {
   private evictLRU(): void {
     let lruKey = '';
     let lruAccess = Infinity;
-    
+
     for (const [key, access] of this.accessOrder) {
       if (access < lruAccess) {
         lruAccess = access;
         lruKey = key;
       }
     }
-    
+
     if (lruKey) {
       this.cache.delete(lruKey);
       this.accessOrder.delete(lruKey);
@@ -114,11 +114,11 @@ export class StorageAdapter {
       l1MaxSizeMB: 50,
       l2MaxSizeMB: 200,
       l3MaxSizeMB: 500,
-      ...config
+      ...config,
     };
 
     this.l1Cache = new MemoryLRUCache(
-      Math.floor((this.config.l1MaxSizeMB * 1024 * 1024) / 2048) // ~2KB per entry
+      Math.floor((this.config.l1MaxSizeMB * 1024 * 1024) / 2048), // ~2KB per entry
     );
 
     this.resetStats();
@@ -157,7 +157,9 @@ export class StorageAdapter {
    * Initialiser tables SQLite
    */
   private async initializeSQLiteTables(): Promise<void> {
-    if (!this.sqliteDb) return;
+    if (!this.sqliteDb) {
+      return;
+    }
 
     try {
       // Table pour données volumineuses (playlists, etc.)
@@ -207,16 +209,19 @@ export class StorageAdapter {
         if (storedValue) {
           value = JSON.parse(storedValue);
           this.stats.l2HitRate = this.updateHitRate(this.stats.l2HitRate, true);
-          
+
           // Promouvoir en L1
           if (this.config.enableL1Cache) {
             this.l1Cache.set(key, value);
           }
-          
+
           this.updateReadTime(Date.now() - startTime);
           return value;
         } else {
-          this.stats.l2HitRate = this.updateHitRate(this.stats.l2HitRate, false);
+          this.stats.l2HitRate = this.updateHitRate(
+            this.stats.l2HitRate,
+            false,
+          );
         }
       }
 
@@ -228,7 +233,6 @@ export class StorageAdapter {
 
       this.updateReadTime(Date.now() - startTime);
       return null;
-
     } catch (error) {
       console.error('Storage get error:', error);
       this.updateReadTime(Date.now() - startTime);
@@ -253,35 +257,49 @@ export class StorageAdapter {
       // 🔧 CORRECTION CRITIQUE: Éviter stockage de gros datasets pour éviter SQLITE_FULL
       if (sizeMB > 5) {
         // > 5MB: Stocker uniquement en mémoire L1 (éviter AsyncStorage plein)
-        console.log(`⚠️ Very large dataset (${sizeMB.toFixed(1)}MB), storing in memory only`);
+        console.log(
+          `⚠️ Very large dataset (${sizeMB.toFixed(
+            1,
+          )}MB), storing in memory only`,
+        );
         if (this.config.enableL1Cache) {
           this.l1Cache.set(key, value);
         }
-        console.log(`💾 Large dataset stored in memory cache only`);
+        console.log('💾 Large dataset stored in memory cache only');
       } else if (sizeMB > 2) {
         // 2-5MB: L1 + nettoyage AsyncStorage avant stockage
-        console.log(`📦 Large dataset (${sizeMB.toFixed(1)}MB), cleaning old data first`);
+        console.log(
+          `📦 Large dataset (${sizeMB.toFixed(1)}MB), cleaning old data first`,
+        );
         await this.cleanOldData(); // Nettoyer avant stockage
         await this.setL1Only(key, value); // L1 uniquement pour éviter overflow
       } else if (sizeMB > 0.5) {
         // 500KB-2MB: L1 + L2 avec vérification espace
-        console.log(`📦 Medium dataset (${sizeMB.toFixed(1)}MB), storing in L1+L2`);
+        console.log(
+          `📦 Medium dataset (${sizeMB.toFixed(1)}MB), storing in L1+L2`,
+        );
         await this.setL1AndL2(key, value, serializedValue);
       } else {
         // < 500KB: L1 + L2 normal
-        console.log(`📦 Small dataset (${sizeMB.toFixed(1)}MB), storing in L1+L2`);
+        console.log(
+          `📦 Small dataset (${sizeMB.toFixed(1)}MB), storing in L1+L2`,
+        );
         await this.setL1AndL2(key, value, serializedValue);
       }
 
       this.updateWriteTime(Date.now() - startTime);
       return true;
-
     } catch (error) {
       console.error('Storage set error:', error);
-      
+
       // 🔧 FALLBACK: En cas d'erreur, stocker uniquement en mémoire
-      if (error.message?.includes('SQLITE_FULL') || error.message?.includes('full')) {
-        console.log('🚨 Storage full detected, falling back to memory-only storage');
+      if (
+        error.message?.includes('SQLITE_FULL') ||
+        error.message?.includes('full')
+      ) {
+        console.log(
+          '🚨 Storage full detected, falling back to memory-only storage',
+        );
         try {
           if (this.config.enableL1Cache) {
             this.l1Cache.set(key, value);
@@ -292,7 +310,7 @@ export class StorageAdapter {
           console.error('❌ Even memory fallback failed:', fallbackError);
         }
       }
-      
+
       this.updateWriteTime(Date.now() - startTime);
       return false;
     }
@@ -301,7 +319,11 @@ export class StorageAdapter {
   /**
    * Stockage L1 + L2 (petites données)
    */
-  private async setL1AndL2(key: string, value: any, serializedValue: string): Promise<void> {
+  private async setL1AndL2(
+    key: string,
+    value: any,
+    serializedValue: string,
+  ): Promise<void> {
     // L1 Cache
     if (this.config.enableL1Cache) {
       this.l1Cache.set(key, value);
@@ -317,7 +339,10 @@ export class StorageAdapter {
   /**
    * Stockage L2 + L3 (données moyennes)
    */
-  private async setL2AndL3(key: string, serializedValue: string): Promise<void> {
+  private async setL2AndL3(
+    key: string,
+    serializedValue: string,
+  ): Promise<void> {
     // L2 MMKV/AsyncStorage
     if (this.config.enableL2MMKV) {
       await AsyncStorage.setItem(key, serializedValue);
@@ -345,10 +370,10 @@ export class StorageAdapter {
     // L3 SQLite uniquement
     // TODO: Implémenter quand SQLite sera configuré
     console.log('L3 storage not implemented yet, falling back to memory-only');
-    
+
     // 🔧 CORRECTION: Ne pas utiliser AsyncStorage pour les gros datasets
     // await AsyncStorage.setItem(key, serializedValue); // DÉSACTIVÉ pour éviter SQLITE_FULL
-    
+
     // Fallback vers mémoire uniquement
     try {
       const value = JSON.parse(serializedValue);
@@ -367,7 +392,7 @@ export class StorageAdapter {
   private async cleanOldData(): Promise<void> {
     try {
       console.log('🧹 Cleaning old data to free storage space...');
-      
+
       // Nettoyer le cache L1 en gardant seulement les 100 éléments les plus récents
       if (this.l1Cache.size > 100) {
         const currentSize = this.l1Cache.size;
@@ -375,10 +400,10 @@ export class StorageAdapter {
         this.l1Cache.clear();
         console.log(`🧹 Cleared L1 cache: ${currentSize} items removed`);
       }
-      
+
       // Optionnel: Nettoyer AsyncStorage des anciens playlists
       // Note: Ceci nécessiterait un système de tracking des clés par date
-      
+
       console.log('✅ Storage cleanup completed');
     } catch (error) {
       console.error('Storage cleanup failed:', error);
@@ -436,7 +461,7 @@ export class StorageAdapter {
   /**
    * Batch operations pour optimiser les écritures multiples
    */
-  async setBatch(items: Array<{key: string, value: any}>): Promise<boolean> {
+  async setBatch(items: Array<{key: string; value: any}>): Promise<boolean> {
     try {
       const batchPromises = items.map(item => this.set(item.key, item.value));
       await Promise.all(batchPromises);
@@ -461,7 +486,8 @@ export class StorageAdapter {
    */
   private updateReadTime(time: number): void {
     const alpha = 0.1;
-    this.stats.averageReadTime = this.stats.averageReadTime * (1 - alpha) + time * alpha;
+    this.stats.averageReadTime =
+      this.stats.averageReadTime * (1 - alpha) + time * alpha;
   }
 
   /**
@@ -469,7 +495,8 @@ export class StorageAdapter {
    */
   private updateWriteTime(time: number): void {
     const alpha = 0.1;
-    this.stats.averageWriteTime = this.stats.averageWriteTime * (1 - alpha) + time * alpha;
+    this.stats.averageWriteTime =
+      this.stats.averageWriteTime * (1 - alpha) + time * alpha;
   }
 
   /**
@@ -483,7 +510,7 @@ export class StorageAdapter {
       totalOperations: 0,
       averageReadTime: 0,
       averageWriteTime: 0,
-      memoryUsageMB: 0
+      memoryUsageMB: 0,
     };
   }
 
@@ -492,13 +519,13 @@ export class StorageAdapter {
    */
   getStats(): StorageStats {
     this.stats.memoryUsageMB = this.l1Cache.getMemoryUsageMB();
-    return { ...this.stats };
+    return {...this.stats};
   }
 
   /**
    * Configuration adaptative selon device
    */
-  adaptToDevice(deviceInfo: { totalMemoryMB: number, isLowEnd: boolean }): void {
+  adaptToDevice(deviceInfo: {totalMemoryMB: number; isLowEnd: boolean}): void {
     if (deviceInfo.isLowEnd) {
       console.log('📱 Low-end device detected, reducing cache sizes');
       this.config.l1MaxSizeMB = Math.min(25, this.config.l1MaxSizeMB);

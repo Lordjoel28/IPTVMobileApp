@@ -4,9 +4,13 @@
  * Performance cible : IPTV Smarters Pro / TiviMate level
  */
 
-import { streamingParser, StreamingParseOptions, ParseProgress } from './StreamingM3UParser';
-import { networkService } from '../NetworkService';
-import type { Channel } from '../../types';
+import {
+  streamingParser,
+  StreamingParseOptions,
+  ParseProgress,
+} from './StreamingM3UParser';
+import {networkService} from '../NetworkService';
+import type {Channel} from '../../types';
 
 export interface OptimizedImportResult {
   success: boolean;
@@ -35,68 +39,82 @@ export class OptimizedPlaylistService {
     url: string,
     playlistName: string,
     callbacks?: ImportProgressCallback,
-    options: StreamingParseOptions = {}
+    options: StreamingParseOptions = {},
   ): Promise<OptimizedImportResult> {
-
     const startTime = Date.now();
     this.abortController = new AbortController();
 
     try {
       // 1. 📥 DOWNLOAD avec NetworkService robuste
-      callbacks?.onStatusChange('Téléchargement playlist...', `Connexion à ${url}`);
-      
+      callbacks?.onStatusChange(
+        'Téléchargement playlist...',
+        `Connexion à ${url}`,
+
       const content = await networkService.fetchText(url, {
-        timeout: options.maxMemoryMB && options.maxMemoryMB > 100 ? 90000 : 60000,
-        retryAttempts: 3
+        timeout:
+          options.maxMemoryMB && options.maxMemoryMB > 100 ? 90000 : 60000,
+        retryAttempts: 3,
       });
 
       const contentSizeMB = Math.round(content.length / 1024 / 1024);
       console.log(`📥 Downloaded ${contentSizeMB}MB M3U content`);
 
-      callbacks?.onStatusChange('Traitement playlist...', `${contentSizeMB}MB téléchargés`);
+      callbacks?.onStatusChange(
+        'Traitement playlist...',
+        `${contentSizeMB}MB téléchargés`,
+      );
 
       // 2. 🚀 PARSING STREAMING avec progress callbacks
       const parseResult = await streamingParser.parseStreamAsync(
         content,
         {
-          chunkSize: 15000,        // Plus gros chunks pour 100K+
-          yieldInterval: 8000,     // Yield moins fréquent
-          maxMemoryMB: 200,        // Plus de mémoire autorisée
+          chunkSize: 15000, // Plus gros chunks pour 100K+
+          yieldInterval: 8000, // Yield moins fréquent
+          maxMemoryMB: 200, // Plus de mémoire autorisée
           enableSQLiteStream: true, // Stream vers SQLite
-          ...options
+          ...options,
         },
-        (progress) => {
+        progress => {
           // Callback progress vers UI
           callbacks?.onProgress(progress);
-          
+
           // Status updates détaillés
           if (progress.channelsParsed > 0) {
-            const eta = progress.estimatedTimeLeft > 0 ? ` (${progress.estimatedTimeLeft}s restantes)` : '';
+            const eta =
+              progress.estimatedTimeLeft > 0
+                ? ` (${progress.estimatedTimeLeft}s restantes)`
+                : '';
             callbacks?.onStatusChange(
               `Traitement... ${progress.channelsParsed} chaînes`,
-              `${Math.round(progress.parseSpeed)} ch/s${eta}`
+              `${Math.round(progress.parseSpeed)} ch/s${eta}`,
             );
           }
-        }
+        },
       );
 
       // 3. 💾 STOCKAGE optimisé avec ID unique
-      const playlistId = `opt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      
+      const playlistId = `opt_${Date.now()}_${Math.random()
+        .toString(36)
+        .substr(2, 9)}`;
+
       // TODO: Intégrer avec PlaylistStore pour stocker résultats
       // await this.storeOptimizedResults(playlistId, playlistName, parseResult);
 
       const totalTime = Date.now() - startTime;
-      
-      console.log(`🎉 OPTIMIZED IMPORT SUCCESS`);
+
+      console.log('🎉 OPTIMIZED IMPORT SUCCESS');
       console.log(`├─ Channels: ${parseResult.totalChannels}`);
-      console.log(`├─ Time: ${totalTime}ms (${parseResult.avgChannelsPerSecond} ch/s)`);
+      console.log(
+        `├─ Time: ${totalTime}ms (${parseResult.avgChannelsPerSecond} ch/s)`,
+      );
       console.log(`├─ Memory Peak: ${parseResult.memoryPeakMB}MB`);
       console.log(`└─ Errors: ${parseResult.errors.length}`);
 
       callbacks?.onStatusChange(
-        `✅ Import terminé`,
-        `${parseResult.totalChannels} chaînes en ${Math.round(totalTime/1000)}s`
+        '✅ Import terminé',
+        `${parseResult.totalChannels} chaînes en ${Math.round(
+          totalTime / 1000,
+        )}s`,
       );
 
       return {
@@ -107,15 +125,14 @@ export class OptimizedPlaylistService {
         avgSpeed: parseResult.avgChannelsPerSecond,
         memoryPeakMB: parseResult.memoryPeakMB,
         errors: parseResult.errors,
-        warnings: parseResult.warnings
+        warnings: parseResult.warnings,
       };
-
     } catch (error) {
       console.error('❌ Optimized import failed:', error);
-      
+
       callbacks?.onStatusChange(
         '❌ Erreur import',
-        error instanceof Error ? error.message : 'Erreur inconnue'
+        error instanceof Error ? error.message : 'Erreur inconnue',
       );
 
       return {
@@ -126,7 +143,7 @@ export class OptimizedPlaylistService {
         avgSpeed: 0,
         memoryPeakMB: 0,
         errors: [error instanceof Error ? error.message : 'Erreur inconnue'],
-        warnings: []
+        warnings: [],
       };
     }
   }
@@ -147,7 +164,7 @@ export class OptimizedPlaylistService {
    */
   async benchmarkParser(testUrls: string[] = []) {
     const defaultTestUrls = [
-      'https://iptv-org.github.io/iptv/languages/fra.m3u',  // ~500 chaînes
+      'https://iptv-org.github.io/iptv/languages/fra.m3u', // ~500 chaînes
       // Ajouter URLs tests plus volumineux quand disponibles
     ];
 
@@ -156,30 +173,31 @@ export class OptimizedPlaylistService {
 
     for (const url of urls) {
       console.log(`🧪 Benchmarking: ${url}`);
-      
+
       try {
         const startTime = Date.now();
         const result = await this.importM3UOptimized(url, 'Benchmark Test', {
-          onProgress: (progress) => {
-            console.log(`Progress: ${progress.progress}% (${progress.parseSpeed} ch/s)`);
+          onProgress: progress => {
+            console.log(
+              `Progress: ${progress.progress}% (${progress.parseSpeed} ch/s)`,
+            );
           },
           onStatusChange: (status, details) => {
             console.log(`Status: ${status} - ${details}`);
-          }
+          },
         });
 
         results.push({
           url,
           ...result,
-          totalTimeMs: Date.now() - startTime
+          totalTimeMs: Date.now() - startTime,
         });
-
       } catch (error) {
         console.error(`❌ Benchmark failed for ${url}:`, error);
         results.push({
           url,
           success: false,
-          error: error.message
+          error: error.message,
         });
       }
     }
@@ -189,7 +207,9 @@ export class OptimizedPlaylistService {
       if (result.success) {
         console.log(`✅ ${result.url}`);
         console.log(`   Channels: ${result.totalChannels}`);
-        console.log(`   Time: ${result.totalTimeMs}ms (${result.avgSpeed} ch/s)`);
+        console.log(
+          `   Time: ${result.totalTimeMs}ms (${result.avgSpeed} ch/s)`,
+        );
         console.log(`   Memory: ${result.memoryPeakMB}MB`);
       } else {
         console.log(`❌ ${result.url} - ${result.error}`);

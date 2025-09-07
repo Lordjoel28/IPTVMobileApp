@@ -3,8 +3,8 @@
  * Remplace les contextes utilisateur pour la gestion d'état
  */
 
-import { create } from 'zustand';
-import type { User } from '../types';
+import {create} from 'zustand';
+import type {User} from '../types';
 
 export interface UserStoreState {
   // État
@@ -36,49 +36,58 @@ export const useUserStore = create<UserStoreState>((set, get) => ({
   error: null,
 
   // Actions
-  setUsers: (users) => set({ users }),
-  
-  setCurrentUser: (user) => set({ 
-    currentUser: user,
-    isAuthenticated: user !== null 
-  }),
-  
-  addUser: (user) => set((state) => ({
-    users: [...state.users, user]
-  })),
-  
-  updateUser: (id, updates) => set((state) => ({
-    users: state.users.map(u => u.id === id ? { ...u, ...updates } : u),
-    currentUser: state.currentUser?.id === id 
-      ? { ...state.currentUser, ...updates } 
-      : state.currentUser
-  })),
-  
-  removeUser: (id) => set((state) => ({
-    users: state.users.filter(u => u.id !== id),
-    currentUser: state.currentUser?.id === id ? null : state.currentUser,
-    isAuthenticated: state.currentUser?.id === id ? false : state.isAuthenticated
-  })),
-  
-  login: (user) => set({ 
-    currentUser: user, 
-    isAuthenticated: true,
-    error: null 
-  }),
-  
-  logout: () => set({ 
-    currentUser: null, 
-    isAuthenticated: false 
-  }),
-  
-  setLoading: (loading) => set({ loading }),
-  setError: (error) => set({ error }),
-  
-  reset: () => set({
-    users: [],
-    currentUser: null,
-    isAuthenticated: false,
-    loading: false,
-    error: null
-  })
+  setUsers: users => set({users}),
+
+  setCurrentUser: user =>
+    set({
+      currentUser: user,
+      isAuthenticated: user !== null,
+    }),
+
+  addUser: user =>
+    set(state => ({
+      users: [...state.users, user],
+    })),
+
+  updateUser: (id, updates) =>
+    set(state => ({
+      users: state.users.map(u => (u.id === id ? {...u, ...updates} : u)),
+      currentUser:
+        state.currentUser?.id === id
+          ? {...state.currentUser, ...updates}
+          : state.currentUser,
+    })),
+
+  removeUser: id =>
+    set(state => ({
+      users: state.users.filter(u => u.id !== id),
+      currentUser: state.currentUser?.id === id ? null : state.currentUser,
+      isAuthenticated:
+        state.currentUser?.id === id ? false : state.isAuthenticated,
+    })),
+
+  login: user =>
+    set({
+      currentUser: user,
+      isAuthenticated: true,
+      error: null,
+    }),
+
+  logout: () =>
+    set({
+      currentUser: null,
+      isAuthenticated: false,
+    }),
+
+  setLoading: loading => set({loading}),
+  setError: error => set({error}),
+
+  reset: () =>
+    set({
+      users: [],
+      currentUser: null,
+      isAuthenticated: false,
+      loading: false,
+      error: null,
+    }),
 }));
