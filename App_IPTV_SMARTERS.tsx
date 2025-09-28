@@ -14,7 +14,8 @@ import {
   Image,
   Modal,
   Alert,
-} from 'react-native';
+}from 'react-native';
+import SystemNavigationBar from 'react-native-system-navigation-bar';
 // Solution native MainActivity.java pour immersif
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -27,17 +28,24 @@ import XtreamCodeModal from './src/components/XtreamCodeModal';
 import M3UUrlModal from './src/components/M3UUrlModal';
 import ProfilesModal from './src/components/ProfilesModal';
 // import { ServiceTest } from './src/components/ServiceTest'; // Removed for production
+
+// 🔧 DEBUG: Script pour vider le cache EPG (test 1er démarrage TiviMate)
+import './clearEPGCache';
 import type {Channel} from './src/types';
 // import { APP_VERSION } from './src/version'; // Removed for production
-import type {SimpleRootStackParamList} from './AppWithNavigation';
 // AppContext removed - using UIStore instead
 import {useUIStore} from './src/stores/UIStore';
+import {useGlobalImmersion} from './src/hooks/useGlobalImmersion';
+import { useStatusBar } from './src/hooks/useStatusBar';
 
 // Import des nouveaux services migrés
 import IPTVService from './src/services/IPTVService';
 
 // 🏗️ Import du nouveau système d'architecture DI
 import {initializeServiceArchitecture, ServiceMigration} from './src/core';
+
+// 🎯 Import EPGCacheManager pour initialisation au démarrage
+import {EPGCacheManager} from './src/services/epg/EPGCacheManager';
 
 // --- Catalogue des icônes PNG ---
 const iconMap = {
@@ -64,10 +72,21 @@ const bottomRowCards = [
 ];
 
 // Type pour navigation
-type NavigationProp = StackNavigationProp<SimpleRootStackParamList>;
+type NavigationProp = StackNavigationProp<RootStackParamList>;
 
 const App: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
+
+  // Hook global pour immersion quand PiP présent
+  useGlobalImmersion();
+
+  // StatusBar normale pour l'écran d'accueil (sera surchargée par les écrans immersifs)
+  const { setNormal } = useStatusBar();
+
+  useEffect(() => {
+    setNormal('App_HomeScreen');
+  }, [setNormal]);
+
   // Replaced AppContext with UIStore
   const {
     showLoading,
@@ -77,9 +96,14 @@ const App: React.FC = () => {
     registerModalCloser,
   } = useUIStore();
 
-  const [currentTime, setCurrentTime] = useState(new Date());
   const [showVideoPlayer, setShowVideoPlayer] = useState(false);
   const [currentChannel, setCurrentChannel] = useState<Channel | null>(null);
+  // États pour lecteur persistant (nouvelles fonctionnalités)
+  const [showPersistentPlayer, setShowPersistentPlayer] = useState(false);
+  const [isPersistentFullscreen, setIsPersistentFullscreen] = useState(false);
+  const [persistentChannel, setPersistentChannel] = useState<Channel | null>(
+    null,
+  );
   const [showConnectionModal, setShowConnectionModal] = useState(false);
   const [showXtreamModal, setShowXtreamModal] = useState(false);
   const [showM3UModal, setShowM3UModal] = useState(false);
@@ -105,15 +129,22 @@ const App: React.FC = () => {
     category: 'Test',
   };
 
+  // Test channel for persistent player
+  const testPersistentChannel: Channel = {
+    id: '2',
+    name: '🚀 Test Lecteur Persistant',
+    url: 'https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8',
+    category: 'Test',
+  };
+
   useEffect(() => {
-    // Mode immersif avec react-native-edge-to-edge (solution moderne 2025)
+    // Mode immersif géré par StatusBarManager centralisé
 
     Animated.timing(fadeAnim, {
       toValue: 1,
       duration: 600,
       useNativeDriver: true,
     }).start();
-    const timeInterval = setInterval(() => setCurrentTime(new Date()), 1000);
 
     // Enregistrer la fonction de fermeture du modal de connexion
     registerModalCloser(() => setShowConnectionModal(false));
@@ -171,7 +202,6 @@ const App: React.FC = () => {
           users: stats.users.totalUsers,
           playlists: stats.playlists.totalPlaylists,
         });
-
       } catch (error) {
         console.log(
           '⚠️ Services pas encore complètement prêts:',
@@ -184,11 +214,69 @@ const App: React.FC = () => {
     // Initialise d'abord la nouvelle architecture DI
     initializeDIArchitecture();
 
+    // 🚀 TiviMate Style : Pas d'auto-initialisation EPG
+    // EPG sera chargé progressivement seulement quand nécessaire
+    console.log('🚀 [App] Démarrage rapide - EPG chargé à la demande');
+
     // Puis les services existants
     testServices();
 
+    // 🎯 IPTV SMARTERS PRO STYLE : Restaurer la playlist active au démarrage
+    const restoreActivePlaylist = async () => {
+      try {
+        console.log('🔄 Restauration playlist active via IPTVService...');
+
+        // Récupérer l'ID de la dernière playlist sélectionnée
+        const AsyncStorage = await import('@react-native-async-storage/async-storage');
+        const lastSelectedId = await AsyncStorage.default.getItem('last_selected_playlist_id');
+
+        if (lastSelectedId) {
+          console.log('🎯 ID playlist précédemment sélectionnée:', lastSelectedId);
+
+          // Utiliser les méthodes disponibles d'IPTVService
+          const iptv = IPTVService.getInstance();
+          await iptv.initialize();
+
+          const playlists = await iptv.getAllPlaylists();
+          const targetPlaylist = playlists.find(p => p.id === lastSelectedId);
+
+          if (targetPlaylist) {
+            console.log('✅ Playlist spécifique trouvée pour restauration:', targetPlaylist.name);
+            setSelectedPlaylistId(targetPlaylist.id);
+            console.log('✅ Active playlist restored successfully');
+          } else {
+            console.log('⚠️ Playlist précédente introuvable, prendre la première disponible');
+            if (playlists.length > 0) {
+              const firstPlaylist = playlists[0];
+              setSelectedPlaylistId(firstPlaylist.id);
+              console.log('✅ Fallback playlist restored:', firstPlaylist.name);
+            }
+          }
+        } else {
+          console.log('ℹ️ Aucune playlist précédemment sélectionnée');
+
+          // Fallback : prendre la première playlist disponible
+          const iptv = IPTVService.getInstance();
+          await iptv.initialize();
+          const playlists = await iptv.getAllPlaylists();
+
+          if (playlists.length > 0) {
+            const firstPlaylist = playlists[0];
+            setSelectedPlaylistId(firstPlaylist.id);
+            console.log('✅ First available playlist restored:', firstPlaylist.name);
+          } else {
+            console.log('ℹ️ No playlist available to restore');
+          }
+        }
+      } catch (error) {
+        console.error('❌ Error restoring active playlist:', error);
+      }
+    };
+
+    // Restaurer la playlist active après initialisation des services
+    setTimeout(restoreActivePlaylist, 1000); // Délai pour s'assurer que les services sont prêts
+
     return () => {
-      clearInterval(timeInterval);
       // Pas de cleanup nécessaire avec SystemBars
     };
   }, []);
@@ -412,7 +500,6 @@ const App: React.FC = () => {
                       console.log(
                         `💾 Playlist Xtream sauvée: ${chunks.length} chunks de ${chunkSize} chaînes`,
                       );
-
                     } else {
                       // Sauvegarde normale pour petites playlists
                       await AsyncStorage.setItem(
@@ -462,7 +549,7 @@ const App: React.FC = () => {
                               handleTVCardPress();
                             }, 1000);
                           },
-                        }
+                        },
                       ],
                     );
 
@@ -528,7 +615,6 @@ const App: React.FC = () => {
               }
             }
           }
-
 
           // Si toujours pas trouvé, recherche générale dans toutes les clés
           if (!playlist) {
@@ -702,7 +788,6 @@ const App: React.FC = () => {
                   setTimeout(() => {
                     handleTVCardPress();
                   }, 1000);
-
                 } catch (repairError) {
                   console.error(
                     '❌ Erreur lors de la réparation:',
@@ -715,7 +800,7 @@ const App: React.FC = () => {
                   );
                 }
               },
-            }
+            },
           ],
         );
       } else {
@@ -733,6 +818,25 @@ const App: React.FC = () => {
     console.log('❌ Closing Video Player');
     setShowVideoPlayer(false);
     setCurrentChannel(null);
+  };
+
+  // Handlers pour lecteur persistant (nouvelles fonctionnalités)
+  const handleShowPersistentPlayer = (channel: Channel) => {
+    console.log('🎬 Starting persistent player for:', channel.name);
+    setPersistentChannel(channel);
+    setShowPersistentPlayer(true);
+  };
+
+  const handlePersistentPlayerToggleFullscreen = (isFullscreen: boolean) => {
+    console.log('🎬 Persistent player fullscreen:', isFullscreen);
+    setIsPersistentFullscreen(isFullscreen);
+  };
+
+  const handleClosePersistentPlayer = () => {
+    console.log('❌ Closing persistent player');
+    setShowPersistentPlayer(false);
+    setPersistentChannel(null);
+    setIsPersistentFullscreen(false);
   };
 
   // Handlers pour le modal de connexion
@@ -865,7 +969,6 @@ const App: React.FC = () => {
       console.log(
         `✅ Import Xtream WatermelonDB réussi: ${playlist.channelsCount} chaînes`,
       );
-
     } catch (error) {
       console.error('❌ Erreur import Xtream WatermelonDB:', error);
       hideLoading();
@@ -940,7 +1043,7 @@ const App: React.FC = () => {
           maxChannels: 25000,
           enableCache: true,
           parserMode: 'ultra',
-        }
+        },
       );
 
       // Progression parsing
@@ -1000,7 +1103,6 @@ const App: React.FC = () => {
 
         // Définir comme playlist active
         setSelectedPlaylistId(result.playlist.id);
-
       } catch (saveError) {
         console.error('❌ Erreur sauvegarde playlist:', saveError);
       }
@@ -1024,7 +1126,6 @@ const App: React.FC = () => {
         console.log('📋 Ouverture automatique du ProfilesModal');
         setShowProfilesModal(true);
       }, 1000); // Petit délai pour laisser la notification s'afficher
-
     } catch (error) {
       console.error('❌ TEST SERVICES IPTV FAILED:', error);
 
@@ -1116,7 +1217,7 @@ const App: React.FC = () => {
 
       updateLoading({
         progress: step.progress,
-        subtitle: step.subtitle, 
+        subtitle: step.subtitle,
       });
 
       // Pause plus longue sur l'étape de chargement des chaînes
@@ -1131,8 +1232,17 @@ const App: React.FC = () => {
     // Masquer chargement
     hideLoading();
 
-    // Activer la playlist
+    // Activer la playlist et sauvegarder l'ID pour persistance
     setSelectedPlaylistId(playlist.id);
+
+    // Sauvegarder l'ID de playlist active pour restauration au redémarrage
+    try {
+      const AsyncStorage = await import('@react-native-async-storage/async-storage');
+      await AsyncStorage.default.setItem('last_selected_playlist_id', playlist.id);
+      console.log('💾 ID playlist active sauvegardé:', playlist.id);
+    } catch (error) {
+      console.error('❌ Erreur sauvegarde ID playlist active:', error);
+    }
 
     // Fermer le ProfilesModal
     setShowProfilesModal(false);
@@ -1153,6 +1263,11 @@ const App: React.FC = () => {
     }, 100);
   };
 
+  const handleSettingsPress = () => {
+    console.log('⚙️ Navigation vers paramètres');
+    navigation.navigate('Settings');
+  };
+
   return (
     <LinearGradient
       colors={['#253a58', '#2d4663', '#405E87', '#E67E22']}
@@ -1160,58 +1275,10 @@ const App: React.FC = () => {
       start={{x: 0, y: 0}}
       end={{x: 1, y: 1}}
       style={styles.container}>
-      {/* Mode immersif géré par MainActivity.java */}
-      <StatusBar
-        barStyle="light-content"
-        backgroundColor="transparent"
-        translucent
-      />
+      {/* StatusBar gérée par StatusBarManager centralisé */}
 
       <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <View style={styles.logoContainer}>
-            <View style={styles.logoIcon}>
-              <Icon name="tv" size={24} color="#FFFFFF" />
-            </View>
-            <Text style={styles.logoText}>IPTV SMARTERS</Text>
-          </View>
-          <Text style={styles.timeText}>
-            {currentTime.toLocaleString('fr-FR', {
-              hour: '2-digit',
-              minute: '2-digit',
-              day: 'numeric',
-              month: 'long',
-              year: 'numeric',
-              weekday: 'short',
-            })}
-          </Text>
-        </View>
         <View style={styles.headerRight}>
-          <TouchableOpacity
-            style={styles.headerButton}
-            onPress={() => {
-              console.log('🔍 RECHERCHE PRINCIPALE!');
-              Alert.alert('DEBUG', '🔍 RECHERCHE CLIQUÉ!');
-            }}>
-            <Icon name="search" size={24} color="#FFFFFF" />
-            <Text style={styles.headerButtonText}>Main Recherche</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.headerIconButton}
-            onPress={() => {
-              console.log('📥 TÉLÉCHARGEMENTS!');
-              Alert.alert('DEBUG', '📥 TÉLÉCHARGEMENTS CLIQUÉ!');
-            }}>
-            <Icon name="download" size={24} color="#FFFFFF" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.headerIconButton}
-            onPress={() => {
-              console.log('🔔 NOTIFICATIONS!');
-              Alert.alert('DEBUG', '🔔 NOTIFICATIONS CLIQUÉ!');
-            }}>
-            <Icon name="notifications" size={24} color="#FFFFFF" />
-          </TouchableOpacity>
           <TouchableOpacity
             style={styles.headerIconButton}
             onPress={() => {
@@ -1222,34 +1289,14 @@ const App: React.FC = () => {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.headerIconButton}
-            onPress={() => {
-              console.log('📺 CAST/CHROMECAST!');
-              Alert.alert('DEBUG', 'CAST CLIQUÉ!');
-            }}>
-            <Icon name="cast" size={24} color="#FFFFFF" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.headerIconButton}
-            onPress={() => {
-              console.log('⚙️ PARAMÈTRES!');
-              Alert.alert('DEBUG', 'PARAMÈTRES CLIQUÉ!');
-            }}>
+            onPress={handleSettingsPress}>
             <Icon name="settings" size={24} color="#FFFFFF" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.headerIconButton}
-            onPress={() => {
-              console.log('🚪 DÉCONNEXION!');
-              Alert.alert('DEBUG', 'DÉCONNEXION CLIQUÉ!');
-            }}>
-            <Icon name="logout" size={24} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
       </View>
 
       <View style={styles.content}>
         <View style={styles.mainCardsSection}>
-
           <View style={styles.leftColumn}>
             <View style={{flex: 1}}>
               <TouchableOpacity
@@ -1540,16 +1587,40 @@ const App: React.FC = () => {
       />
 
       {/* Composants de test DI supprimés pour production */}
+
+      {/* VideoPlayerPersistent maintenant intégré directement dans ChannelPlayerScreen */}
     </LinearGradient>
   );
 };
 
 const styles = StyleSheet.create({
   absoluteFill: {position: 'absolute', top: 0, left: 0, right: 0, bottom: 0},
+
+  // Styles pour bouton de test lecteur persistant
+  testPersistentButton: {
+    position: 'absolute',
+    top: 120,
+    right: 20,
+    backgroundColor: 'rgba(255, 69, 0, 0.9)',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 25,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    zIndex: 999,
+  },
+  testButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
+  },
   container: {flex: 1},
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingTop: 20,

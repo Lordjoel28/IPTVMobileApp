@@ -3,7 +3,8 @@
  * Structure: Sidebar catégories + Grille chaînes + Recherche
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, {useState, useEffect, useRef} from 'react';
+import {useFocusEffect} from '@react-navigation/native';
 import {
   View,
   Text,
@@ -19,14 +20,19 @@ import {
   Alert,
   InteractionManager,
   Modal,
+  Platform,
 } from 'react-native';
+import { useImmersiveScreen } from '../hooks/useStatusBar';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import LinearGradient from 'react-native-linear-gradient';
 import ChannelCard from '../components/ChannelCard';
-import type { Category } from '../types';
+import type {Category} from '../types';
+import {usePlayerStore} from '../stores/PlayerStore';
+import {useRecentChannelsStore} from '../stores/RecentChannelsStore';
+import { useThemeColors } from '../contexts/ThemeContext';
 // import SmartImage from '../components/common/SmartImage'; // Temporairement désactivé
 
-const { width, height } = Dimensions.get('window');
+const {width, height} = Dimensions.get('window');
 
 interface Channel {
   id: string;
@@ -55,29 +61,451 @@ interface ChannelsScreenProps {
   navigation: any;
 }
 
-const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) => {
-  const { playlistId, channelsCount = 0, useWatermelonDB = false } = route.params || {};
-  
+// Fonction createStyles définie avant le composant
+const createStyles = (colors: any) => StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.background.primary,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.background.primary,
+  },
+  loadingText: {
+    color: colors.text.primary,
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  loadingSubtext: {
+    color: colors.text.secondary,
+    fontSize: 14,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+    backgroundColor: colors.surface.primary,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.ui.border,
+  },
+  backButton: {
+    padding: 8,
+  },
+  headerTitle: {
+    color: colors.text.primary,
+    fontSize: 18,
+    fontWeight: '700',
+    textAlign: 'center',
+    flex: 1,
+    marginHorizontal: 16,
+  },
+  headerTitleCount: {
+    color: colors.text.primary,
+    fontSize: 16,
+    fontWeight: '400',
+  },
+  headerActions: {
+    flexDirection: 'row',
+  },
+  headerButton: {
+    padding: 8,
+    marginLeft: 8,
+  },
+  searchButton: {
+    padding: 8,
+    marginLeft: 8,
+    borderRadius: 20,
+    backgroundColor: colors.surface.elevated,
+    minWidth: 40,
+    minHeight: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerSidebarButton: {
+    padding: 8,
+    marginRight: 16,
+    borderRadius: 20,
+    backgroundColor: colors.surface.elevated,
+    minWidth: 40,
+    minHeight: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  mainContent: {
+    flex: 1,
+    flexDirection: 'row',
+  },
+  sidebar: {
+    width: width * 0.32,
+    paddingTop: 16,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    backgroundColor: colors.surface.secondary,
+    borderTopRightRadius: 16,
+    borderBottomRightRadius: 16,
+    borderRightWidth: 1,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: colors.ui.border,
+    shadowColor: colors.ui.shadow,
+    shadowOffset: {width: 0, height: 8},
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    elevation: 12,
+  },
+  sidebarHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.ui.border,
+    minHeight: 44,
+  },
+  sidebarTitle: {
+    color: colors.text.primary,
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  sidebarCloseButton: {
+    padding: 6,
+    borderRadius: 18,
+    backgroundColor: colors.surface.elevated,
+    minWidth: 32,
+    minHeight: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  channelsGridFullWidth: {
+    flex: 1,
+    width: '100%',
+  },
+  categoriesList: {
+    flex: 1,
+  },
+  categoriesListContent: {
+    paddingBottom: 20,
+    flexGrow: 1,
+  },
+  categoryItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    marginBottom: 3,
+    backgroundColor: 'transparent',
+  },
+      categoryItemSelected: {
+        backgroundColor: colors.surface.elevated,
+        borderRadius: 8,
+      },  categoryIcon: {
+    marginRight: 12,
+    width: 20,
+  },
+  categoryName: {
+    flex: 1,
+    color: colors.text.secondary,
+    fontSize: 15,
+    fontWeight: '500',
+    lineHeight: 18,
+  },
+  categoryNameSelected: {
+    color: colors.accent.primary,
+    fontWeight: '700',
+  },
+  categoryCount: {
+    color: colors.text.primary,
+    fontSize: 13,
+    fontWeight: '400',
+    marginLeft: 8,
+    minWidth: 40,
+    textAlign: 'right',
+  },
+  categoryCountSelected: {
+    color: colors.accent.primary,
+    fontWeight: '700',
+    fontSize: 18,
+    transform: [{scale: 1.1}],
+  },
+  categoryCountContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    minWidth: 45,
+  },
+  channelsGrid: {
+    flex: 1,
+    backgroundColor: colors.background.primary,
+  },
+  channelsGridContent: {
+    paddingTop: 8,
+    paddingBottom: 20,
+  },
+  channelsRow: {
+    justifyContent: 'flex-start',
+    marginBottom: 6,
+  },
+  emptyChannels: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  emptyText: {
+    color: colors.text.secondary,
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  emptySubtext: {
+    color: colors.text.tertiary,
+    fontSize: 12,
+    marginTop: 8,
+    textAlign: 'center',
+    paddingHorizontal: 32,
+    lineHeight: 16,
+  },
+  loadingFooter: {
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingFooterText: {
+    color: colors.text.secondary,
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  endFooter: {
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  endFooterText: {
+    color: 'rgba(255, 255, 255, 0.5)',
+    fontSize: 12,
+    fontWeight: '400',
+  },
+  rowSpacingSidebar: {
+    justifyContent: 'space-between',
+    paddingHorizontal: 0,
+    marginBottom: 4,
+  },
+  rowSpacingFullscreen: {
+    justifyContent: 'space-between',
+    paddingHorizontal: 0,
+    marginBottom: 6,
+  },
+  dropdownOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1000,
+  },
+  dropdownBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'transparent',
+  },
+  dropdownMenu: {
+    position: 'absolute',
+    top: 55,
+    right: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    paddingVertical: 8,
+    minWidth: 200,
+    maxWidth: 240,
+    borderWidth: 0,
+    shadowColor: '#000000',
+    shadowOffset: {width: 0, height: 8},
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 15,
+    backdropFilter: 'blur(10px)',
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginHorizontal: 8,
+    marginVertical: 2,
+    backgroundColor: 'transparent',
+  },
+  dropdownText: {
+    color: '#333333',
+    fontSize: 14,
+    fontWeight: '400',
+    marginLeft: 12,
+    flex: 1,
+  },
+  dropdownSeparator: {
+    height: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.06)',
+    marginVertical: 6,
+    marginHorizontal: 16,
+    borderRadius: 1,
+  },
+  sortModalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 2000,
+  },
+  sortModalBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.15)',
+  },
+  sortModalContent: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 20,
+    paddingVertical: 24,
+    paddingHorizontal: 24,
+    minWidth: 280,
+    maxWidth: 320,
+    width: '80%',
+    borderWidth: 0,
+    shadowColor: '#000000',
+    shadowOffset: {width: 0, height: 16},
+    shadowOpacity: 0.15,
+    shadowRadius: 24,
+    elevation: 24,
+    transform: [{translateY: -2}],
+    backdropFilter: 'blur(20px)',
+  },
+  sortModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sortModalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333333',
+    marginLeft: 10,
+  },
+  sortOptions: {
+    marginBottom: 18,
+  },
+  sortOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    borderRadius: 8,
+    marginVertical: 1,
+  },
+  sortOptionText: {
+    fontSize: 15,
+    fontWeight: '400',
+    color: '#333333',
+    marginLeft: 10,
+  },
+  sortOptionTextSelected: {
+    fontWeight: '500',
+    color: '#4A9EFF',
+  },
+  sortModalActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+    paddingTop: 8,
+  },
+  sortModalButtonSecondary: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 16,
+    backgroundColor: '#F2F2F7',
+    shadowColor: '#000000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+    minWidth: 90,
+  },
+  sortModalButtonSecondaryText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#8E8E93',
+    textAlign: 'center',
+  },
+  sortModalButtonPrimary: {
+    paddingVertical: 12,
+    paddingHorizontal: 28,
+    borderRadius: 16,
+    backgroundColor: '#007AFF',
+    shadowColor: '#007AFF',
+    shadowOffset: {width: 0, height: 8},
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
+    minWidth: 120,
+  },
+  sortModalButtonPrimaryText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    textAlign: 'center',
+  },
+});
+
+const ChannelsScreen: React.FC<ChannelsScreenProps> = ({route, navigation}) => {
+  const colors = useThemeColors();
+  const styles = createStyles(colors);
+
+  // StatusBar immersif automatique pour cet écran
+  useImmersiveScreen('Channels', true);
+
+  const {
+    playlistId,
+    channelsCount = 0,
+    useWatermelonDB = false,
+  } = route.params || {};
+
   // 🔧 CORRECTION: Respecter l'architecture originale
-  // M3U → Legacy (useWatermelonDB: false)  
+  // M3U → Legacy (useWatermelonDB: false)
   // Xtream → WatermelonDB (useWatermelonDB: true)
   console.log('🔧 Architecture respectée:', {
     useWatermelonDB,
     channelsCount,
-    type: useWatermelonDB ? 'Xtream (WatermelonDB)' : 'M3U (Legacy)'
+    type: useWatermelonDB ? 'Xtream (WatermelonDB)' : 'M3U (Legacy)',
   });
-  
+
   // États
   const [channels, setChannels] = useState<Channel[]>([]);
   const [playlistName, setPlaylistName] = useState<string>('Playlist');
   const [totalChannels, setTotalChannels] = useState<number>(0);
   const [serverUrl, setServerUrl] = useState<string>('');
-  
+
   const [categories, setCategories] = useState<Category[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<Category | null>(
+    null,
+  );
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const flatListRef = useRef<FlatList>(null);
-  const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const [displayedChannels, setDisplayedChannels] = useState<Channel[]>([]);
@@ -87,24 +515,32 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
   const [hideChannelNames, setHideChannelNames] = useState(false);
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
   const [showSortModal, setShowSortModal] = useState(false);
-  const [sortOption, setSortOption] = useState<'default' | 'newest' | 'az' | 'za'>('default');
+  const [sortOption, setSortOption] = useState<
+    'default' | 'newest' | 'az' | 'za'
+  >('default');
   const CHANNELS_PER_PAGE = 500; // WatermelonDB pagination augmentée pour afficher plus de chaînes
-  
+
+  // 🕰️ LISTENER RÉCENTS: Ecouter les changements dans RecentChannelsStore pour mettre à jour le compteur
+  const recentChannels = useRecentChannelsStore(state => state.recentChannels);
+
   // 🛡️ SOLUTION RACE CONDITION: useRef pour capturer états actuels sans stale state
   const currentStateRef = useRef({
     channels: [] as Channel[],
     displayedChannels: [] as Channel[],
     categories: [] as Category[],
-    selectedCategory: null as Category | null
+    selectedCategory: null as Category | null,
   });
-  
+
   // ⚡ OPTIMISATION GROSSES PLAYLISTS - getItemLayout pour performances
   const ITEM_HEIGHT = 148; // 140 (height) + 8 (marginBottom) = 148px - AJUSTÉ pour 2 lignes
-  const getItemLayout = React.useCallback((data: ArrayLike<Channel> | null | undefined, index: number) => ({
-    length: ITEM_HEIGHT,
-    offset: ITEM_HEIGHT * index,
-    index,
-  }), []);
+  const getItemLayout = React.useCallback(
+    (data: ArrayLike<Channel> | null | undefined, index: number) => ({
+      length: ITEM_HEIGHT,
+      offset: ITEM_HEIGHT * index,
+      index,
+    }),
+    [],
+  );
 
   // 🚀 OPTIMISATION MÉMOIRE - KeyExtractor optimisé pour 10K+ items
   const keyExtractor = React.useCallback((item: Channel, index: number) => {
@@ -113,8 +549,8 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
 
   // Normaliser les noms de catégories pour cohérence
   const normalizeCategoryName = (name: string): string => {
-    if (!name || name.trim() === '') return 'Non classé';
-    
+    if (!name || name.trim() === '') {return 'Non classé';}
+
     return name
       .trim()
       .replace(/[<>]/g, '') // Supprimer caractères dangereux
@@ -127,20 +563,69 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
   // NOUVEAU : Charger favoris et historique depuis AsyncStorage
   const loadFavoritesAndHistory = async () => {
     try {
-      const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
-      
+      const AsyncStorage = (
+        await import('@react-native-async-storage/async-storage')
+      ).default;
+
       // Charger favoris
       const favoritesData = await AsyncStorage.getItem('favorites_channels');
-      const favoritesCount = favoritesData ? JSON.parse(favoritesData).length : 0;
-      
-      // Charger historique
-      const historyData = await AsyncStorage.getItem('channels_history');
-      const historyCount = historyData ? JSON.parse(historyData).length : 0;
-      
-      return { favoritesCount, historyCount };
+      const favoritesCount = favoritesData
+        ? JSON.parse(favoritesData).length
+        : 0;
+
+      // Charger historique - debug complet des clés
+      let historyCount = 0;
+
+      // Debug: Voir toutes les clés AsyncStorage
+      const allKeys = await AsyncStorage.getAllKeys();
+      console.log('🔍 [ChannelsScreen] Toutes les clés AsyncStorage:', allKeys);
+
+      // Chercher toutes les clés avec "recent" ou "history"
+      const recentKeys = allKeys.filter(
+        key => key.includes('recent') || key.includes('history'),
+      );
+      console.log('🕰️ [ChannelsScreen] Clés avec "recent/history":', recentKeys);
+
+      // Tentative 1: Clé spécifique avec playlistId (comme ChannelPlayerScreen)
+      const recentKey = allKeys.find(key => key.startsWith('recent_channels_'));
+
+      if (recentKey) {
+        const recentData = await AsyncStorage.getItem(recentKey);
+        historyCount = recentData ? JSON.parse(recentData).length : 0;
+        console.log(
+          `✅ [ChannelsScreen] Chaînes récentes depuis ${recentKey}: ${historyCount}`,
+        );
+      } else {
+        // Tentative 2: Toutes les clés avec "recent"
+        for (const key of recentKeys) {
+          const data = await AsyncStorage.getItem(key);
+          if (data) {
+            try {
+              const parsed = JSON.parse(data);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                historyCount = parsed.length;
+                console.log(
+                  `✅ [ChannelsScreen] Chaînes récentes trouvées dans ${key}: ${historyCount}`,
+                );
+                break;
+              }
+            } catch (e) {
+              console.log(`⚠️ [ChannelsScreen] Erreur parsing ${key}:`, e);
+            }
+          }
+        }
+
+        if (historyCount === 0) {
+          console.log(
+            `❌ [ChannelsScreen] Aucune chaîne récente trouvée dans toutes les clés`,
+          );
+        }
+      }
+
+      return {favoritesCount, historyCount};
     } catch (error) {
       console.log('⚠️ Erreur chargement favoris/historique:', error);
-      return { favoritesCount: 0, historyCount: 0 };
+      return {favoritesCount: 0, historyCount: 0};
     }
   };
 
@@ -150,36 +635,88 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
       channels: channels,
       displayedChannels: displayedChannels,
       categories: categories,
-      selectedCategory: selectedCategory
+      selectedCategory: selectedCategory,
     };
     console.log('🔄 REF UPDATED:', {
       channels: channels.length,
       displayedChannels: displayedChannels.length,
       categories: categories.length,
-      selectedCategory: selectedCategory?.name
+      selectedCategory: selectedCategory?.name,
     });
   }, [channels, displayedChannels, categories, selectedCategory]);
+
+  // 🕰️ MISE À JOUR TEMPS RÉEL: Mettre à jour le compteur RÉCENTS quand RecentChannelsStore change
+  useEffect(() => {
+    console.log(
+      `🔄 [ChannelsScreen] RecentChannels changed: ${recentChannels.length} chaînes récentes`,
+    );
+
+    setCategories(prevCategories =>
+      prevCategories.map(cat => {
+        if (cat.id === 'history' || cat.name.includes('RÉCENTS')) {
+          console.log(
+            `📊 [ChannelsScreen] Mise à jour compteur RÉCENTS: ${cat.count} → ${recentChannels.length}`,
+          );
+          return {...cat, count: recentChannels.length};
+        }
+        return cat;
+      }),
+    );
+  }, [recentChannels]);
+
+  // 🔄 Focus listener pour rafraîchir les compteurs quand on revient sur l'écran
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', async () => {
+      console.log('🎯 [ChannelsScreen] Focus - Rafraîchissement des compteurs');
+      try {
+        const {favoritesCount, historyCount} = await loadFavoritesAndHistory();
+
+        // Mettre à jour les catégories avec les nouveaux compteurs
+        setCategories(prevCategories =>
+          prevCategories.map(cat => {
+            if (cat.id === 'favorites') {
+              return {...cat, count: favoritesCount};
+            }
+            if (cat.id === 'history') {
+              return {...cat, count: historyCount};
+            }
+            return cat;
+          }),
+        );
+      } catch (error) {
+        console.log('❌ [ChannelsScreen] Erreur refresh focus:', error);
+      }
+    });
+
+    return unsubscribe;
+  }, [navigation]);
+
+  // StatusBar gérée automatiquement par useImmersiveScreen
 
   // Chargement des chaînes depuis l'ID de playlist
   useEffect(() => {
     console.log('🔄 useEffect ChannelsScreen - DÉMARRAGE');
     console.log('🔄 playlistId:', playlistId);
     console.log('🔄 useWatermelonDB:', useWatermelonDB);
-    
+
     // Mode de chargement identifié
-    console.log(`🔄 Mode: ${useWatermelonDB ? 'Xtream (WatermelonDB)' : 'M3U (Legacy)'} - ${channelsCount} chaînes`);
-    
+    console.log(
+      `🔄 Mode: ${
+        useWatermelonDB ? 'Xtream (WatermelonDB)' : 'M3U (Legacy)'
+      } - ${channelsCount} chaînes`,
+    );
+
     const loadChannels = async () => {
       if (!playlistId) {
         console.error('❌ Aucun ID de playlist fourni');
         setIsLoading(false);
         return;
       }
-      
+
       try {
         console.log('📺 ChannelsScreen - Chargement playlist:', playlistId);
         console.log('🍉 useWatermelonDB flag:', useWatermelonDB);
-        
+
         // 🍉 NOUVELLE LOGIQUE: WatermelonDB ou ancien système selon le flag
         if (useWatermelonDB) {
           console.log('🍉🍉🍉 USING WATERMELONDB for channels loading');
@@ -195,30 +732,33 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
         Alert.alert(
           '❌ Erreur',
           'Impossible de charger les chaînes de la playlist.',
-          [{ text: 'OK', onPress: () => navigation.goBack() }]
+          [{text: 'OK', onPress: () => navigation.goBack()}],
         );
         setIsLoading(false);
       }
     };
-    
+
     loadChannels();
   }, [playlistId, useWatermelonDB]);
 
   // Fonction pour normaliser les URLs de logos Xtream
-  const normalizeXtreamLogoUrl = (logoUrl: string, serverUrl: string): string => {
-    if (!logoUrl || logoUrl.trim() === '' || logoUrl === 'null') return '';
-    
+  const normalizeXtreamLogoUrl = (
+    logoUrl: string,
+    serverUrl: string,
+  ): string => {
+    if (!logoUrl || logoUrl.trim() === '' || logoUrl === 'null') {return '';}
+
     // URL complète - retourner directement
     if (logoUrl.startsWith('http://') || logoUrl.startsWith('https://')) {
       return logoUrl;
     }
-    
+
     // URL relative - construire avec serveur
     const cleanServerUrl = serverUrl.replace(/\/$/, '');
     if (logoUrl.startsWith('/')) {
       return `${cleanServerUrl}${logoUrl}`;
     }
-    
+
     // Cas Xtream typique: chemin simple sans slash
     return `${cleanServerUrl}/${logoUrl}`;
   };
@@ -229,135 +769,181 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
       console.log('🍉 Loading from WatermelonDB - playlistId:', playlistId);
       console.log('🍉 WatermelonDB function CALLED - début chargement');
       const startTime = Date.now();
-      
+
       // Importer le service WatermelonDB
-      const WatermelonXtreamService = (await import('../services/WatermelonXtreamService')).default;
-      
+      const WatermelonXtreamService = (
+        await import('../services/WatermelonXtreamService')
+      ).default;
+
       // Pagination WatermelonDB optimisée - Charger par pages de 100
-      const result = await WatermelonXtreamService.getPlaylistWithChannels(playlistId, 100, 0);
+      const result = await WatermelonXtreamService.getPlaylistWithChannels(
+        playlistId,
+        100,
+        0,
+      );
       console.log(`⏱️ WatermelonDB Query Time: ${Date.now() - startTime}ms`);
-      
+
       console.log('🍉 WatermelonDB result:', {
         playlist: result.playlist?.name,
         channels: result.channels?.length,
         categories: result.categories?.length,
-        totalChannels: result.totalChannels
+        totalChannels: result.totalChannels,
       });
-      
+
       if (!result.playlist) {
         throw new Error('Playlist WatermelonDB introuvable');
       }
-      
+
       // Récupérer le serveur Xtream pour normaliser les logos
       const playlistServerUrl = result.playlist.server || '';
       setServerUrl(playlistServerUrl);
-      
+
       // Convertir les modèles WatermelonDB en objets Channel compatibles AVEC LOGOS CORRIGÉS
-      const convertedChannels: Channel[] = result.channels.map((channel: any, index: number) => {
-        const rawLogo = channel.logoUrl || channel.streamIcon || '';
-        const normalizedLogo = normalizeXtreamLogoUrl(rawLogo, playlistServerUrl);
-        
-        // Debug pour les premiers logos
-        if (index < 5) {
-          console.log(`🔍 LOGO DEBUG ${index}: "${channel.name}"`);
-          console.log(`   Logo brut: "${rawLogo}"`);
-          console.log(`   Logo normalisé: "${normalizedLogo}"`);
-          console.log(`   Serveur: "${serverUrl}"`);
-        }
-        
-        return {
-          id: channel.id,
-          name: channel.name || 'Sans nom',
-          logo: normalizedLogo,
-          group: channel.groupTitle || channel.categoryName || 'Non classé',
-          url: channel.streamUrl || '',
-          type: 'XTREAM' as const
-        };
-      });
-      
+      const convertedChannels: Channel[] = result.channels.map(
+        (channel: any, index: number) => {
+          const rawLogo = channel.logoUrl || channel.streamIcon || '';
+          const normalizedLogo = normalizeXtreamLogoUrl(
+            rawLogo,
+            playlistServerUrl,
+          );
+
+          // Debug pour les premiers logos
+          if (index < 5) {
+            console.log(`🔍 LOGO DEBUG ${index}: "${channel.name}"`);
+            console.log(`   Logo brut: "${rawLogo}"`);
+            console.log(`   Logo normalisé: "${normalizedLogo}"`);
+            console.log(`   Serveur: "${serverUrl}"`);
+          }
+
+          return {
+            id: channel.id,
+            name: channel.name || 'Sans nom',
+            logo: normalizedLogo,
+            group: channel.groupTitle || channel.categoryName || 'Non classé',
+            url: channel.streamUrl || '',
+            type: 'XTREAM' as const,
+          };
+        },
+      );
+
       console.log('🍉 Converted channels:', convertedChannels.length);
-      console.log('🍉 Sample channels:', convertedChannels.slice(0, 3).map(ch => ({
-        name: ch.name,
-        group: ch.group,
-        hasLogo: !!ch.logo,
-        logoUrl: ch.logo?.substring(0, 50) + (ch.logo?.length > 50 ? '...' : '')
-      })));
-      
+      console.log(
+        '🍉 Sample channels:',
+        convertedChannels.slice(0, 3).map(ch => ({
+          name: ch.name,
+          group: ch.group,
+          hasLogo: !!ch.logo,
+          logoUrl:
+            ch.logo?.substring(0, 50) + (ch.logo?.length > 50 ? '...' : ''),
+        })),
+      );
+
       const categoriesStartTime = Date.now();
-      
+
       // Charger favoris et historique
-      const { favoritesCount, historyCount } = await loadFavoritesAndHistory();
-      
+      const {favoritesCount, historyCount} = await loadFavoritesAndHistory();
+
       // Récupérer les VRAIES catégories Xtream stockées dans WatermelonDB
       const xtreamCategories = result.categories || [];
-      console.log('📂 Vraies catégories Xtream trouvées:', xtreamCategories.length);
-      
+      console.log(
+        '📂 Vraies catégories Xtream trouvées:',
+        xtreamCategories.length,
+      );
+
       // CORRECTION: Assigner les vraies chaînes à la catégorie TOUT
       const categoriesWithCounts: Category[] = [
         {
           id: 'all',
           name: 'TOUT',
           count: result.totalChannels || result.playlist.channelsCount || 0,
-          channels: convertedChannels // 🔧 CORRECTION: Vraies chaînes au lieu d'array vide
+          channels: convertedChannels, // 🔧 CORRECTION: Vraies chaînes au lieu d'array vide
         },
         // NOUVEAU : Catégories spéciales avec icônes modernes et vrais compteurs
         {
           id: 'favorites',
           name: '💙 FAVORIS',
           count: favoritesCount,
-          channels: [] // Sera chargé depuis AsyncStorage
+          channels: [], // Sera chargé depuis AsyncStorage
         },
         {
           id: 'history',
           name: '📺 RÉCENTS',
           count: historyCount,
-          channels: [] // Sera chargé depuis AsyncStorage
-        }
+          channels: [], // Sera chargé depuis AsyncStorage
+        },
       ];
-      
+
       // Ajouter TOUTES les vraies catégories Xtream (314 catégories)
       xtreamCategories.forEach((cat: any) => {
         categoriesWithCounts.push({
           id: cat.categoryId || cat.id,
           name: cat.name || 'Sans nom',
           count: cat.channelsCount || 0,
-          channels: [] // Sera chargé dynamiquement
+          channels: [], // Sera chargé dynamiquement
         });
       });
-      
-      console.log(`⏱️ Categories Processing: ${Date.now() - categoriesStartTime}ms`);
-      console.log(`📂 Catégories finales: ${categoriesWithCounts.length} catégories (${categoriesWithCounts.slice(1, 6).map(c => `${c.name}: ${c.count}`).join(', ')}, ...)`);
-      
+
+      console.log(
+        `⏱️ Categories Processing: ${Date.now() - categoriesStartTime}ms`,
+      );
+      console.log(
+        `📂 Catégories finales: ${
+          categoriesWithCounts.length
+        } catégories (${categoriesWithCounts
+          .slice(1, 6)
+          .map(c => `${c.name}: ${c.count}`)
+          .join(', ')}, ...)`,
+      );
+
       const setStateStartTime = Date.now();
-      
+
       // Initialiser les données (ne pas mettre dans channels pour éviter useEffect)
       setDisplayedChannels(convertedChannels);
       // setChannels(convertedChannels); // DÉSACTIVÉ pour WatermelonDB - évite le useEffect groupChannelsByCategories
       setPlaylistName(result.playlist.name || 'Playlist WatermelonDB');
-      setTotalChannels(result.totalChannels || result.playlist.channelsCount || 0);
+      setTotalChannels(
+        result.totalChannels || result.playlist.channelsCount || 0,
+      );
       console.log('🔍 DIAGNOSTIC WatermelonDB - Avant setState:');
-      console.log('   categoriesWithCounts.length:', categoriesWithCounts.length);
+      console.log(
+        '   categoriesWithCounts.length:',
+        categoriesWithCounts.length,
+      );
       console.log('   convertedChannels.length:', convertedChannels.length);
-      console.log('   categoriesWithCounts[0].channels.length:', categoriesWithCounts[0]?.channels?.length || 0);
-      
+      console.log(
+        '   categoriesWithCounts[0].channels.length:',
+        categoriesWithCounts[0]?.channels?.length || 0,
+      );
+
       setCategories(categoriesWithCounts);
       setSelectedCategory(categoriesWithCounts[0]); // Sélectionner "TOUT"
       setDisplayedChannels(convertedChannels);
-      
+
       // Configurer la pagination
       setCurrentPage(0);
       setHasMoreChannels(convertedChannels.length === CHANNELS_PER_PAGE);
-      
+
       console.log('🔍 DIAGNOSTIC WatermelonDB - Après setState:');
-      console.log('   setState appelé avec', categoriesWithCounts.length, 'catégories');
-      console.log('   Catégorie TOUT avec', categoriesWithCounts[0]?.channels?.length || 0, 'chaînes');
-      
-      console.log(`⏱️ React setState Time: ${Date.now() - setStateStartTime}ms`);
-      console.log('🍉 ChannelsScreen - WatermelonDB channels loaded successfully');
-      
+      console.log(
+        '   setState appelé avec',
+        categoriesWithCounts.length,
+        'catégories',
+      );
+      console.log(
+        '   Catégorie TOUT avec',
+        categoriesWithCounts[0]?.channels?.length || 0,
+        'chaînes',
+      );
+
+      console.log(
+        `⏱️ React setState Time: ${Date.now() - setStateStartTime}ms`,
+      );
+      console.log(
+        '🍉 ChannelsScreen - WatermelonDB channels loaded successfully',
+      );
+
       // Arrêter l'écran de chargement
       setIsLoading(false);
-      
     } catch (error) {
       console.error('❌ Erreur chargement WatermelonDB:', error);
       throw error;
@@ -367,110 +953,155 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
   // 📦 FONCTION LEGACY: Chargement depuis l'ancien système (M3U)
   const loadChannelsFromLegacySystem = async () => {
     console.log('📦 Loading from Legacy System - playlistId:', playlistId);
-    
+
     // Importer le service IPTV
     const IPTVService = (await import('../services/IPTVService')).default;
     const iptvService = IPTVService.getInstance();
     await iptvService.initialize();
-    
+
     // Récupérer la playlist avec fallback
     let playlist = await iptvService.getPlaylist(playlistId);
-    
+
     // 🔧 CHUNKING SUPPORT: Vérifier si playlist chunkée même si trouvée (OPTIMISÉ)
-    if (playlist && playlist.chunked && playlist.chunkCount && (!playlist.channels || playlist.channels.length === 0)) {
-      console.log(`📦 Playlist en mémoire chunkée détectée: ${playlist.chunkCount} chunks à reconstruire...`);
-      
-      const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+    if (
+      playlist &&
+      playlist.chunked &&
+      playlist.chunkCount &&
+      (!playlist.channels || playlist.channels.length === 0)
+    ) {
+      console.log(
+        `📦 Playlist en mémoire chunkée détectée: ${playlist.chunkCount} chunks à reconstruire...`,
+      );
+
+      const AsyncStorage = (
+        await import('@react-native-async-storage/async-storage')
+      ).default;
       const reconstructedChannels = [];
       let successfulChunks = 0;
-      
+
       // ⚡ OPTIMISATION: Chargement par batch de 3 chunks en parallèle
       const batchSize = 3;
-      
-      for (let batchStart = 0; batchStart < playlist.chunkCount; batchStart += batchSize) {
+
+      for (
+        let batchStart = 0;
+        batchStart < playlist.chunkCount;
+        batchStart += batchSize
+      ) {
         const batchEnd = Math.min(batchStart + batchSize, playlist.chunkCount);
-        
+
         const batchPromisesArray = [];
         for (let i = batchStart; i < batchEnd; i++) {
-          const chunkKey = `playlist_${playlistId}_chunk_${String(i).padStart(3, '0')}`;
+          const chunkKey = `playlist_${playlistId}_chunk_${String(i).padStart(
+            3,
+            '0',
+          )}`;
           batchPromisesArray.push(
-            AsyncStorage.getItem(chunkKey).then(chunkData => ({ index: i, data: chunkData }))
+            AsyncStorage.getItem(chunkKey).then(chunkData => ({
+              index: i,
+              data: chunkData,
+            })),
           );
         }
-        
+
         try {
           const batchResults = await Promise.all(batchPromisesArray);
-          
+
           batchResults
             .sort((a, b) => a.index - b.index)
-            .forEach(({ index, data }) => {
+            .forEach(({index, data}) => {
               if (data) {
                 try {
                   const chunk = JSON.parse(data);
                   if (Array.isArray(chunk)) {
                     reconstructedChannels.push(...chunk);
                     successfulChunks++;
-                    if (index < 3) console.log(`✅ Chunk ${index}: ${chunk.length} chaînes`);
+                    if (index < 3) {
+                      console.log(`✅ Chunk ${index}: ${chunk.length} chaînes`);
+                    }
                   }
                 } catch (parseError) {
                   console.warn(`⚠️ Erreur parsing chunk ${index}`);
                 }
               }
             });
-          
+
           const progress = Math.round((batchEnd / playlist.chunkCount) * 100);
-          console.log(`🔄 Progression: ${progress}% (${successfulChunks} chunks traités)`);
-          
+          console.log(
+            `🔄 Progression: ${progress}% (${successfulChunks} chunks traités)`,
+          );
+
         } catch (batchError) {
-          console.error(`❌ Erreur batch ${batchStart}-${batchEnd}:`, batchError.message);
+          console.error(
+            `❌ Erreur batch ${batchStart}-${batchEnd}:`,
+            batchError.message,
+          );
         }
       }
-      
+
       if (reconstructedChannels.length > 0) {
         playlist.channels = reconstructedChannels;
         playlist.totalChannels = reconstructedChannels.length;
-        console.log(`✅ Reconstruction en mémoire réussie: ${reconstructedChannels.length} chaînes depuis ${successfulChunks}/${playlist.chunkCount} chunks`);
+        console.log(
+          `✅ Reconstruction en mémoire réussie: ${reconstructedChannels.length} chaînes depuis ${successfulChunks}/${playlist.chunkCount} chunks`,
+        );
       }
     }
-    
+
     // Fallback si pas de playlist
     if (!playlist) {
       console.log('⚠️ Playlist non trouvée, tentative depuis AsyncStorage...');
-      
-      const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+
+      const AsyncStorage = (
+        await import('@react-native-async-storage/async-storage')
+      ).default;
       const playlistData = await AsyncStorage.getItem(`playlist_${playlistId}`);
-      
+
       if (playlistData) {
         playlist = JSON.parse(playlistData);
         console.log('✅ Playlist récupérée depuis AsyncStorage');
       }
     }
-    
+
     if (!playlist) {
       throw new Error('Playlist introuvable dans le service et le storage');
     }
-    
+
     // 🔧 VALIDATION FINALE: Vérifier structure des chaînes
     if (!playlist.channels || !Array.isArray(playlist.channels)) {
-      console.error('❌ Structure channels invalide:', typeof playlist.channels);
-      throw new Error('Playlist invalide: structure des chaînes manquante ou corrompue');
+      console.error(
+        '❌ Structure channels invalide:',
+        typeof playlist.channels,
+      );
+      throw new Error(
+        'Playlist invalide: structure des chaînes manquante ou corrompue',
+      );
     }
-    
-    console.log('📺 Legacy System - Chaînes chargées:', playlist.channels.length);
-    
+
+    console.log(
+      '📺 Legacy System - Chaînes chargées:',
+      playlist.channels.length,
+    );
+
     setChannels(playlist.channels);
     setPlaylistName(playlist.name || 'Playlist Legacy');
-    
-    console.log('📺 ChannelsScreen - Legacy system channels loaded successfully');
+
+    console.log(
+      '📺 ChannelsScreen - Legacy system channels loaded successfully',
+    );
   };
-  
+
   // 🔧 UNIFIED LOADING: Un seul useEffect unifié (Best Practice 2024)
   useEffect(() => {
-    console.log('🔄 UNIFIED DATA LOADING - Mode:', useWatermelonDB ? 'WatermelonDB' : 'Legacy');
-    
+    console.log(
+      '🔄 UNIFIED DATA LOADING - Mode:',
+      useWatermelonDB ? 'WatermelonDB' : 'Legacy',
+    );
+
     if (useWatermelonDB) {
       // WatermelonDB géré par son propre chargement initial - PAS de regroupement ici
-      console.log('📺 WatermelonDB: Chargement déjà effectué dans loadChannelsFromWatermelonDB');
+      console.log(
+        '📺 WatermelonDB: Chargement déjà effectué dans loadChannelsFromWatermelonDB',
+      );
     } else if (!useWatermelonDB && channels.length > 0) {
       // Legacy: Effectuer le regroupement SEULEMENT après chargement des données
       console.log('📺 Legacy: Regroupement avec', channels.length, 'chaînes');
@@ -484,52 +1115,62 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
   const groupChannelsByCategories = () => {
     console.log('🔄 UNIFIED GROUPING - Legacy mode - Début regroupement');
     setIsLoading(true);
-    
+
     try {
       console.log('🔄 Regroupement par catégories réelles...');
-      console.log(`📊 Analyse de ${channels.length} chaînes pour extraction catégories`);
-      
+      console.log(
+        `📊 Analyse de ${channels.length} chaînes pour extraction catégories`,
+      );
+
       // Statistiques de catégories détaillées
-      const categoryStats = new Map<string, {
-        count: number;
-        channels: Channel[];
-        types: Set<string>;
-      }>();
-      
+      const categoryStats = new Map<
+        string,
+        {
+          count: number;
+          channels: Channel[];
+          types: Set<string>;
+        }
+      >();
+
       // Analyser toutes les chaînes et extraire les vraies catégories
       channels.forEach((channel, index) => {
         // Extraire le nom de catégorie (group pour M3U, vraie catégorie pour Xtream)
         let categoryName = 'Non classé';
-        
+
         // Essayer plusieurs propriétés pour la catégorie
-        const categoryField = (channel as any).groupTitle || channel.group || channel.category || '';
-        
+        const categoryField =
+          (channel as any).groupTitle ||
+          channel.group ||
+          (channel as any).category;
+
         if (categoryField && categoryField.trim() !== '') {
           categoryName = categoryField.trim();
         }
-        
+
         // Nettoyer et normaliser le nom de catégorie
         categoryName = normalizeCategoryName(categoryName);
-        
+
         // Debug pour les premières chaînes
         if (index < 10) {
-          console.log(`🔍 Channel ${index}: "${channel.name}" -> catégorie: "${categoryName}"`);
-          console.log(`   Props:`, {
+          console.log(
+            `🔍 Channel ${index}: "${channel.name}" -> catégorie: "${categoryName}"`,
+          );
+          console.log('   Props:', {
             group: channel.group,
-            category: channel.category, 
-            groupTitle: (channel as any).groupTitle
+            category: (channel as any).category,
+            groupTitle: (channel as any).groupTitle,
           });
         }
-        
+
         // Initialiser ou mettre à jour les stats de catégorie
         if (!categoryStats.has(categoryName)) {
           categoryStats.set(categoryName, {
             count: 0,
             channels: [],
-            types: new Set()
+            types: new Set(),
           });
         }
-        
+
         const stats = categoryStats.get(categoryName)!;
         stats.count++;
         stats.channels.push(channel);
@@ -537,90 +1178,95 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
       });
 
       console.log(`📂 ${categoryStats.size} catégories uniques trouvées`);
-      
+
       // Créer la liste des catégories avec compteurs et tri intelligent
       const categoriesList: Category[] = [];
-      
+
       // Ajouter "TOUT" en premier + catégories spéciales
       categoriesList.push({
         id: 'all',
         name: 'TOUT',
         count: channels.length,
-        channels: channels
+        channels: channels,
       });
-      
+
       // NOUVEAU : Catégories spéciales pour système legacy avec icônes modernes
       categoriesList.push({
         id: 'favorites',
         name: '💙 FAVORIS',
         count: 0, // TODO: Compter favoris depuis AsyncStorage
-        channels: [] // Sera chargé depuis AsyncStorage
+        channels: [], // Sera chargé depuis AsyncStorage
       });
-      
+
       categoriesList.push({
         id: 'history',
         name: '📺 RÉCENTS',
         count: 0, // TODO: Compter historique depuis AsyncStorage
-        channels: [] // Sera chargé depuis AsyncStorage
+        channels: [], // Sera chargé depuis AsyncStorage
       });
 
       // Convertir Map en array et trier par popularité puis alphabétiquement
-      const sortedCategories = Array.from(categoryStats.entries())
-        .sort(([nameA, statsA], [nameB, statsB]) => {
+      const sortedCategories = Array.from(categoryStats.entries()).sort(
+        ([nameA, statsA], [nameB, statsB]) => {
           // D'abord par nombre de chaînes (desc), puis alphabétiquement
           if (statsB.count !== statsA.count) {
             return statsB.count - statsA.count;
           }
           return nameA.localeCompare(nameB);
-        });
+        },
+      );
 
       // Ajouter les vraies catégories triées avec IDs uniques
       const usedIds = new Set(['all']); // Tracker des IDs déjà utilisés
       sortedCategories.forEach(([categoryName, stats], index) => {
-        let categoryId = categoryName.toLowerCase()
+        let categoryId = categoryName
+          .toLowerCase()
           .replace(/[^a-z0-9\s]/g, '') // Supprimer caractères spéciaux
           .replace(/\s+/g, '_') // Remplacer espaces par underscores
           .substring(0, 40); // Réduire à 40 pour laisser place au suffix
-        
+
         // Assurer l'unicité en ajoutant un index si nécessaire
         if (usedIds.has(categoryId)) {
           categoryId = `${categoryId}_${index}`;
         }
         usedIds.add(categoryId);
-        
+
         categoriesList.push({
           id: categoryId,
           name: categoryName,
           count: stats.count,
-          channels: stats.channels
+          channels: stats.channels,
         });
-        
+
         // Log des catégories populaires
         if (stats.count >= 10) {
-          console.log(`📺 ${categoryName}: ${stats.count} chaînes (types: ${Array.from(stats.types).join(', ')})`);
+          console.log(
+            `📺 ${categoryName}: ${stats.count} chaînes (types: ${Array.from(
+              stats.types,
+            ).join(', ')})`,
+          );
         }
       });
 
-      // 🔧 UNIFIED STATE UPDATE: Même logique que WatermelonDB 
+      // 🔧 UNIFIED STATE UPDATE: Même logique que WatermelonDB
       setCategories(categoriesList);
       setSelectedCategory(categoriesList[0]); // Sélectionner "TOUT" par défaut
       setDisplayedChannels(categoriesList[0]?.channels || []); // 🔧 NOUVEAU: Assurer cohérence displayedChannels
-      
+
       // 🔧 CORRECTION: Configurer la pagination comme WatermelonDB
       setCurrentPage(0);
       setHasMoreChannels(false); // Legacy charge tout d'un coup
-      
+
       console.log('✅ UNIFIED Legacy State Update:', {
         categories: categoriesList.length,
         selectedCategory: categoriesList[0]?.name,
-        displayedChannels: categoriesList[0]?.channels?.length || 0
+        displayedChannels: categoriesList[0]?.channels?.length || 0,
       });
-      
+
       console.log('🏆 Top 5 catégories Legacy:');
       categoriesList.slice(1, 6).forEach(cat => {
         console.log(`   ${cat.name}: ${cat.count} chaînes`);
       });
-      
     } catch (error) {
       console.error('❌ Erreur regroupement catégories:', error);
     } finally {
@@ -632,37 +1278,210 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
     navigation.goBack();
   };
 
-  const handleChannelPress = (channel: Channel) => {
+  // Fonction pour ouvrir la nouvelle page de recherche modale
+  const openSearchScreen = () => {
+    // Préparer toutes les chaînes disponibles pour la recherche
+    // CORRECTION: Utiliser displayedChannels ou la catégorie "TOUT" qui contient toutes les chaînes
+    const allChannels = displayedChannels.length > 0
+      ? displayedChannels
+      : (categories.find(cat => cat.id === 'all')?.channels || []);
+
+    console.log('🔍 [ChannelsScreen] Opening search with:');
+    console.log('  - displayedChannels length:', displayedChannels.length);
+    console.log('  - allChannels length:', allChannels.length);
+    console.log('  - playlistId:', playlistId);
+
+    // Stocker les données de navigation dans le PlayerStore pour la recherche
+    const navigationData = {
+      playlistId: playlistId || 'default',
+      allCategories: categories,
+      initialCategory: selectedCategory || categories[0] || { id: 'all', name: 'Toutes', count: allChannels.length, channels: allChannels },
+      initialChannels: allChannels,
+      playlistName: playlistName || 'Recherche',
+      useWatermelonDB: false
+    };
+
+    // Utiliser le PlayerStore pour passer les données
+    usePlayerStore.getState().actions.setNavigationData(navigationData);
+
+    // Naviguer vers SearchScreen
+    navigation.navigate('Search');
+  };
+
+  const handleChannelPress = async (channel: Channel) => {
     console.log('🛡️ RACE CONDITION FIX - GitHub/Reddit Solutions');
-    
+
     // ⚡ SOLUTION 1: useRef pour éviter stale state (GitHub Issue #194)
     const currentState = currentStateRef.current;
+
+    // 🎯 CAS SPÉCIAL: Si PiP visible, passer directement en fullscreen au lieu de naviguer
+    const {isVisible: pipVisible, actions} = usePlayerStore.getState();
+    if (pipVisible) {
+      console.log(
+        '🔄 [PiP → Fullscreen] PiP détecté, transition directe vers fullscreen',
+      );
+
+      // 🔧 Préparer navigation vers ChannelPlayerScreen pour le retour depuis fullscreen
+      if (!currentState) {
+        console.warn(
+          '⚠️ [PiP → Fullscreen] currentState est undefined, utilisation des états directs',
+        );
+        // Fallback: utiliser les états React directs au lieu de currentStateRef
+        const fallbackChannels = displayedChannels;
+        const fallbackCategories = categories;
+        const fallbackSelected = selectedCategory;
+
+        if (fallbackChannels && fallbackChannels.length > 0) {
+          const unifiedCategory: Category = {
+            id: 'pip_to_fullscreen_fallback',
+            name: fallbackSelected?.name || 'CHAÎNES PiP',
+            count: fallbackChannels.length,
+            channels: fallbackChannels,
+          };
+
+          console.log(
+            '📍 [ChannelsScreen] Storing navigation data (fallback path):',
+            {
+              playlistId,
+              playlistName,
+              channelCount: fallbackChannels.length,
+              categoryName: (fallbackSelected || unifiedCategory).name,
+            },
+          );
+
+          actions.setNavigationData({
+            playlistId,
+            allCategories: fallbackCategories || [unifiedCategory],
+            initialCategory: fallbackSelected || unifiedCategory,
+            initialChannels: fallbackChannels,
+            playlistName,
+            useWatermelonDB,
+          });
+
+          console.log(
+            `📍 [Navigation Data Fallback] Préparé pour retour vers ChannelPlayerScreen avec ${fallbackChannels.length} chaînes`,
+          );
+        }
+      } else {
+        const {
+          displayedChannels: safeChannels,
+          categories: safeCategories,
+          selectedCategory: safeSelected,
+        } = currentState;
+
+        if (safeChannels && safeChannels.length > 0) {
+          const unifiedCategory: Category = {
+            id: 'pip_to_fullscreen_category',
+            name: safeSelected?.name || 'CHAÎNES PiP',
+            count: safeChannels.length,
+            channels: safeChannels,
+          };
+
+          // Stocker les données pour ChannelPlayerScreen dans le PlayerStore
+          console.log(
+            '📍 [ChannelsScreen] Storing navigation data (normal path):',
+            {
+              playlistId,
+              playlistName,
+              channelCount: safeChannels.length,
+              categoryName: (safeSelected || unifiedCategory).name,
+            },
+          );
+
+          actions.setNavigationData({
+            playlistId,
+            allCategories: safeCategories || [unifiedCategory],
+            initialCategory: safeSelected || unifiedCategory,
+            initialChannels: safeChannels,
+            playlistName,
+            useWatermelonDB,
+          });
+
+          console.log(
+            `📍 [Navigation Data] Préparé pour retour vers ChannelPlayerScreen avec ${safeChannels.length} chaînes`,
+          );
+        }
+      }
+
+      // 🕰️ AJOUTER À L'HISTORIQUE RÉCENT avant de lancer la chaîne
+      try {
+        const AsyncStorage = (
+          await import('@react-native-async-storage/async-storage')
+        ).default;
+        const recentKey = `recent_channels_${playlistId}`;
+
+        // Récupérer l'historique actuel
+        const existingData = await AsyncStorage.getItem(recentKey);
+        let recentChannels: Channel[] = existingData
+          ? JSON.parse(existingData)
+          : [];
+
+        // Retirer la chaîne si elle existe déjà (éviter doublons)
+        recentChannels = recentChannels.filter(c => c.id !== channel.id);
+
+        // Ajouter la chaîne en première position
+        recentChannels.unshift(channel);
+
+        // Limiter à 20 chaînes récentes maximum
+        if (recentChannels.length > 20) {
+          recentChannels = recentChannels.slice(0, 20);
+        }
+
+        // Sauvegarder l'historique mis à jour
+        await AsyncStorage.setItem(recentKey, JSON.stringify(recentChannels));
+        console.log(
+          `✅ [Historique] Chaîne "${channel.name}" ajoutée aux récents (${recentChannels.length} total)`,
+        );
+
+        // Mettre à jour le store partagé pour synchronisation
+        const {setRecentChannels} = (
+          await import('../stores/RecentChannelsStore')
+        ).useRecentChannelsStore.getState();
+        setRecentChannels(recentChannels);
+      } catch (error) {
+        console.error('❌ [Historique] Erreur ajout aux récents:', error);
+      }
+
+      // Jouer la nouvelle chaîne en fullscreen directement
+      actions.playChannel(channel, true); // true = startInFullscreen
+      console.log(
+        `✅ [PiP → Fullscreen] Chaîne "${channel.name}" lancée en fullscreen`,
+      );
+      return; // Exit early, pas de navigation vers ChannelPlayer
+    }
+
     console.log('📊 REF STATE:', {
       channels: currentState.channels?.length || 0,
       displayedChannels: currentState.displayedChannels?.length || 0,
       categories: currentState.categories?.length || 0,
-      selectedCategory: currentState.selectedCategory?.name || 'null'
+      selectedCategory: currentState.selectedCategory?.name || 'null',
     });
-    
+
     // ⚡ SOLUTION 2: InteractionManager pour délayer navigation (Issue #1266)
     const performNavigation = () => {
-      const { displayedChannels: safeChannels, categories: safeCategories, selectedCategory: safeSelected } = currentState;
-      
+      const {
+        displayedChannels: safeChannels,
+        categories: safeCategories,
+        selectedCategory: safeSelected,
+      } = currentState;
+
       if (!safeChannels || safeChannels.length === 0) {
         console.error('❌ REF: Aucune chaîne dans useRef');
-        Alert.alert("Race Condition", "États non synchronisés. Réessayez dans un instant.");
+        Alert.alert('Race Condition', 'États non synchronisés. Réessayez dans un instant.');
         return;
       }
-      
+
       const unifiedCategory: Category = {
         id: 'ref_safe_channels',
         name: 'CHAÎNES (REF SAFE)',
         count: safeChannels.length,
-        channels: safeChannels
+        channels: safeChannels,
       };
-      
-      console.log(`🎬 REF NAVIGATION: ${safeChannels.length} chaînes sécurisées (useRef)`);
-      
+
+      console.log(
+        `🎬 REF NAVIGATION: ${safeChannels.length} chaînes sécurisées (useRef)`,
+      );
+
       navigation.navigate('ChannelPlayer', {
         playlistId,
         allCategories: safeCategories || [unifiedCategory],
@@ -673,7 +1492,7 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
         useWatermelonDB,
       });
     };
-    
+
     // ⚡ SOLUTION 3: InteractionManager.runAfterInteractions (React Router Flux Fix)
     InteractionManager.runAfterInteractions(() => {
       console.log('🚀 Navigation après interactions complétées');
@@ -683,107 +1502,176 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
 
   const handleCategorySelect = async (category: Category) => {
     console.log('📂 Catégorie sélectionnée:', category.name);
-    
+
     // Déclencher l'animation de transition
     animateCategoryTransition();
-    
+
     if (!useWatermelonDB) {
+      let allChannels = category.channels || [];
+
+      // 🎯 CAS SPÉCIAL: RÉCENTS - charger les vraies chaînes récentes depuis AsyncStorage
+      if (
+        category.name.toLowerCase().includes('récent') ||
+        category.name.includes('📺') ||
+        category.id.includes('recent') ||
+        category.id.includes('history')
+      ) {
+        console.log(
+          `🕰️ [ChannelsScreen] Catégorie RÉCENTS détectée, chargement des vraies chaînes récentes...`,
+        );
+
+        try {
+          const AsyncStorage = (
+            await import('@react-native-async-storage/async-storage')
+          ).default;
+          const recentKey = `recent_channels_${playlistId}`;
+          console.log(`🔑 [ChannelsScreen] Clé recherchée: ${recentKey}`);
+
+          const recentData = await AsyncStorage.getItem(recentKey);
+          if (recentData) {
+            const recentChannelsData = JSON.parse(recentData);
+            allChannels = recentChannelsData;
+            console.log(
+              `✅ [ChannelsScreen] ${recentChannelsData.length} chaînes récentes chargées pour affichage`,
+            );
+          } else {
+            console.log(
+              `❌ [ChannelsScreen] Aucune donnée récente dans ${recentKey}`,
+            );
+            allChannels = [];
+          }
+        } catch (error) {
+          console.error('🚨 [ChannelsScreen] Erreur chargement récents:', error);
+          allChannels = [];
+        }
+      }
+
       // 🆕 CORRECTION LEGACY: Initialiser pagination correcte
-      console.log(`📦 Legacy: Sélection catégorie "${category.name}" avec ${category.channels?.length || 0} chaînes`);
-      
+      console.log(
+        `📦 Legacy: Sélection catégorie "${category.name}" avec ${allChannels.length} chaînes`,
+      );
+
       setSelectedCategory(category);
       setCurrentPage(0); // CORRECTION: commencer à 0 pour pagination
-      
+
       // Charger seulement la première page (500 chaînes)
-      const allChannels = category.channels || [];
       const firstPageChannels = allChannels.slice(0, CHANNELS_PER_PAGE);
       setDisplayedChannels(firstPageChannels);
-      
+
       // Configurer pagination
       const hasMorePages = allChannels.length > CHANNELS_PER_PAGE;
       setHasMoreChannels(hasMorePages);
-      
-      console.log(`📈 Legacy init: Affichage ${firstPageChannels.length}/${allChannels.length} chaînes (hasMore: ${hasMorePages})`);
-      
+
+      console.log(
+        `📈 Legacy init: Affichage ${firstPageChannels.length}/${allChannels.length} chaînes (hasMore: ${hasMorePages})`,
+      );
+
       // Scroll vers le haut
       setTimeout(() => {
-        flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+        flatListRef.current?.scrollToOffset({offset: 0, animated: true});
       }, 100);
-      
+
       return;
     }
-    
+
     setSelectedCategory(category);
     setCurrentPage(0);
     setHasMoreChannels(true);
-    
+
     try {
-      const WatermelonXtreamService = (await import('../services/WatermelonXtreamService')).default;
-      
+      const WatermelonXtreamService = (
+        await import('../services/WatermelonXtreamService')
+      ).default;
+
       let result;
       if (category.id === 'all') {
         // Charger toutes les chaînes
-        result = await WatermelonXtreamService.getPlaylistWithChannels(playlistId, CHANNELS_PER_PAGE, 0);
+        result = await WatermelonXtreamService.getPlaylistWithChannels(
+          playlistId,
+          CHANNELS_PER_PAGE,
+          0,
+        );
       } else {
         // Charger la première page de la catégorie
-        result = await WatermelonXtreamService.getChannelsByCategory(playlistId, category.id, CHANNELS_PER_PAGE, 0);
+        result = await WatermelonXtreamService.getChannelsByCategory(
+          playlistId,
+          category.id,
+          CHANNELS_PER_PAGE,
+          0,
+        );
         // Convertir en format attendu
-        result = { channels: result, playlist: null };
-        
+        result = {channels: result, playlist: null};
+
         // 🔧 CORRECTION: Désactiver chargement automatique qui interfere avec pagination normale
         // if (result.channels && result.channels.length === CHANNELS_PER_PAGE) {
         //   setTimeout(async () => {
         //     await loadAllRemainingChannels(category);
         //   }, 100);
         // }
-        console.log('🔍 Catégorie chargée - Pagination normale activee avec hasMoreChannels:', result.channels.length === CHANNELS_PER_PAGE);
+        console.log(
+          '🔍 Catégorie chargée - Pagination normale activee avec hasMoreChannels:',
+          result.channels.length === CHANNELS_PER_PAGE,
+        );
       }
-      
+
       if (result.channels && result.channels.length > 0) {
-        
+
         const newChannels = result.channels.map((channel: any) => {
           const rawLogo = channel.logoUrl || channel.streamIcon || '';
           const normalizedLogo = normalizeXtreamLogoUrl(rawLogo, serverUrl);
-          
+
           return {
             id: channel.id,
             name: channel.name || 'Sans nom',
             logo: normalizedLogo,
             group: channel.groupTitle || channel.categoryName || 'Non classé',
             url: channel.streamUrl || '',
-            type: 'XTREAM' as const
+            type: 'XTREAM' as const,
           };
         });
-        
+
         setDisplayedChannels(newChannels);
         setHasMoreChannels(newChannels.length === CHANNELS_PER_PAGE);
-        
+
         // 🔧 CORRECTION: Scroll vers le haut lors du changement de catégorie
         setTimeout(() => {
-          flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+          flatListRef.current?.scrollToOffset({offset: 0, animated: true});
         }, 100);
-        
-        console.log(`✅ Catégorie "${category.name}" chargée: ${newChannels.length} chaînes`);
+
+        console.log(
+          `✅ Catégorie "${category.name}" chargée: ${newChannels.length} chaînes`,
+        );
       }
     } catch (error) {
       console.error('❌ Erreur chargement catégorie:', error);
     }
   };
-  
+
   // Charger une page de chaînes
   const loadChannelsPage = (channels: Channel[], page: number) => {
     const startIndex = 0;
     const endIndex = page * CHANNELS_PER_PAGE;
     const newChannels = channels.slice(startIndex, endIndex);
-    
+
     console.log('🔍 LoadChannelsPage DEBUG:');
-    console.log('  - channels input:', Array.isArray(channels), channels?.length);
-    console.log('  - newChannels output:', Array.isArray(newChannels), newChannels?.length);
-    console.log('  - sample newChannels:', newChannels?.slice(0, 2)?.map(ch => ({ name: ch?.name, id: ch?.id })));
-    
+    console.log(
+      '  - channels input:',
+      Array.isArray(channels),
+      channels?.length,
+    );
+    console.log(
+      '  - newChannels output:',
+      Array.isArray(newChannels),
+      newChannels?.length,
+    );
+    console.log(
+      '  - sample newChannels:',
+      newChannels?.slice(0, 2)?.map(ch => ({name: ch?.name, id: ch?.id})),
+    );
+
     setDisplayedChannels(newChannels);
   };
-  
+
   // 🔧 CORRECTION PAGINATION : Fonction corrigée pour charger TOUTES les chaînes
   const loadMoreChannels = async () => {
     console.log('🔄 onEndReached déclenché - loadMoreChannels appelé avec:', {
@@ -793,157 +1681,189 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
       selectedCategory: selectedCategory?.name,
       currentPage,
       displayedCount: displayedChannels.length,
-      categoryId: selectedCategory?.id
+      categoryId: selectedCategory?.id,
     });
-    
+
     if (!hasMoreChannels || isLoadingMore || !selectedCategory) {
       console.log('⛔ Conditions non remplies pour loadMoreChannels:', {
         hasMoreChannels,
         isLoadingMore,
         useWatermelonDB,
-        hasSelectedCategory: !!selectedCategory
+        hasSelectedCategory: !!selectedCategory,
       });
       return;
     }
-    
+
     // 🆕 CORRECTION LEGACY : Gérer pagination pour système Legacy
     if (!useWatermelonDB) {
-      console.log('📦 Système Legacy - Chargement page suivante depuis category.channels');
+      console.log(
+        '📦 Système Legacy - Chargement page suivante depuis category.channels',
+      );
       setIsLoadingMore(true);
-      
+
       try {
         const allCategoryChannels = selectedCategory.channels || [];
         const currentlyDisplayed = displayedChannels.length;
-        
+
         // 🔧 CORRECTION: Calculer depuis les chaînes déjà affichées
         const startIndex = currentlyDisplayed;
-        const endIndex = Math.min(startIndex + CHANNELS_PER_PAGE, allCategoryChannels.length);
+        const endIndex = Math.min(
+          startIndex + CHANNELS_PER_PAGE,
+          allCategoryChannels.length,
+        );
         const newChannels = allCategoryChannels.slice(startIndex, endIndex);
-        
+
         console.log('📄 Legacy pagination CORRIGÉE:', {
           totalChannelsInCategory: allCategoryChannels.length,
           currentlyDisplayed,
           startIndex,
           endIndex,
           newChannelsToAdd: newChannels.length,
-          willHaveTotal: currentlyDisplayed + newChannels.length
+          willHaveTotal: currentlyDisplayed + newChannels.length,
         });
-        
+
         if (newChannels.length > 0) {
           // Ajouter les nouvelles chaînes à l'affichage
           setDisplayedChannels(prev => {
             const updated = [...prev, ...newChannels];
-            console.log(`📈 Legacy: ${prev.length} + ${newChannels.length} = ${updated.length} chaînes`);
-            
+            console.log(
+              `📈 Legacy: ${prev.length} + ${newChannels.length} = ${updated.length} chaînes`,
+            );
+
             // 🔧 SUPPRESSION du système anti-doublons défaillant
             // Le système supprimait des chaînes légitimes avec des IDs similaires
             // Les vraies données M3U n'ont généralement pas de doublons réels
-            
+
             return updated;
           });
-          
-          setCurrentPage(Math.ceil((currentlyDisplayed + newChannels.length) / CHANNELS_PER_PAGE));
-          
+
+          setCurrentPage(
+            Math.ceil(
+              (currentlyDisplayed + newChannels.length) / CHANNELS_PER_PAGE,
+            ),
+          );
+
           // Vérifier s'il reste des chaînes
           const totalAfterAddition = currentlyDisplayed + newChannels.length;
           const hasMorePages = totalAfterAddition < allCategoryChannels.length;
           setHasMoreChannels(hasMorePages);
-          
-          console.log(`✅ Legacy: +${newChannels.length} chaînes (Total: ${totalAfterAddition}/${allCategoryChannels.length}, hasMore: ${hasMorePages})`);
+
+          console.log(
+            `✅ Legacy: +${newChannels.length} chaînes (Total: ${totalAfterAddition}/${allCategoryChannels.length}, hasMore: ${hasMorePages})`,
+          );
         } else {
           console.log('🔚 Legacy: Aucune nouvelle chaîne à charger');
           setHasMoreChannels(false);
         }
-        
       } catch (error) {
         console.error('❌ Erreur pagination Legacy:', error);
         setHasMoreChannels(false);
       } finally {
         setIsLoadingMore(false);
       }
-      
+
       return; // Sortir pour système Legacy
     }
-    
+
     // 🍉 SYSTÈME WATERMELONDB : Logique originale
     setIsLoadingMore(true);
     console.log('🍉 WatermelonDB - Démarrage chargement page suivante...');
-    
+
     try {
-      const WatermelonXtreamService = (await import('../services/WatermelonXtreamService')).default;
+      const WatermelonXtreamService = (
+        await import('../services/WatermelonXtreamService')
+      ).default;
       const nextPage = currentPage + 1;
       const offset = nextPage * CHANNELS_PER_PAGE;
-      
-      console.log(`📄 Chargement page ${nextPage} pour "${selectedCategory.name}" (offset: ${offset}, CHANNELS_PER_PAGE: ${CHANNELS_PER_PAGE})`);
-      
+
+      console.log(
+        `📄 Chargement page ${nextPage} pour "${selectedCategory.name}" (offset: ${offset}, CHANNELS_PER_PAGE: ${CHANNELS_PER_PAGE})`,
+      );
+
       let result;
       if (selectedCategory.id === 'all') {
         // Charger toutes les chaînes avec offset
         console.log('🌍 Chargement TOUT avec offset:', offset);
-        result = await WatermelonXtreamService.getPlaylistWithChannels(playlistId, CHANNELS_PER_PAGE, offset);
+        result = await WatermelonXtreamService.getPlaylistWithChannels(
+          playlistId,
+          CHANNELS_PER_PAGE,
+          offset,
+        );
       } else {
         // 🔧 CORRECTION: Charger chaînes spécifiques de la catégorie
-        console.log(`📊 Chargement catégorie "${selectedCategory.name}" (ID: ${selectedCategory.id}) avec offset:`, offset);
-        const categoryChannels = await WatermelonXtreamService.getChannelsByCategory(
-          playlistId, 
-          selectedCategory.id, 
-          CHANNELS_PER_PAGE, 
-          offset
+        console.log(
+          `📊 Chargement catégorie "${selectedCategory.name}" (ID: ${selectedCategory.id}) avec offset:`,
+          offset,
         );
-        result = { channels: categoryChannels, playlist: null };
+        const categoryChannels =
+          await WatermelonXtreamService.getChannelsByCategory(
+            playlistId,
+            selectedCategory.id,
+            CHANNELS_PER_PAGE,
+            offset,
+          );
+        result = {channels: categoryChannels, playlist: null};
       }
-      
+
       console.log('🔍 Résultat chargement pagination:', {
         channelsLoaded: result.channels?.length || 0,
         expectedChannels: CHANNELS_PER_PAGE,
         offset,
         nextPage,
-        isLastPage: (result.channels?.length || 0) < CHANNELS_PER_PAGE
+        isLastPage: (result.channels?.length || 0) < CHANNELS_PER_PAGE,
       });
-      
+
       if (result.channels && result.channels.length > 0) {
         const newChannels = result.channels.map((channel: any) => {
           const rawLogo = channel.logoUrl || channel.streamIcon || '';
           const normalizedLogo = normalizeXtreamLogoUrl(rawLogo, serverUrl);
-          
+
           return {
-            id: channel.id || `channel-${channel.streamId || channel.stream_id}-${Date.now()}`,
+            id:
+              channel.id ||
+              `channel-${channel.streamId || channel.stream_id}-${Date.now()}`,
             name: channel.name || channel.displayName || 'Sans nom',
             logo: normalizedLogo,
-            group: channel.groupTitle || channel.categoryName || selectedCategory.name,
+            group:
+              channel.groupTitle ||
+              channel.categoryName ||
+              selectedCategory.name,
             url: channel.streamUrl || channel.url || '',
-            type: 'XTREAM' as const
+            type: 'XTREAM' as const,
           };
         });
-        
+
         // 🔧 CORRECTION: Éviter doublons et mise à jour robuste
         setDisplayedChannels(prev => {
           const existingIds = new Set(prev.map(ch => ch.id));
-          const uniqueNewChannels = newChannels.filter(ch => !existingIds.has(ch.id));
+          const uniqueNewChannels = newChannels.filter(
+            ch => !existingIds.has(ch.id),
+          );
           const updatedChannels = [...prev, ...uniqueNewChannels];
-          
-          console.log(`➕ Ajout de ${uniqueNewChannels.length} nouvelles chaînes uniques (Total: ${updatedChannels.length})`);
+
+          console.log(
+            `➕ Ajout de ${uniqueNewChannels.length} nouvelles chaînes uniques (Total: ${updatedChannels.length})`,
+          );
           return updatedChannels;
         });
-        
+
         setCurrentPage(nextPage);
-        
+
         // 🔧 CORRECTION: Logic plus robuste pour hasMoreChannels
         const hasMorePages = result.channels.length === CHANNELS_PER_PAGE;
         setHasMoreChannels(hasMorePages);
-        
+
         console.log(`✅ Page ${nextPage} chargée avec succès:`, {
           newChannelsCount: newChannels.length,
           categoryName: selectedCategory.name,
           hasMorePages,
-          totalDisplayed: displayedChannels.length + newChannels.length
+          totalDisplayed: displayedChannels.length + newChannels.length,
         });
-        
+
       } else {
         console.log('🔚 Aucune nouvelle chaîne trouvée - Fin de pagination');
         setHasMoreChannels(false);
       }
-      
     } catch (error) {
       console.error('❌ ERREUR dans loadMoreChannels:', error);
       setHasMoreChannels(false);
@@ -954,56 +1874,56 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
   };
 
   // NOUVEAU : Rendu avec animation pour compteurs
-  const renderCategoryItem = ({ item: category }: { item: Category }) => {
+  const renderCategoryItem = ({item: category}: {item: Category}) => {
     const isSelected = selectedCategory?.id === category.id;
-    
+
     // 🎨 Icônes uniquement pour Favoris et Récents
     const getCategoryIcon = (name: string) => {
-      if (name.includes('FAVORIS') || name.includes('💙')) return 'favorite';
-      if (name.includes('RÉCENTS') || name.includes('📺')) return 'history';
+      if (name.includes('FAVORIS') || name.includes('💙')) {
+        return 'favorite';
+      }
+      if (name.includes('RÉCENTS') || name.includes('📺')) {
+        return 'history';
+      }
       return null; // Pas d'icône pour les autres catégories
     };
-    
+
     // 🎨 Couleur d'accent moderne (Cyan menthe)
     const accentColor = '#00D4AA';
     const iconColor = isSelected ? accentColor : 'rgba(255, 255, 255, 0.6)';
-    
+
     return (
       <TouchableOpacity
-        style={[
-          styles.categoryItem,
-          isSelected && styles.categoryItemSelected
-        ]}
+        style={[styles.categoryItem, isSelected && styles.categoryItemSelected]}
         onPress={() => handleCategorySelect(category)}
-        activeOpacity={0.7}
-      >
+        activeOpacity={0.7}>
         {/* Icône uniquement pour Favoris et Récents */}
         {getCategoryIcon(category.name) && (
-          <Icon 
-            name={getCategoryIcon(category.name)} 
-            size={20} 
-            color={iconColor} 
-            style={styles.categoryIcon} 
+          <Icon
+            name={getCategoryIcon(category.name)}
+            size={20}
+            color={iconColor}
+            style={styles.categoryIcon}
           />
         )}
-        
+
         {/* Nom de catégorie avec hiérarchie typographique */}
-        <Text 
+        <Text
           style={[
             styles.categoryName,
-            isSelected && styles.categoryNameSelected
+            isSelected && styles.categoryNameSelected,
           ]}
-          numberOfLines={1}
-        >
+          numberOfLines={1}>
           {category.name.replace(/💙|📺|[🎯📂]/g, '').trim()}
         </Text>
-        
+
         {/* Compteur avec style secondaire */}
         <Animated.View style={styles.categoryCountContainer}>
-          <Animated.Text style={[
-            styles.categoryCount,
-            isSelected && styles.categoryCountSelected
-          ]}>
+          <Animated.Text
+            style={[
+              styles.categoryCount,
+              isSelected && styles.categoryCountSelected,
+            ]}>
             {category.count.toLocaleString()}
           </Animated.Text>
         </Animated.View>
@@ -1014,18 +1934,18 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
   // Obtenir l'icône selon le nom de catégorie
   const getCategoryIcon = (categoryName: string): string => {
     const name = categoryName.toLowerCase();
-    
-    if (name === 'tout') return 'apps';
-    if (name.includes('sport')) return 'sports-soccer';
-    if (name.includes('news') || name.includes('info')) return 'newspaper';
-    if (name.includes('movies') || name.includes('film')) return 'movie';
-    if (name.includes('kids') || name.includes('enfant')) return 'child-care';
-    if (name.includes('music') || name.includes('musique')) return 'music-note';
-    if (name.includes('documentary') || name.includes('docu')) return 'school';
-    if (name.includes('entertainment')) return 'tv';
-    if (name.includes('religion')) return 'place';
-    if (name.includes('adult')) return 'block';
-    
+
+    if (name === 'tout') {return 'apps';}
+    if (name.includes('sport')) {return 'sports-soccer';}
+    if (name.includes('news') || name.includes('info')) {return 'newspaper';}
+    if (name.includes('movies') || name.includes('film')) {return 'movie';}
+    if (name.includes('kids') || name.includes('enfant')) {return 'child-care';}
+    if (name.includes('music') || name.includes('musique')) {return 'music-note';}
+    if (name.includes('documentary') || name.includes('docu')) {return 'school';}
+    if (name.includes('entertainment')) {return 'tv';}
+    if (name.includes('religion')) {return 'place';}
+    if (name.includes('adult')) {return 'block';}
+
     return 'tv'; // Icône par défaut
   };
 
@@ -1043,7 +1963,7 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
 
   // Animation de transition entre catégories uniquement
   const categoryTransitionAnim = useRef(new Animated.Value(1)).current;
-  
+
   // Animation de transition entre catégories optimisée
   const animateCategoryTransition = () => {
     Animated.sequence([
@@ -1067,7 +1987,7 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
   // Fonction pour appliquer le tri
   const applySorting = (sortType: 'default' | 'newest' | 'az' | 'za') => {
     let sortedChannels = [...displayedChannels];
-    
+
     switch (sortType) {
       case 'az':
         sortedChannels.sort((a, b) => a.name.localeCompare(b.name));
@@ -1084,45 +2004,68 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
         // Ordre par défaut - peut recharger depuis la source ou garder l'ordre initial
         break;
     }
-    
+
     setDisplayedChannels(sortedChannels);
-    console.log(`✅ Tri appliqué: ${sortType} - ${sortedChannels.length} chaînes`);
+    console.log(
+      `✅ Tri appliqué: ${sortType} - ${sortedChannels.length} chaînes`,
+    );
   };
 
   // Fonction pour charger automatiquement toutes les chaînes restantes d'une catégorie
   const loadAllRemainingChannels = async (category: Category) => {
-    if (!useWatermelonDB || category.id === 'all') return;
-    
+    if (!useWatermelonDB || category.id === 'all') {
+      return;
+    }
+
     try {
-      const WatermelonXtreamService = (await import('../services/WatermelonXtreamService')).default;
+      const WatermelonXtreamService = (
+        await import('../services/WatermelonXtreamService')
+      ).default;
       let page = 1;
       let allChannels = [...displayedChannels];
       let hasMore = true;
-      
-      console.log(`🔄 Chargement automatique invisible pour "${category.name}"...`);
-      
+
+      console.log(
+        `🔄 Chargement automatique invisible pour "${category.name}"...`,
+      );
+
       while (hasMore) {
         const offset = page * CHANNELS_PER_PAGE;
-        const result = await WatermelonXtreamService.getChannelsByCategory(playlistId, category.id, CHANNELS_PER_PAGE, offset);
-        
+        const result = await WatermelonXtreamService.getChannelsByCategory(
+          playlistId,
+          category.id,
+          CHANNELS_PER_PAGE,
+          offset,
+        );
+
         if (result && result.length > 0) {
           const newChannels = result.map((channel: any) => ({
             id: channel.id || `channel-${channel.stream_id}-${Date.now()}`,
             name: channel.name || channel.displayName || 'Sans nom',
-            logo: normalizeXtreamLogoUrl(channel.displayLogo || channel.logoUrl || channel.streamIcon || '', serverUrl),
+            logo: normalizeXtreamLogoUrl(
+              channel.displayLogo ||
+                channel.logoUrl ||
+                channel.streamIcon ||
+                '',
+              serverUrl,
+            ),
             group: category.name,
             url: channel.streamUrl || channel.url || '',
-            type: 'XTREAM' as const
+            type: 'XTREAM' as const,
           }));
-          
+
           allChannels = [...allChannels, ...newChannels];
-          
+
           // Mise à jour silencieuse de l'affichage
           setDisplayedChannels(allChannels);
-          
-          console.log(`📄 Page ${page + 1} chargée: +${newChannels.length} chaînes (Total: ${allChannels.length})`);
+
+          console.log(
+            `📄 Page ${page + 1} chargée: +${
+              newChannels.length
+            } chaînes (Total: ${allChannels.length})`,
+          );
           page++;
-          
+
           if (result.length < CHANNELS_PER_PAGE) {
             hasMore = false;
             setHasMoreChannels(false);
@@ -1132,35 +2075,40 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
           setHasMoreChannels(false);
         }
       }
-      
-      console.log(`✅ Chargement automatique terminé: ${allChannels.length} chaînes pour "${category.name}"`);
+
+      console.log(
+        `✅ Chargement automatique terminé: ${allChannels.length} chaînes pour "${category.name}"`,
+      );
     } catch (error) {
       console.error('❌ Erreur chargement automatique:', error);
     }
   };
 
   // Rendu d'un item de chaîne avec nouveau composant optimisé
-  const renderChannelItem = React.useCallback(({ item: channel, index }: { item: Channel; index: number }) => {
-    return (
-      <ChannelCard
-        channel={channel}
-        index={index}
-        width={getChannelCardWidth()}
-        onPress={handleChannelPress}
-        serverUrl={serverUrl}
-        hideChannelNames={hideChannelNames}
-      />
-    );
-  }, [serverUrl, hideChannelNames]); // Dépendances minimales
+  const renderChannelItem = React.useCallback(
+    ({item: channel, index}: {item: Channel; index: number}) => {
+      return (
+        <ChannelCard
+          channel={channel}
+          index={index}
+          width={getChannelCardWidth()}
+          onPress={handleChannelPress}
+          serverUrl={serverUrl}
+          hideChannelNames={hideChannelNames}
+        />
+      );
+    },
+    [serverUrl, hideChannelNames],
+  ); // Dépendances minimales
 
   // OPTIMISÉ : Calcul largeur pour utiliser TOUT l'espace disponible
   const getChannelCardWidth = (): number => {
     // Calcul précis de l'espace disponible
-    const sidebarWidth = sidebarVisible ? (width * 0.32) : 0;
+    const sidebarWidth = sidebarVisible ? width * 0.32 : 0;
     const availableScreenWidth = width - sidebarWidth;
-    
+
     const columns = getOptimalColumns();
-    
+
     if (sidebarVisible) {
       // Mode sidebar : cartes légèrement plus grandes avec espacement amélioré
       const containerPadding = 6 * 2; // AUGMENTÉ : plus d'espace aux bords
@@ -1201,7 +2149,7 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
         </View>
       );
     }
-    
+
     if (!hasMoreChannels && displayedChannels.length > 0) {
       return (
         <View style={styles.endFooter}>
@@ -1211,19 +2159,22 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
         </View>
       );
     }
-    
+
     return null;
   };
-
 
   if (isLoading) {
     return (
       <View style={styles.container}>
-        <StatusBar barStyle="light-content" backgroundColor="#000000" hidden={true} translucent={true} />
+        {/* StatusBar gérée automatiquement par useImmersiveScreen */}
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>Chargement des chaînes...</Text>
           <Text style={styles.loadingSubtext}>
-            {channelsCount > 0 ? `Reconstruction de ${Math.floor(channelsCount/1000)}K chaînes...` : 'Préparation de la playlist volumineuse...'}
+            {channelsCount > 0
+              ? `Reconstruction de ${Math.floor(
+                  channelsCount / 1000,
+                )}K chaînes...`
+              : 'Préparation de la playlist volumineuse...'}
           </Text>
           <Text style={styles.loadingSubtext}>
             Veuillez patienter quelques secondes
@@ -1235,46 +2186,52 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#000000" hidden={true} translucent={true} />
-      
+      {/* StatusBar gérée automatiquement par useImmersiveScreen */}
+
       {/* Header simplifié */}
       <View style={styles.header}>
         <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-          <Icon name="arrow-back" size={24} color="#FFFFFF" />
+          <Icon name="arrow-back" size={24} color={colors.text.primary} />
         </TouchableOpacity>
-        
+
         <Text style={styles.headerTitle}>
-          {selectedCategory?.name || 'TOUTES LES CHAÎNES'} <Text style={styles.headerTitleCount}>({selectedCategory?.id === 'all' ? (selectedCategory?.count || totalChannels || displayedChannels.length) : displayedChannels.length}{hasMoreChannels && selectedCategory?.id !== 'all' ? '+' : ''})</Text>
+          {selectedCategory?.name || 'TOUTES LES CHAÎNES'}{' '}
+          <Text style={styles.headerTitleCount}>
+            (
+            {selectedCategory?.id === 'all'
+              ? selectedCategory?.count ||
+                totalChannels ||
+                displayedChannels.length
+              : displayedChannels.length}
+            {hasMoreChannels && selectedCategory?.id !== 'all' ? '+' : ''})
+          </Text>
         </Text>
-        
+
         <View style={styles.headerActions}>
           {/* Bouton pour ouvrir sidebar si fermé */}
           {!sidebarVisible && (
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={() => setSidebarVisible(true)}
-              style={styles.headerSidebarButton}
-            >
-              <Icon name="menu" size={24} color="#FFFFFF" />
+              style={styles.headerSidebarButton}>
+              <Icon name="menu" size={24} color={colors.text.primary} />
             </TouchableOpacity>
           )}
-          
-          {/* Barre de recherche intégrée */}
-          <View style={styles.searchContainerHeader}>
-            <Icon name="search" size={20} color="rgba(255, 255, 255, 0.6)" style={styles.searchIcon} />
-            <TextInput
-              style={styles.searchInputHeader}
-              placeholder="Rechercher..."
-              placeholderTextColor="rgba(255, 255, 255, 0.5)"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
+
+          {/* Bouton recherche modale */}
+          <TouchableOpacity
+            onPress={openSearchScreen}
+            style={styles.searchButton}>
+            <Icon
+              name="search"
+              size={24}
+              color="#FFFFFF"
             />
-          </View>
-          
-          <TouchableOpacity 
+          </TouchableOpacity>
+
+          <TouchableOpacity
             style={styles.headerButton}
-            onPress={() => setShowOptionsMenu(true)}
-          >
-            <Icon name="more-vert" size={26} color="#FFFFFF" />
+            onPress={() => setShowOptionsMenu(true)}>
+            <Icon name="more-vert" size={26} color={colors.text.primary} />
           </TouchableOpacity>
         </View>
       </View>
@@ -1282,7 +2239,7 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
       {/* Menu d'options (3 points) - Version dropdown compacte */}
       {showOptionsMenu && (
         <View style={styles.dropdownOverlay}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.dropdownBackdrop}
             activeOpacity={1}
             onPress={() => setShowOptionsMenu(false)}
@@ -1294,36 +2251,34 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
               onPress={() => {
                 setHideChannelNames(!hideChannelNames);
                 setShowOptionsMenu(false);
-              }}
-            >
-              <Icon 
-                name={hideChannelNames ? "visibility" : "visibility-off"} 
-                size={18} 
-                color="#333333" 
+              }}>
+              <Icon
+                name={hideChannelNames ? 'visibility' : 'visibility-off'}
+                size={18}
+                color="#333333"
               />
               <Text style={styles.dropdownText}>
-                {hideChannelNames ? "Afficher les noms" : "Masquer le nom de la chaîne"}
+                {hideChannelNames
+                  ? 'Afficher les noms'
+                  : 'Masquer le nom de la chaîne'}
               </Text>
             </TouchableOpacity>
-            
+
             <View style={styles.dropdownSeparator} />
-            
+
             <TouchableOpacity
               style={styles.dropdownItem}
               activeOpacity={0.7}
               onPress={() => {
                 setShowOptionsMenu(false);
                 setShowSortModal(true);
-              }}
-            >
-              <Icon 
-                name="sort" 
-                size={18} 
-                color="#333333" 
+              }}>
+              <Icon
+                name="sort"
+                size={18}
+                color="#333333"
               />
-              <Text style={styles.dropdownText}>
-                Trier
-              </Text>
+              <Text style={styles.dropdownText}>Trier</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1332,7 +2287,7 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
       {/* Modal de tri - Version sans Modal React Native */}
       {showSortModal && (
         <View style={styles.sortModalOverlay}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.sortModalBackdrop}
             activeOpacity={1}
             onPress={() => setShowSortModal(false)}
@@ -1340,49 +2295,61 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
           <View style={styles.sortModalContent}>
             {/* Header du modal */}
             <View style={styles.sortModalHeader}>
-              <Icon name="sort" size={24} color="#4A9EFF" />
+              <Icon name="sort" size={24} color={colors.accent.primary} />
               <Text style={styles.sortModalTitle}>Trier selon :</Text>
             </View>
-            
+
             {/* Options de tri */}
             <View style={styles.sortOptions}>
               {[
-                { key: 'default', label: 'Défaut', icon: 'radio-button-unchecked' },
-                { key: 'newest', label: 'Top Ajouté', icon: 'radio-button-unchecked' },
-                { key: 'az', label: 'A-Z', icon: 'radio-button-unchecked' },
-                { key: 'za', label: 'Z-A', icon: 'radio-button-unchecked' },
-              ].map((option) => (
+                {
+                  key: 'default',
+                  label: 'Défaut',
+                  icon: 'radio-button-unchecked',
+                },
+                {
+                  key: 'newest',
+                  label: 'Top Ajouté',
+                  icon: 'radio-button-unchecked',
+                },
+                {key: 'az', label: 'A-Z', icon: 'radio-button-unchecked'},
+                {key: 'za', label: 'Z-A', icon: 'radio-button-unchecked'},
+              ].map(option => (
                 <TouchableOpacity
                   key={option.key}
                   style={styles.sortOption}
                   activeOpacity={0.6}
-                  onPress={() => setSortOption(option.key as any)}
-                >
-                  <Icon 
-                    name={sortOption === option.key ? "radio-button-checked" : "radio-button-unchecked"} 
-                    size={20} 
-                    color={sortOption === option.key ? "#4A9EFF" : "#666666"} 
+                  onPress={() => setSortOption(option.key as any)}>
+                  <Icon
+                    name={
+                      sortOption === option.key
+                        ? 'radio-button-checked'
+                        : 'radio-button-unchecked'
+                    }
+                    size={20}
+                    color={sortOption === option.key ? '#4A9EFF' : '#666666'}
                   />
-                  <Text style={[
-                    styles.sortOptionText,
-                    sortOption === option.key && styles.sortOptionTextSelected
-                  ]}>
+                  <Text
+                    style={[
+                      styles.sortOptionText,
+                      sortOption === option.key &&
+                        styles.sortOptionTextSelected,
+                    ]}>
                     {option.label}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
-            
+
             {/* Boutons d'action */}
             <View style={styles.sortModalActions}>
               <TouchableOpacity
                 style={styles.sortModalButtonSecondary}
                 activeOpacity={0.7}
-                onPress={() => setShowSortModal(false)}
-              >
+                onPress={() => setShowSortModal(false)}>
                 <Text style={styles.sortModalButtonSecondaryText}>FERMER</Text>
               </TouchableOpacity>
-              
+
               <TouchableOpacity
                 style={styles.sortModalButtonPrimary}
                 activeOpacity={0.8}
@@ -1390,9 +2357,10 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
                   // Appliquer le tri
                   applySorting(sortOption);
                   setShowSortModal(false);
-                }}
-              >
-                <Text style={styles.sortModalButtonPrimaryText}>ENREGISTRER</Text>
+                }}>
+                <Text style={styles.sortModalButtonPrimaryText}>
+                  ENREGISTRER
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1401,50 +2369,58 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
 
       {/* Contenu principal - Layout horizontal */}
       <View style={styles.mainContent}>
-        
+
         {/* NOUVEAU : Sidebar épuré style liste */}
         {sidebarVisible && (
-        <View style={styles.sidebar}>
-          {/* Header simplifié - seulement bouton fermer */}
-          <View style={styles.sidebarHeader}>
-            <Text style={styles.sidebarTitle}>Catégories</Text>
-            <TouchableOpacity 
-              onPress={() => setSidebarVisible(false)}
-              style={styles.sidebarCloseButton}
-            >
-              <Icon name="close" size={20} color="rgba(255, 255, 255, 0.7)" />
-            </TouchableOpacity>
-          </View>
-          
+          <View style={styles.sidebar}>
+            {/* Header simplifié - seulement bouton fermer */}
+            <View style={styles.sidebarHeader}>
+              <Text style={styles.sidebarTitle}>Catégories</Text>
+              <TouchableOpacity
+                onPress={() => setSidebarVisible(false)}
+                style={styles.sidebarCloseButton}>
+                <Icon name="close" size={20} color="rgba(255, 255, 255, 0.7)" />
+              </TouchableOpacity>
+            </View>
+
           <FlatList
-            data={categories}
-            keyExtractor={(item, index) => `category-${item.id}-${index}`}
-            renderItem={renderCategoryItem}
-            showsVerticalScrollIndicator={false}
-            style={styles.categoriesList}
-            contentContainerStyle={styles.categoriesListContent}
-          />
-        </View>
+              data={categories}
+              keyExtractor={(item, index) => `category-${item.id}-${index}`}
+              renderItem={renderCategoryItem}
+              showsVerticalScrollIndicator={false}
+              style={styles.categoriesList}
+              contentContainerStyle={styles.categoriesListContent}
+            />
+          </View>
         )}
 
         {/* ÉTAPE 4: Grille principale des chaînes */}
-        <Animated.View style={[styles.channelsGrid, !sidebarVisible && styles.channelsGridFullWidth, { opacity: categoryTransitionAnim }]}>
+        <Animated.View
+          style={[
+            styles.channelsGrid,
+            !sidebarVisible && styles.channelsGridFullWidth,
+            {opacity: categoryTransitionAnim},
+          ]}>
           <FlatList
             ref={flatListRef}
             data={displayedChannels}
             keyExtractor={keyExtractor}
             renderItem={renderChannelItem}
             numColumns={getOptimalColumns()}
-            key={`channels-grid-${sidebarVisible ? 'sidebar' : 'fullscreen'}-${getOptimalColumns()}`} // Force re-render when columns change
+            key={`channels-grid-${sidebarVisible ? 'sidebar' : 'fullscreen'}-${getOptimalColumns()}`}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={[
               styles.channelsGridContent,
-              { 
+              {
                 paddingHorizontal: sidebarVisible ? 6 : 8, // Correspond au containerPadding
-                paddingBottom: 20
+                paddingBottom: 20,
               }
             ]}
-            columnWrapperStyle={sidebarVisible ? styles.rowSpacingSidebar : styles.rowSpacingFullscreen}
+            columnWrapperStyle={
+              sidebarVisible
+                ? styles.rowSpacingSidebar
+                : styles.rowSpacingFullscreen
+            }
             ItemSeparatorComponent={null}
             ListEmptyComponent={renderEmptyChannels}
             ListFooterComponent={renderFooter}
@@ -1464,473 +2440,8 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({ route, navigation }) =>
           />
         </Animated.View>
       </View>
-
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#000000',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#000000',
-  },
-  loadingText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  loadingSubtext: {
-    color: 'rgba(255, 255, 255, 0.7)',
-    fontSize: 14,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 4,
-    backgroundColor: '#111111',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  backButton: {
-    padding: 8,
-  },
-  headerTitle: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '700', // BOLD : Maintenu pour les titres importants
-    textAlign: 'center',
-    flex: 1,
-    marginHorizontal: 16,
-  },
-  headerTitleCount: {
-    color: '#FFFFFF', // BLANC : Compteur en blanc comme demandé
-    fontSize: 16,
-    fontWeight: '400', // REGULAR : Poids normal pour le compteur
-  },
-  headerActions: {
-    flexDirection: 'row',
-  },
-  headerButton: {
-    padding: 8,
-    marginLeft: 8,
-  },
-  headerSidebarButton: {
-    padding: 8,
-    marginRight: 16, // ÉLOIGNÉ : 8→16 de la barre de recherche
-    borderRadius: 20, // ARRONDI : 8→20 pour forme plus ronde
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    minWidth: 40,
-    minHeight: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  mainContent: {
-    flex: 1,
-    flexDirection: 'row',
-  },
-  sidebar: {
-    width: width * 0.32,
-    paddingTop: 16,
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    backgroundColor: '#1a1a1a',
-    borderTopRightRadius: 16,
-    borderBottomRightRadius: 16,
-    borderRightWidth: 1,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    // Ombres identiques aux cartes
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.5,
-    shadowRadius: 16,
-    elevation: 12,
-  },
-  sidebarHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
-    minHeight: 44,
-  },
-  sidebarTitle: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '700', // BOLD : Pour section importante comme suggéré
-    letterSpacing: 0.5,
-  },
-  sidebarCloseButton: {
-    padding: 6, // RÉDUIT : bouton plus compact
-    borderRadius: 18, // AUGMENTÉ : plus arrondi
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    minWidth: 32, // RÉDUIT : plus petit
-    minHeight: 32, // RÉDUIT : plus petit
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  // openSidebarButton supprimé - bouton déplacé dans header
-  channelsGridFullWidth: {
-    flex: 1,
-    width: '100%',
-  },
-  searchContainerHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.08)', // 🎨 MODERNISÉ : Plus subtil
-    borderRadius: 20, // Arrondi moderne
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    marginRight: 8,
-    minWidth: 160,
-    maxWidth: 220,
-    height: 36,
-    // Bordure subtile pour plus de définition
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  searchIcon: {
-    marginRight: 6, // RÉDUIT : espacement plus compact
-    alignSelf: 'center', // NOUVEAU : centrer verticalement
-  },
-  searchInputHeader: {
-    flex: 1,
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '500',
-    paddingVertical: 0, // SUPPRIMÉ : padding pour centrage parfait
-    lineHeight: 16,
-    textAlign: 'center', // NOUVEAU : centrer le texte
-    textAlignVertical: 'center', // NOUVEAU : centrage vertical Android
-  },
-  categoriesList: {
-    flex: 1,
-  },
-  categoriesListContent: {
-    paddingBottom: 20, // AUGMENTÉ : plus d'espace en bas
-    flexGrow: 1, // NOUVEAU : utilise tout l'espace disponible
-  },
-  categoryItem: {
-    // NOUVEAU : Style liste standard simple
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 10, // RÉDUIT : plus compact
-    marginBottom: 3, // AUGMENTÉ : léger espacement entre items
-    backgroundColor: 'transparent',
-  },
-  categoryItemSelected: {
-    // 🎨 MODERNISÉ : Sélection avec couleur cyan menthe
-    backgroundColor: '#2a2a2a',
-    borderRadius: 8,
-    borderLeftWidth: 4,
-    borderLeftColor: '#00D4AA', // Couleur cyan menthe moderne
-    // Effet subtil de shadow
-    shadowColor: '#00D4AA',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  categoryIcon: {
-    marginRight: 12,
-    width: 20,
-  },
-  categoryName: {
-    flex: 1,
-    color: 'rgba(255, 255, 255, 0.9)',
-    fontSize: 15,
-    fontWeight: '500', // 🎨 MODERNISÉ : Medium pour hiérarchie
-    lineHeight: 18,
-  },
-  categoryNameSelected: {
-    color: '#00D4AA', // 🎨 MODERNISÉ : Couleur cyan menthe
-    fontWeight: '700', // Bold pour items sélectionnés
-  },
-  categoryCount: {
-    color: '#FFFFFF', // BLANC : Compteur normal
-    fontSize: 13, // Taille réduite pour style secondaire
-    fontWeight: '400', // Regular pour compteurs
-    marginLeft: 8,
-    minWidth: 40, // Largeur minimum pour éviter déplacement lors animation
-    textAlign: 'right',
-  },
-  categoryCountSelected: {
-    color: '#00D4AA', // VERT : Compteur sélectionné
-    fontWeight: '700', // BOLD pour sélection
-    fontSize: 18, // PLUS GRAND : Seulement pour l'item sélectionné
-    transform: [{ scale: 1.1 }], // ANIMATION : Agrandissement plus visible pour sélection
-  },
-  categoryCountContainer: {
-    // NOUVEAU : Container pour animation fluide
-    justifyContent: 'center',
-    alignItems: 'center',
-    minWidth: 45,
-  },
-  channelsGrid: {
-    flex: 1,
-    backgroundColor: '#0a0a0a',
-  },
-  channelsGridContent: {
-    paddingTop: 8, // NOUVEAU : espacement en haut
-    paddingBottom: 20, // AUGMENTÉ : plus d'espace en bas
-  },
-  channelsRow: {
-    justifyContent: 'flex-start',
-    marginBottom: 6,
-  },
-  // Styles channelCard supprimés - désormais dans ChannelCard.tsx
-  emptyChannels: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 60,
-  },
-  emptyText: {
-    color: 'rgba(255, 255, 255, 0.6)',
-    fontSize: 16,
-    fontWeight: '600',
-    marginTop: 16,
-    textAlign: 'center',
-  },
-  emptySubtext: {
-    color: 'rgba(255, 255, 255, 0.4)',
-    fontSize: 12,
-    marginTop: 8,
-    textAlign: 'center',
-    paddingHorizontal: 32,
-    lineHeight: 16,
-  },
-  // channelNameFallback supprimé - désormais dans ChannelCard.tsx
-  loadingFooter: {
-    padding: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loadingFooterText: {
-    color: 'rgba(255, 255, 255, 0.7)',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  endFooter: {
-    padding: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  endFooterText: {
-    color: 'rgba(255, 255, 255, 0.5)',
-    fontSize: 12,
-    fontWeight: '400',
-  },
-  // NOUVEAU : Styles pour espacement entre rangées - ALIGNEMENT RÉTABLI
-  rowSpacingSidebar: {
-    justifyContent: 'space-between', // RÉTABLI : distribution équitable
-    paddingHorizontal: 0,
-    marginBottom: 4, // Espacement vertical entre rangées
-  },
-  rowSpacingFullscreen: {
-    justifyContent: 'space-between', // RÉTABLI : distribution équitable
-    paddingHorizontal: 0, 
-    marginBottom: 6, // Plus d'espacement en mode plein écran
-  },
-  // Styles pour dropdown menu - SANS modal fullscreen
-  dropdownOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 1000,
-  },
-  dropdownBackdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'transparent', // Pas de film noir
-  },
-  dropdownMenu: {
-    position: 'absolute',
-    top: 55, // Position sous le header
-    right: 12, // Aligné avec le bouton 3 points
-    backgroundColor: '#FFFFFF', // Blanc pur pour maximum de contraste
-    borderRadius: 16, // Très arrondi pour effet moderne
-    paddingVertical: 8,
-    minWidth: 200,
-    maxWidth: 240,
-    borderWidth: 0, // Pas de bordure pour effet plus clean
-    // Dégradé subtil avec plusieurs ombres pour effet de profondeur
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
-    elevation: 15,
-    // Effet de glassmorphism avec backdrop
-    backdropFilter: 'blur(10px)',
-  },
-  dropdownItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderRadius: 12, // Plus arrondi pour cohérence
-    marginHorizontal: 8, // Espacement des côtés
-    marginVertical: 2, // Espacement vertical entre items
-    backgroundColor: 'transparent',
-    // Effet de transition hover (simulé avec activeOpacity)
-  },
-  dropdownText: {
-    color: '#333333', // Texte sombre sur fond clair
-    fontSize: 14,
-    fontWeight: '400',
-    marginLeft: 12,
-    flex: 1,
-  },
-  dropdownSeparator: {
-    height: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.06)', // Ligne très subtile
-    marginVertical: 6,
-    marginHorizontal: 16, // Plus d'espacement sur les côtés
-    borderRadius: 1, // Légèrement arrondi
-  },
-  // Styles pour le modal de tri - Position absolue SANS Modal React Native
-  sortModalOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 2000,
-  },
-  sortModalBackdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.15)', // Beaucoup moins opaque
-  },
-  sortModalContent: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)', // Blanc légèrement transparent
-    borderRadius: 20, // iOS native style - très arrondi
-    paddingVertical: 24, // Padding premium
-    paddingHorizontal: 24,
-    minWidth: 280,
-    maxWidth: 320,
-    width: '80%',
-    borderWidth: 0,
-    // ✨ iOS Native - Ombres douces multi-layered
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.15,
-    shadowRadius: 24,
-    // ✨ Material Design 3 - Surface élevée
-    elevation: 24,
-    // ✨ Premium depth effect
-    transform: [{ translateY: -2 }],
-    // ✨ Glassmorphism effect
-    backdropFilter: 'blur(20px)',
-  },
-  sortModalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16, // Réduit de 20 à 16
-  },
-  sortModalTitle: {
-    fontSize: 18, // Réduit de 20 à 18
-    fontWeight: '600',
-    color: '#333333',
-    marginLeft: 10, // Réduit de 12 à 10
-  },
-  sortOptions: {
-    marginBottom: 18, // Réduit de 24 à 18
-  },
-  sortOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10, // Réduit de 14 à 10
-    paddingHorizontal: 6, // Réduit de 8 à 6
-    borderRadius: 8, // Réduit de 10 à 8
-    marginVertical: 1, // Réduit de 2 à 1
-  },
-  sortOptionText: {
-    fontSize: 15, // Réduit de 16 à 15
-    fontWeight: '400',
-    color: '#333333',
-    marginLeft: 10, // Réduit de 12 à 10
-  },
-  sortOptionTextSelected: {
-    fontWeight: '500',
-    color: '#4A9EFF',
-  },
-  sortModalActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between', // Meilleur alignement
-    alignItems: 'center',
-    marginTop: 8, // Espacement du haut
-    paddingTop: 8, // Séparation visuelle
-  },
-  sortModalButtonSecondary: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 16, // ✨ iOS Native - coins très arrondis
-    backgroundColor: '#F2F2F7', // ✨ iOS system gray
-    // ✨ Premium subtle shadow
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-    minWidth: 90, // Largeur minimale pour alignement
-  },
-  sortModalButtonSecondaryText: {
-    fontSize: 13, // Réduit de 14 à 13
-    fontWeight: '600',
-    color: '#666666',
-  },
-  sortModalButtonPrimary: {
-    paddingVertical: 12,
-    paddingHorizontal: 28,
-    borderRadius: 16, // ✨ iOS Native - coins très arrondis
-    backgroundColor: '#007AFF', // ✨ iOS system blue
-    // ✨ Premium glowing shadow effect
-    shadowColor: '#007AFF',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 8,
-    // ✨ Material Design 3 - Subtle gradient
-    minWidth: 120, // Largeur minimale pour alignement
-  },
-  sortModalButtonPrimaryText: {
-    fontSize: 14, // ✨ Premium - taille optimale
-    fontWeight: '600',
-    color: '#FFFFFF',
-    textAlign: 'center',
-  },
-  sortModalButtonSecondaryText: {
-    fontSize: 14, // ✨ Cohérence avec primaire
-    fontWeight: '600',
-    color: '#8E8E93', // ✨ iOS system gray
-    textAlign: 'center',
-  },
-});
 
 export default ChannelsScreen;
