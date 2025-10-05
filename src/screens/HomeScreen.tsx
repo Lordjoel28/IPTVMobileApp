@@ -17,7 +17,6 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import {BlurView} from '@react-native-community/blur';
 import VideoPlayer from '../components/VideoPlayer';
 import ConnectionModal from '../components/ConnectionModal';
 import XtreamCodeModal from '../components/XtreamCodeModal';
@@ -28,6 +27,7 @@ import type {StackNavigationProp} from '@react-navigation/stack';
 import type {RootStackParamList} from '../types';
 
 // Import du service IPTV
+import {usePlaylistStore} from '../stores/PlaylistStore';
 import IPTVService from '../services/IPTVService';
 
 // Type pour navigation
@@ -59,6 +59,7 @@ const bottomRowCards = [
 
 const HomeScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
+  const {loadPlaylist} = usePlaylistStore();
 
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showVideoPlayer, setShowVideoPlayer] = useState(false);
@@ -93,8 +94,6 @@ const HomeScreen: React.FC = () => {
     // Test d'initialisation des nouveaux services IPTV - INSTANCE UNIQUE
     const testServices = async () => {
       try {
-        console.log('🚀 Initialisation des services IPTV...');
-
         // Utiliser toujours la même instance
         if (!iptvServiceRef.current) {
           iptvServiceRef.current = IPTVService.getInstance({
@@ -130,10 +129,45 @@ const HomeScreen: React.FC = () => {
     return () => clearInterval(timeInterval);
   }, []);
 
-  const handleTVCardPress = () => {
-    console.log('🎬 TV Card Pressed - NAVIGATION DIRECTE!');
+  const handleTVCardPress = async () => {
+    console.log('🎬 TV Card Pressed - VÉRIFICATION PLAYLIST ACTIVE!');
 
-    // 🧪 DONNÉES MOCK POUR TEST NAVIGATION
+    // 🔍 VÉRIFIER D'ABORD S'IL Y A UNE PLAYLIST ACTIVE
+    const {channels, selectedPlaylistId} = usePlaylistStore.getState();
+
+    if (channels.length > 0 && selectedPlaylistId) {
+      console.log(`✅ Playlist active trouvée: ${selectedPlaylistId} avec ${channels.length} chaînes`);
+
+      // Navigation vers les vraies chaînes de la playlist active
+      try {
+        navigation.navigate('ChannelList', {
+          playlistId: selectedPlaylistId,
+          playlistName: 'Playlist Active',
+          channels: channels,
+          totalChannels: channels.length,
+        });
+        console.log('✅ Navigation vers playlist active réussie!');
+        return;
+      } catch (error) {
+        console.error('❌ ERREUR NAVIGATION playlist active:', error);
+      }
+    } else {
+      // Si aucune playlist n'est active dans le store, on affiche l'alerte.
+      // La restauration est maintenant automatique grâce à la persistance du store Zustand.
+      console.log('❌ Aucune playlist active trouvée dans le store. Affichage de l\'alerte.');
+      Alert.alert(
+        '📺 Aucune playlist',
+        'Veuillez d\'abord importer et sélectionner une playlist depuis le menu "Profils".',
+        [
+          {
+            text: 'OK',
+            style: 'default',
+          },
+        ],
+      );
+    }
+
+    // 🧪 FALLBACK : DONNÉES MOCK POUR TEST NAVIGATION
     const mockChannels = [
       {
         id: '1',
@@ -201,6 +235,133 @@ const HomeScreen: React.FC = () => {
       console.log('✅ Navigation TV HomeScreen réussie!');
     } catch (error) {
       console.error('❌ ERREUR NAVIGATION TV HomeScreen:', error);
+    }
+  };
+
+  const handleEPGCardPress = () => {
+    console.log('📺 [HomeScreen] handleEPGCardPress appelée - DÉBUT NAVIGATION EPG!');
+    console.log('📺 EPG Card Pressed - NAVIGATION DIRECTE!');
+
+    // 🧪 DONNÉES MOCK POUR TEST EPG NAVIGATION
+    const mockChannels = [
+      {
+        id: '1',
+        name: 'TF1 HD',
+        url: 'https://example.com/tf1.m3u8',
+        category: 'Généraliste',
+        logo: 'https://example.com/tf1.png',
+      },
+      {
+        id: '2',
+        name: 'France 2 HD',
+        url: 'https://example.com/france2.m3u8',
+        category: 'Généraliste',
+        logo: 'https://example.com/france2.png',
+      },
+      {
+        id: '3',
+        name: 'Canal+ Sport',
+        url: 'https://example.com/canal.m3u8',
+        category: 'Sport',
+        logo: 'https://example.com/canal.png',
+      },
+      {
+        id: '4',
+        name: 'Eurosport 1',
+        url: 'https://example.com/eurosport1.m3u8',
+        category: 'Sport',
+        logo: 'https://example.com/eurosport.png',
+      },
+      {
+        id: '5',
+        name: 'BFM TV',
+        url: 'https://example.com/bfm.m3u8',
+        category: 'Actualités',
+        logo: 'https://example.com/bfm.png',
+      },
+      {
+        id: '6',
+        name: 'Arte HD',
+        url: 'https://example.com/arte.m3u8',
+        category: 'Culture',
+        logo: 'https://example.com/arte.png',
+      },
+      {
+        id: '7',
+        name: 'Discovery Channel',
+        url: 'https://example.com/discovery.m3u8',
+        category: 'Documentaires',
+        logo: 'https://example.com/discovery.png',
+      },
+      {
+        id: '8',
+        name: 'M6 HD',
+        url: 'https://example.com/m6.m3u8',
+        category: 'Généraliste',
+        logo: 'https://example.com/m6.png',
+      },
+      {
+        id: '9',
+        name: 'RMC Sport 1',
+        url: 'https://example.com/rmc1.m3u8',
+        category: 'Sport',
+        logo: 'https://example.com/rmc.png',
+      },
+      {
+        id: '10',
+        name: 'France Info',
+        url: 'https://example.com/franceinfo.m3u8',
+        category: 'Actualités',
+        logo: 'https://example.com/franceinfo.png',
+      },
+    ];
+
+    // Créer catégories avec compteurs de chaînes
+    const mockCategories = [
+      {
+        id: 'generaliste',
+        name: 'Généraliste',
+        channels: mockChannels.filter(c => c.category === 'Généraliste'),
+      },
+      {
+        id: 'sport',
+        name: 'Sport',
+        channels: mockChannels.filter(c => c.category === 'Sport'),
+      },
+      {
+        id: 'actualites',
+        name: 'Actualités',
+        channels: mockChannels.filter(c => c.category === 'Actualités'),
+      },
+      {
+        id: 'culture',
+        name: 'Culture',
+        channels: mockChannels.filter(c => c.category === 'Culture'),
+      },
+      {
+        id: 'documentaires',
+        name: 'Documentaires',
+        channels: mockChannels.filter(c => c.category === 'Documentaires'),
+      },
+    ];
+
+    console.log('📺 NAVIGATION vers EPGCategoriesScreen avec:', {
+      categories: mockCategories.length,
+      totalChannels: mockChannels.length,
+      playlistName: '📺 Guide EPG Test HomeScreen',
+    });
+
+    // Navigation vers l'écran de sélection des catégories EPG
+    try {
+      navigation.navigate('EPGCategoriesScreen', {
+        allCategories: mockCategories,
+        allChannels: mockChannels,
+        playlistId: 'mock-epg-homescreen',
+        playlistName: '📺 Guide EPG Test HomeScreen',
+      });
+      console.log('✅ Navigation EPG HomeScreen réussie!');
+    } catch (error) {
+      console.error('❌ ERREUR NAVIGATION EPG HomeScreen:', error);
     }
   };
 
@@ -286,6 +447,18 @@ const HomeScreen: React.FC = () => {
         success: result.success,
       });
 
+      // 🔄 SYNCHRONISATION CRITIQUE avec PlaylistStore pour persistance
+      console.log('🔄 Synchronisation PlaylistStore avec données importées...');
+      loadPlaylist(
+        source.url,
+        result.playlist.channels,
+        source.name || 'Test Playlist'
+      );
+      console.log('✅ PlaylistStore synchronisé avec', result.playlist.channels.length, 'chaînes');
+
+      // 🎯 La nouvelle action `loadPlaylist` dans le store s'occupe de la sélection.
+      console.log('✅ La persistance est maintenant gérée par le store Zustand.');
+
       // Test recherche si on a des chaînes
       if (result.playlist.channels.length > 0) {
         console.log('🔍 Test recherche...');
@@ -349,6 +522,7 @@ const HomeScreen: React.FC = () => {
         barStyle="light-content"
         backgroundColor="transparent"
         translucent
+      />
 
       <View style={styles.header}>
         <View style={styles.headerLeft}>
@@ -399,18 +573,11 @@ const HomeScreen: React.FC = () => {
                 style={styles.cardTV}
                 onPress={handleTVCardPress}
                 activeOpacity={0.8}>
-                <BlurView
-                  style={styles.absoluteFill}
-                  blurType="light"
-                  blurAmount={15}
-                  reducedTransparencyFallbackColor="rgba(255,255,255,0.15)"
-                  pointerEvents="none"
-                />
                 <LinearGradient
                   colors={[
-                    'rgba(28, 138, 208, 0.7)',
-                    'rgba(20, 100, 160, 0.5)',
-                    'rgba(15, 76, 117, 0.8)',
+                    'rgba(28, 138, 208, 0.92)',
+                    'rgba(20, 100, 160, 0.88)',
+                    'rgba(15, 76, 117, 0.95)',
                   ]}
                   locations={[0, 0.5, 1]}
                   start={{x: 0, y: 0}}
@@ -461,18 +628,11 @@ const HomeScreen: React.FC = () => {
                     Alert.alert('TEST CARTE', '🎬 FILMS CLIQUÉ! ✅');
                   }}
                   activeOpacity={0.8}>
-                  <BlurView
-                    style={styles.absoluteFill}
-                    blurType="light"
-                    blurAmount={15}
-                    reducedTransparencyFallbackColor="rgba(255,255,255,0.15)"
-                    pointerEvents="none"
-                  />
                   <LinearGradient
                     colors={[
-                      'rgba(241, 106, 32, 0.7)',
-                      'rgba(230, 81, 0, 0.5)',
-                      'rgba(200, 60, 0, 0.8)',
+                      'rgba(241, 106, 32, 0.92)',
+                      'rgba(230, 81, 0, 0.88)',
+                      'rgba(200, 60, 0, 0.95)',
                     ]}
                     locations={[0, 0.5, 1]}
                     start={{x: 0, y: 0}}
@@ -522,18 +682,11 @@ const HomeScreen: React.FC = () => {
                     Alert.alert('TEST CARTE', '📺 SERIES CLIQUÉ! ✅');
                   }}
                   activeOpacity={0.8}>
-                  <BlurView
-                    style={styles.absoluteFill}
-                    blurType="light"
-                    blurAmount={15}
-                    reducedTransparencyFallbackColor="rgba(255,255,255,0.15)"
-                    pointerEvents="none"
-                  />
                   <LinearGradient
                     colors={[
-                      'rgba(130, 100, 160, 0.7)',
-                      'rgba(110, 85, 140, 0.5)',
-                      'rgba(95, 70, 125, 0.8)',
+                      'rgba(130, 100, 160, 0.92)',
+                      'rgba(110, 85, 140, 0.88)',
+                      'rgba(95, 70, 125, 0.95)',
                     ]}
                     locations={[0, 0.5, 1]}
                     start={{x: 0, y: 0}}
@@ -583,21 +736,22 @@ const HomeScreen: React.FC = () => {
                     style={[styles.cardBottom, styles.liquidGlassCard]}
                     onPress={() => {
                       console.log(`${card.title} CLICKED!`);
-                      Alert.alert('TEST CARTE', `${card.title} CLIQUÉ! ✅`);
+
+                      // Navigation spécifique par type de carte
+                      if (card.key === 'epg') {
+                        console.log('🎯 [HomeScreen] Bouton LIVE EPG cliqué - Appel handleEPGCardPress');
+                        handleEPGCardPress();
+                      } else {
+                        console.log('🎯 [HomeScreen] Autre bouton cliqué:', card.key);
+                        Alert.alert('TODO', `${card.title} pas encore implémenté`);
+                      }
                     }}
                     activeOpacity={0.8}>
-                    <BlurView
-                      style={styles.absoluteFill}
-                      blurType="light"
-                      blurAmount={8}
-                      reducedTransparencyFallbackColor="rgba(255,255,255,0.18)"
-                      pointerEvents="none"
-                    />
                     <LinearGradient
                       colors={[
-                        'rgba(65, 85, 75, 0.7)',
-                        'rgba(55, 70, 60, 0.5)',
-                        'rgba(45, 60, 50, 0.8)',
+                        'rgba(65, 85, 75, 0.92)',
+                        'rgba(55, 70, 60, 0.88)',
+                        'rgba(45, 60, 50, 0.95)',
                       ]}
                       locations={[0, 0.5, 1]}
                       start={{x: 0, y: 0}}

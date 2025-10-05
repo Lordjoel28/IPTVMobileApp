@@ -310,6 +310,7 @@ class ChunkedAPILoader {
           const progress = 30 + Math.min(60, Math.round(count / 1000)); // Estimate progress
           onProgress?.(progress, `📺 Processed ${count} channels`, count);
         },
+      );
 
       onProgress?.(100, `✅ ${allChannels.length} channels loaded`);
       return allChannels;

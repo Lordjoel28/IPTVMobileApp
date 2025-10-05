@@ -169,6 +169,7 @@ const PlaylistsScreen: React.FC = () => {
       const selectedPlaylist = await selectPlaylistWithAnimation(
         playlist.id,
         playlist.name,
+      );
 
       if (selectedPlaylist) {
         console.log(

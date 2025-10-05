@@ -183,13 +183,13 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   const handleExitFullscreen = () => {
     console.log('❌ Exiting fullscreen mode');
-    
+
     // Sauvegarder la position actuelle pour continuité
     const savedTime = currentTime;
-    
+
     // Changer le mode
     onFullscreenToggle?.(false);
-    
+
     // Restaurer la position après le changement de mode
     setTimeout(() => {
       const newRef = videoRef; // Maintenant on utilise le mini-player
@@ -223,7 +223,15 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
     return (
       <Video
         ref={isFullscreen ? fullscreenVideoRef : videoRef}
-        source={{uri: channel.url}}
+        source={{
+          uri: channel.url,
+          headers: {
+            'User-Agent': 'IPTV Smarters Pro',
+            Referer: 'https://www.iptvsmarters.com/',
+            Accept: '*/*',
+            Connection: 'keep-alive',
+          },
+        }}
         style={isFullscreen ? styles.fullscreenVideo : styles.video}
         resizeMode="contain"
         paused={externalPaused !== undefined ? externalPaused : isPaused}
@@ -239,10 +247,10 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
         onProgress={handleProgress}
         onBuffer={handleBuffer}
         bufferConfig={{
-          minBufferMs: 15000,    // TiviMate style - buffer plus important
-          maxBufferMs: 50000,    // TiviMate style - buffer maximal élevé
-          bufferForPlaybackMs: 2500,    // Démarrage rapide mais sûr
-          bufferForPlaybackAfterRebufferMs: 5000,   // Plus de sécurité après rebuffer
+          minBufferMs: 15000, // TiviMate style - buffer plus important
+          maxBufferMs: 50000, // TiviMate style - buffer maximal élevé
+          bufferForPlaybackMs: 2500, // Démarrage rapide mais sûr
+          bufferForPlaybackAfterRebufferMs: 5000, // Plus de sécurité après rebuffer
         }}
         repeat={false}
         playWhenInactive={false}
@@ -251,19 +259,27 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
         muted={false}
         volume={1.0}
         rate={1.0}
-        progressUpdateInterval={1000}     // Réduction fréquence updates
+        progressUpdateInterval={1000} // Réduction fréquence updates
         hideShutterView={true}
-        shutterColor="transparent" 
+        shutterColor="transparent"
         disableFocus={true}
-        useTextureView={false}            // Performance Android
-        allowsExternalPlayback={false}    // Évite conflit AirPlay
-        controls={false}                  // Contrôles custom seulement
+        useTextureView={false} // Performance Android
+        allowsExternalPlayback={false} // Évite conflit AirPlay
+        controls={false} // Contrôles custom seulement
         onReadyForDisplay={() => {
-          console.log(`📹 Video ready for display (${isFullscreen ? 'fullscreen' : 'mini-player'})`);
+          console.log(
+            `📹 Video ready for display (${
+              isFullscreen ? 'fullscreen' : 'mini-player'
+            })`,
+          );
           setIsLoading(false);
         }}
         onVideoLoadStart={() => {
-          console.log(`📹 Video load start (${isFullscreen ? 'fullscreen' : 'mini-player'})`);
+          console.log(
+            `📹 Video load start (${
+              isFullscreen ? 'fullscreen' : 'mini-player'
+            })`,
+          );
           setIsLoading(true);
         }}
         reportBandwidth={true}
@@ -281,7 +297,9 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
         <StatusBar hidden />
         <View style={styles.fullscreenContainer}>
           <View style={styles.fullscreenVideoContainer}>
-            {!hasError ? renderVideoComponent() : (
+            {!hasError ? (
+              renderVideoComponent()
+            ) : (
               <View style={styles.errorContainer}>
                 <Text style={styles.errorText}>❌ Erreur de lecture</Text>
                 <TouchableOpacity
@@ -317,7 +335,9 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   return (
     <View style={[styles.container, style]}>
       <View style={styles.videoContainer}>
-        {!hasError ? renderVideoComponent() : (
+        {!hasError ? (
+          renderVideoComponent()
+        ) : (
           <View style={styles.errorContainer}>
             <Text style={styles.errorText}>❌ Erreur de lecture</Text>
             <Text style={styles.errorSubText}>

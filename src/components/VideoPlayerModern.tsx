@@ -289,7 +289,15 @@ const VideoPlayerModern: React.FC<VideoPlayerModernProps> = ({
           {!hasError ? (
             <Video
               ref={videoRef}
-              source={{ uri: channel.url }}
+              source={{ 
+                uri: channel.url,
+                headers: {
+                  'User-Agent': 'IPTV Smarters Pro',
+                  'Referer': 'https://www.iptvsmarters.com/',
+                  'Accept': '*/*',
+                  'Connection': 'keep-alive',
+                }
+              }}
               style={styles.fullscreenVideo}
               resizeMode="contain"
               controls={false} // Désactivé pour contrôles personnalisés

@@ -408,6 +408,7 @@ class AsyncStorageCache {
     const currentSize = Array.from(this.metadata.values()).reduce(
       (total, meta) => total + meta.size,
       0,
+    );
 
     if (
       currentSize + newItemSize <= this.maxSize &&

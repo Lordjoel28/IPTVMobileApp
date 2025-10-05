@@ -131,7 +131,9 @@ export const useImagePreloader = () => {
       }) => void;
     } = {},
   ) => {
-    if (uris.length === 0) {return;}
+    if (uris.length === 0) {
+      return;
+    }
 
     setIsPreloading(true);
     setPreloadStats({total: uris.length, loaded: 0, errors: 0});

@@ -12,8 +12,6 @@ import {
   SafeAreaView,
   StatusBar,
   TouchableOpacity,
-  FlatList,
-  Image,
   Dimensions,
   Pressable,
   ScrollView,
@@ -23,6 +21,8 @@ import {
   InteractionManager,
   TextInput,
 } from 'react-native';
+import {FlashList} from '@shopify/flash-list';
+import FastImage from 'react-native-fast-image'; // ✅ FastImage pour logos optimisés
 // StatusBar géré par StatusBarManager centralisé
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import {
@@ -81,7 +81,7 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({route}) => {
   // StatusBar immersif automatique pour cet écran
   useImmersiveScreen('ChannelPlayer', true);
   const miniPlayerPlaceholderRef = useRef<View>(null);
-  const channelsListRef = useRef<FlatList>(null);
+  const channelsListRef = useRef<FlashList<Channel>>(null);
   const {
     playlistId,
     allCategories,
@@ -154,6 +154,26 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({route}) => {
       playerActions.setInChannelPlayerScreen(false);
     };
   }, [playerActions]);
+
+  // 🚀 Précharger les logos initiaux au montage
+  useEffect(() => {
+    if (initialChannels.length > 0) {
+      setTimeout(() => {
+        const logosToPreload = initialChannels
+          .slice(0, 20)
+          .filter(ch => ch.logo && ch.logo.trim())
+          .map(ch => ({
+            uri: ch.logo!,
+            priority: FastImage.priority.high,
+            cache: FastImage.cacheControl.immutable,
+          }));
+
+        if (logosToPreload.length > 0) {
+          FastImage.preload(logosToPreload);
+        }
+      }, 100);
+    }
+  }, []);
 
   // 🔄 Synchronisation avec PlayerStore : Mettre à jour selectedChannel quand une chaîne est lancée depuis l'extérieur
   const lastSyncedChannelIdRef = useRef<string | null>(null);
@@ -666,6 +686,8 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({route}) => {
       }
 
       setChannels(newChannels);
+      // Précharger les logos
+      preloadChannelLogos(newChannels);
 
       // JAMAIS changer automatiquement la chaîne lors de la navigation
       // L'utilisateur garde sa chaîne actuelle peu importe la catégorie
@@ -959,6 +981,24 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({route}) => {
   const realProgramInfo = getRealProgramInfo();
   const technicalBadges = getTechnicalBadges();
 
+  // 🚀 Préchargement des logos pour affichage instantané
+  const preloadChannelLogos = (channelsList: Channel[], limit: number = 20) => {
+    setTimeout(() => {
+      const logosToPreload = channelsList
+        .slice(0, limit)
+        .filter(ch => ch.logo && ch.logo.trim())
+        .map(ch => ({
+          uri: ch.logo!,
+          priority: FastImage.priority.high,
+          cache: FastImage.cacheControl.immutable,
+        }));
+
+      if (logosToPreload.length > 0) {
+        FastImage.preload(logosToPreload);
+      }
+    }, 50);
+  };
+
   // 🔍 CHARGEMENT DYNAMIQUE basé sur patterns GitHub/Reddit - FIX prototype error avec AsyncStorage
   const loadChannelsForCategory = async (
     categoryId: string,
@@ -983,6 +1023,8 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({route}) => {
         if (recentData) {
           const recentChannelsData = JSON.parse(recentData);
           setChannels(recentChannelsData);
+          // Précharger les logos
+          preloadChannelLogos(recentChannelsData);
           // Aussi mettre à jour l'état local pour la cohérence
           setRecentChannels(recentChannelsData);
           setStoreRecentChannels(recentChannelsData);
@@ -1004,6 +1046,8 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({route}) => {
       if (cachedData) {
         const channelsData = JSON.parse(cachedData);
         setChannels(channelsData);
+        // Précharger les logos
+        preloadChannelLogos(channelsData);
         // JAMAIS changer la chaîne lors du chargement dynamique
       } else {
         // Fallback vers category.channels
@@ -1011,6 +1055,8 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({route}) => {
           categories.find(cat => cat.id === categoryId)?.channels || [];
         if (fallbackChannels.length > 0) {
           setChannels(fallbackChannels);
+          // Précharger les logos
+          preloadChannelLogos(fallbackChannels);
           // Ne pas changer la chaîne automatiquement en fallback non plus
         }
       }
@@ -1024,6 +1070,8 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({route}) => {
         categories.find(cat => cat.id === categoryId)?.channels || [];
       if (fallbackChannels.length > 0) {
         setChannels(fallbackChannels);
+        // Précharger les logos
+        preloadChannelLogos(fallbackChannels);
         // Même en cas d'erreur, ne pas changer automatiquement la chaîne
       }
     }
@@ -1067,10 +1115,14 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({route}) => {
             {/* Logo ou Avatar */}
             <View style={styles.channelLogoContainer}>
               {item.logo ? (
-                <Image
-                  source={{uri: item.logo}}
+                <FastImage
+                  source={{
+                    uri: item.logo,
+                    priority: FastImage.priority.high, // ✅ Priorité haute
+                    cache: FastImage.cacheControl.immutable, // ✅ Cache permanent
+                  }}
                   style={styles.channelLogo}
-                  resizeMode="contain"
+                  resizeMode={FastImage.resizeMode.contain}
                 />
               ) : (
                 <Avatar.Text
@@ -1158,10 +1210,14 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({route}) => {
         {/* Bloc Central: Logo + Nom Chaîne */}
         <View style={styles.headerCenterBlock}>
           {selectedChannel.logo ? (
-            <Image
-              source={{uri: selectedChannel.logo}}
+            <FastImage
+              source={{
+                uri: selectedChannel.logo,
+                priority: FastImage.priority.high,
+                cache: FastImage.cacheControl.immutable,
+              }}
               style={styles.headerChannelLogo}
-              resizeMode="contain"
+              resizeMode={FastImage.resizeMode.contain}
             />
           ) : (
             <Avatar.Text
@@ -1245,37 +1301,20 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({route}) => {
           </View>
 
           {/* La liste des chaînes */}
-          <FlatList
+          <FlashList
             ref={channelsListRef}
             data={channels}
             renderItem={renderChannelItem}
             keyExtractor={(item, index) => `player-${item.id}-${index}`}
             showsVerticalScrollIndicator={false}
-            style={styles.channelsList}
             contentContainerStyle={styles.channelsListContent}
-            // 🚀 OPTIMISATIONS FLATLIST ULTRA-PERFORMANTES
-            removeClippedSubviews={true}
-            maxToRenderPerBatch={15} // Augmenté pour moins de rendus
-            updateCellsBatchingPeriod={30} // Réduit pour plus de réactivité
-            windowSize={12} // Augmenté pour éviter les blancs
-            initialNumToRender={15} // Plus d'items initiaux pour scroll fluide
-            // Éviter re-renders pendant scroll
-            scrollEventThrottle={8} // Plus réactif
-            // Optimisations critiques pour performance
-            disableVirtualization={false}
+            estimatedItemSize={60}
+            // 🚀 OPTIMISATIONS FLASHLIST ULTRA-PERFORMANTES
+            drawDistance={500}
+            estimatedListSize={{height: height * 0.7, width: width * 0.25}}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"
-            // Layout précalculé pour performance maximale
-            getItemLayout={(data, index) => ({
-              length: 60, // Hauteur fixe d'un item
-              offset: 60 * index,
-              index,
-            })}
-            // Éviter re-renders inutiles lors des changements
             extraData={selectedChannel.id}
-            // Performance scroll optimisée
-            nestedScrollEnabled={false}
-            bouncesZoom={false}
           />
         </View>
 
@@ -1493,9 +1532,6 @@ const createStyles = (colors: any) => StyleSheet.create({
     padding: 6, // Padding réduit pour un look plus fin
   },
 
-  channelsList: {
-    flex: 1,
-  },
   channelsListContent: {
     paddingVertical: 8,
   },

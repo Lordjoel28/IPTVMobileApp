@@ -209,7 +209,9 @@ export class ParentalController {
    * Initialisation
    */
   async initialize(): Promise<void> {
-    if (this.isInitialized) {return;}
+    if (this.isInitialized) {
+      return;
+    }
 
     try {
       console.log('🔒 Initializing ParentalController...');
@@ -365,7 +367,7 @@ export class ParentalController {
       console.error('Channel access check failed:', error);
       return {
         allowed: false,
-        reason: 'Erreur de vérification des restrictions', 
+        reason: 'Erreur de vérification des restrictions',
       };
     }
   }
@@ -545,7 +547,9 @@ export class ParentalController {
     blocked: boolean,
     reason: string,
   ): Promise<void> {
-    if (!this.settings.logAccessAttempts) {return;}
+    if (!this.settings.logAccessAttempts) {
+      return;
+    }
 
     const attempt: AccessAttempt = {
       id: `attempt_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
@@ -578,7 +582,9 @@ export class ParentalController {
   }
 
   private isAccessTimeAllowed(user: User): boolean {
-    if (!user.restrictions?.timeRestrictions) {return true;}
+    if (!user.restrictions?.timeRestrictions) {
+      return true;
+    }
 
     const now = new Date();
     const currentDay = now.getDay();
@@ -603,7 +609,9 @@ export class ParentalController {
   }
 
   private async verifyParentalPin(pin: string): Promise<boolean> {
-    if (!this.settings.globalPin) {return true;} // Pas de PIN configuré
+    if (!this.settings.globalPin) {
+      return true;
+    } // Pas de PIN configuré
 
     // TODO: Implémenter vérification hash sécurisée
     // Pour le moment, comparaison simple

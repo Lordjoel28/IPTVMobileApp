@@ -32,7 +32,7 @@ interface TiviMateOverlayProps {
   recentChannels?: any[];
 }
 
-const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+const {width: screenWidth, height: screenHeight} = Dimensions.get('window');
 
 const TiviMateOverlay: React.FC<TiviMateOverlayProps> = ({
   channel,
@@ -46,7 +46,7 @@ const TiviMateOverlay: React.FC<TiviMateOverlayProps> = ({
   const overlayOpacity = useSharedValue(isVisible ? 1 : 0);
 
   React.useEffect(() => {
-    overlayOpacity.value = withTiming(isVisible ? 1 : 0, { duration: 300 });
+    overlayOpacity.value = withTiming(isVisible ? 1 : 0, {duration: 300});
   }, [isVisible, overlayOpacity]);
 
   const overlayStyle = useAnimatedStyle(() => ({
@@ -59,12 +59,12 @@ const TiviMateOverlay: React.FC<TiviMateOverlayProps> = ({
 
   const getCurrentTime = () => {
     const now = new Date();
-    return now.toLocaleTimeString('fr-FR', { 
-      weekday: 'short', 
-      day: 'numeric', 
-      month: 'short', 
-      hour: '2-digit', 
-      minute: '2-digit' 
+    return now.toLocaleTimeString('fr-FR', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
     });
   };
 
@@ -73,14 +73,12 @@ const TiviMateOverlay: React.FC<TiviMateOverlayProps> = ({
       {/* 🔹 EN-TÊTE : Bouquet + Heure */}
       <LinearGradient
         colors={['rgba(0,0,0,0.8)', 'transparent']}
-        style={styles.headerGradient}
-      >
+        style={styles.headerGradient}>
         <View style={styles.header}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.backButton}
             onPress={onBackPress}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
+            hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
             <Icon name="arrow-back" size={24} color="#fff" />
           </TouchableOpacity>
 
@@ -90,9 +88,7 @@ const TiviMateOverlay: React.FC<TiviMateOverlayProps> = ({
             </Text>
           </View>
 
-          <Text style={styles.timeText}>
-            {getCurrentTime()}
-          </Text>
+          <Text style={styles.timeText}>{getCurrentTime()}</Text>
         </View>
       </LinearGradient>
 
@@ -100,8 +96,7 @@ const TiviMateOverlay: React.FC<TiviMateOverlayProps> = ({
       <View style={styles.infoPanel}>
         <LinearGradient
           colors={['transparent', 'rgba(0,0,0,0.9)', 'rgba(0,0,0,0.9)']}
-          style={styles.infoPanelGradient}
-        >
+          style={styles.infoPanelGradient}>
           <View style={styles.infoContent}>
             {/* Logo chaîne */}
             <View style={styles.channelLogo}>
@@ -113,10 +108,21 @@ const TiviMateOverlay: React.FC<TiviMateOverlayProps> = ({
               <Text style={styles.programTitle}>Programme actuel</Text>
               <View style={styles.programDetails}>
                 <Text style={styles.programTime}>
-                  {Math.floor(currentTime / 60).toString().padStart(2, '0')}:
-                  {Math.floor(currentTime % 60).toString().padStart(2, '0')} — 
-                  {Math.floor(duration / 60).toString().padStart(2, '0')}:
-                  {Math.floor(duration % 60).toString().padStart(2, '0')}
+                  {Math.floor(currentTime / 60)
+                    .toString()
+                    .padStart(2, '0')}
+                  :
+                  {Math.floor(currentTime % 60)
+                    .toString()
+                    .padStart(2, '0')}{' '}
+                  —
+                  {Math.floor(duration / 60)
+                    .toString()
+                    .padStart(2, '0')}
+                  :
+                  {Math.floor(duration % 60)
+                    .toString()
+                    .padStart(2, '0')}
                 </Text>
                 <View style={styles.programBadges}>
                   <View style={styles.badge}>
@@ -139,16 +145,17 @@ const TiviMateOverlay: React.FC<TiviMateOverlayProps> = ({
       <View style={styles.recentChannelsDock}>
         <LinearGradient
           colors={['transparent', 'rgba(0,0,0,0.8)']}
-          style={styles.dockGradient}
-        >
+          style={styles.dockGradient}>
           <View style={styles.dockContent}>
             {/* Guide TV et Historique */}
-            <TouchableOpacity style={[styles.dockButton, styles.dockSpecialButton]}>
+            <TouchableOpacity
+              style={[styles.dockButton, styles.dockSpecialButton]}>
               <Icon name="apps" size={20} color="#fff" />
               <Text style={styles.dockButtonText}>Guide TV</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={[styles.dockButton, styles.dockSpecialButton]}>
+            <TouchableOpacity
+              style={[styles.dockButton, styles.dockSpecialButton]}>
               <Icon name="history" size={20} color="#fff" />
               <Text style={styles.dockButtonText}>Historique</Text>
             </TouchableOpacity>
@@ -169,11 +176,11 @@ const TiviMateOverlay: React.FC<TiviMateOverlayProps> = ({
       {/* 🔹 TIMELINE PROGRESS (très fine, en bas) */}
       <View style={styles.timeline}>
         <View style={styles.timelineTrack}>
-          <View 
+          <View
             style={[
-              styles.timelineProgress, 
-              { width: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }
-            ]} 
+              styles.timelineProgress,
+              {width: `${duration > 0 ? (currentTime / duration) * 100 : 0}%`},
+            ]}
           />
         </View>
       </View>
@@ -190,7 +197,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     pointerEvents: 'none', // IMPORTANT: Laisse passer les touches au VideoPlayer
   },
-  
+
   // EN-TÊTE
   headerGradient: {
     position: 'absolute',

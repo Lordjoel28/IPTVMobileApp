@@ -260,7 +260,7 @@ const M3UUrlModal: React.FC<M3UUrlModalProps> = ({
                     </Text>
                   </TouchableOpacity>
 
-              <TouchableOpacity
+                  <TouchableOpacity
                     style={styles.toggleOption}
                     onPress={() => handleToggleMode('file')}
                     activeOpacity={0.8}>
@@ -375,7 +375,7 @@ const M3UUrlModal: React.FC<M3UUrlModalProps> = ({
                   <Text style={styles.cancelButtonText}>Annuler</Text>
                 </TouchableOpacity>
 
-            <TouchableOpacity
+                <TouchableOpacity
                   style={[
                     styles.connectButton,
                     isConnecting && styles.connectButtonDisabled,

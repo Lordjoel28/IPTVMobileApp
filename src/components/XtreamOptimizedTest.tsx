@@ -297,6 +297,7 @@ export const XtreamOptimizedTest: React.FC = () => {
         addLog(
           `✅ Cache HIT: Retrieved user data for ${cachedUserData.userId}`,
         );
+      }
 
       // Test cache miss
       const missData = await CacheIntegrationService.getCached(

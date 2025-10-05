@@ -66,6 +66,7 @@ const PlaylistManagerScreen = () => {
       playlistsData.sort(
         (a, b) =>
           new Date(b.dateAdded).getTime() - new Date(a.dateAdded).getTime(),
+      );
 
       setPlaylists(playlistsData);
       console.log(`📋 ${playlistsData.length} playlists chargées`);

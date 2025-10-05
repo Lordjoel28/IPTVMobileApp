@@ -3,7 +3,7 @@
  * Navigation après import M3U réussi
  */
 
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useCallback} from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
   Alert,
   StatusBar,
   TouchableOpacity,
+  TextInput,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
@@ -30,60 +31,20 @@ interface ChannelListScreenProps {
   navigation?: any;
 }
 
-interface ChannelItemProps {
-  channel: Channel;
-  onPress: (channel: Channel) => void;
-}
-
-const ChannelItem: React.FC<ChannelItemProps> = ({channel, onPress}) => (
-  <TouchableOpacity
-    style={styles.channelItem}
-    onPress={() => onPress(channel)}
-    activeOpacity={0.7}>
-    <View style={styles.channelIcon}>
-      <Icon name="tv" size={24} color="#4A90E2" />
-    </View>
-
-    <View style={styles.channelInfo}>
-      <Text style={styles.channelName} numberOfLines={1}>
-        {channel.name}
-      </Text>
-      <View style={styles.channelMeta}>
-        <Text style={styles.channelCategory} numberOfLines={1}>
-          {channel.category || channel.groupTitle || 'Général'}
-        </Text>
-        {channel.quality && (
-          <View style={styles.qualityBadge}>
-            <Text style={styles.qualityText}>{channel.quality}</Text>
-          </View>
-        )}
-      </View>
-    </View>
-
-    <TouchableOpacity style={styles.favoriteButton}>
-      <Icon name="favorite-border" size={20} color="#666" />
-    </TouchableOpacity>
-  </TouchableOpacity>
-);
-
 const ChannelListScreen: React.FC<ChannelListScreenProps> = ({
   route,
   navigation,
 }) => {
   const [channels, setChannels] = useState<Channel[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [currentChannel, setCurrentChannel] = useState<Channel | null>(null);
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const playlistName = route?.params?.playlistName || 'Playlist IPTV';
-  const totalChannels = route?.params?.totalChannels || 0;
 
-  useEffect(() => {
-    loadChannels();
-  }, []);
-
-  const loadChannels = async () => {
+  const loadChannels = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -106,7 +67,11 @@ const ChannelListScreen: React.FC<ChannelListScreenProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [route?.params?.channels]);
+
+  useEffect(() => {
+    loadChannels();
+  }, [loadChannels]);
 
   const handleChannelPress = (channel: Channel) => {
     console.log('🎬 Ouverture chaîne:', channel.name);
@@ -141,10 +106,28 @@ const ChannelListScreen: React.FC<ChannelListScreenProps> = ({
     }
   };
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await loadChannels();
-    setRefreshing(false);
+  // Fonctions de recherche
+  const toggleSearch = () => {
+    setShowSearch(!showSearch);
+    if (showSearch) {
+      setSearchQuery('');
+    }
+  };
+
+  // Filtrer les chaînes selon la recherche
+  const getFilteredChannels = () => {
+    if (!searchQuery.trim()) {
+      return channels;
+    }
+
+    return channels.filter(
+      channel =>
+        channel.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (channel.group &&
+          channel.group.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (channel.category &&
+          channel.category.toLowerCase().includes(searchQuery.toLowerCase())),
+    );
   };
 
   // Render functions moved to VirtualizedChannelList component
@@ -188,24 +171,52 @@ const ChannelListScreen: React.FC<ChannelListScreenProps> = ({
         </TouchableOpacity>
 
         <View style={styles.headerInfo}>
-          <Text style={styles.headerTitle} numberOfLines={1}>
-            {playlistName}
-          </Text>
-          <Text style={styles.headerSubtitle}>
-            {channels.length} chaîne{channels.length > 1 ? 's' : ''} disponible
-            {channels.length > 1 ? 's' : ''}
-          </Text>
+          {showSearch ? (
+            // Mode Recherche: Texte de recherche à la place du titre
+            <Text style={styles.headerTitle} numberOfLines={1}>
+              {searchQuery || 'Rechercher...'}
+            </Text>
+          ) : (
+            // Mode Normal: Titre + Sous-titre comme avant
+            <>
+              <Text style={styles.headerTitle} numberOfLines={1}>
+                {playlistName}
+              </Text>
+              <Text style={styles.headerSubtitle}>
+                {getFilteredChannels().length} chaîne
+                {getFilteredChannels().length > 1 ? 's' : ''} disponible
+                {getFilteredChannels().length > 1 ? 's' : ''}
+              </Text>
+            </>
+          )}
         </View>
 
-        <TouchableOpacity style={styles.searchButton}>
-          <Icon name="search" size={24} color="#FFFFFF" />
+      {/* TextInput invisible pour capturer la saisie */}
+      {showSearch && (
+        <TextInput
+          style={styles.invisibleTextInput}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          autoFocus={true}
+          autoCapitalize="none"
+          autoCorrect={false}
+          returnKeyType="search"
+        />
+      )}
+
+        <TouchableOpacity style={styles.searchButton} onPress={toggleSearch}>
+          <Icon
+            name={showSearch ? 'close' : 'search'}
+            size={24}
+            color="#FFFFFF"
+          />
         </TouchableOpacity>
       </View>
 
       {/* 🚀 ULTRA-OPTIMIZED CHANNEL LIST - 100K+ Channels Support */}
       <View style={styles.channelListContainer}>
         <VirtualizedChannelList
-          channels={channels}
+          channels={getFilteredChannels()}
           onChannelSelect={handleChannelPress}
           currentChannel={currentChannel}
           favorites={favorites}
@@ -349,6 +360,15 @@ const styles = StyleSheet.create({
     color: '#4A90E2',
     fontSize: 14,
     fontWeight: '600',
+  },
+  // TextInput invisible pour capturer la saisie
+  invisibleTextInput: {
+    position: 'absolute',
+    top: -1000,
+    left: -1000,
+    opacity: 0,
+    width: 1,
+    height: 1,
   },
 });
 

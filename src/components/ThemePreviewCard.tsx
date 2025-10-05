@@ -1,0 +1,250 @@
+/**
+ * 🎨 ThemePreviewCard - Carte de prévisualisation de thème
+ * Carte interactive pour sélectionner et prévisualiser les thèmes
+ */
+
+import React from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Dimensions,
+} from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
+import Icon from 'react-native-vector-icons/MaterialIcons';
+import { Theme } from '../themes/themeConfig';
+
+interface ThemePreviewCardProps {
+  theme: Theme;
+  isSelected: boolean;
+  onSelect: (themeId: string) => void;
+  onPreview?: (themeId: string) => void;
+}
+
+const { width: screenWidth } = Dimensions.get('window');
+const cardWidth = (screenWidth - 60) / 2; // 2 colonnes avec marges
+
+const ThemePreviewCard: React.FC<ThemePreviewCardProps> = ({
+  theme,
+  isSelected,
+  onSelect,
+  onPreview,
+}) => {
+  const handlePress = () => {
+    onSelect(theme.id);
+  };
+
+  const handleLongPress = () => {
+    if (onPreview) {
+      onPreview(theme.id);
+    }
+  };
+
+  const getThemeIcon = (themeId: string) => {
+    switch (themeId) {
+      case 'dark':
+        return 'dark-mode';
+      case 'light':
+        return 'light-mode';
+      case 'ocean':
+        return 'waves';
+      case 'sunset':
+        return 'wb-sunny';
+      case 'forest':
+        return 'nature';
+      default:
+        return 'palette';
+    }
+  };
+
+  return (
+    <TouchableOpacity
+      style={[
+        styles.card,
+        { width: cardWidth },
+        isSelected && styles.selectedCard,
+      ]}
+      onPress={handlePress}
+      onLongPress={handleLongPress}
+      activeOpacity={0.8}>
+
+      {/* Gradient de prévisualisation du thème */}
+      <LinearGradient
+        colors={theme.colors.background.gradient}
+        style={styles.gradientPreview}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      />
+
+      {/* Couleur d'accent en coin */}
+      <View
+        style={[
+          styles.accentDot,
+          { backgroundColor: theme.colors.accent.primary }
+        ]}
+      />
+
+      {/* Contenu de la carte */}
+      <View style={styles.cardContent}>
+        <View style={styles.iconContainer}>
+          <Icon
+            name={getThemeIcon(theme.id)}
+            size={28}
+            color={theme.colors.text.primary}
+          />
+        </View>
+
+        <Text style={[styles.themeName, { color: theme.colors.text.primary }]}>
+          {theme.name}
+        </Text>
+
+        <Text style={[styles.themeDescription, { color: theme.colors.text.secondary }]} numberOfLines={2}>
+          {theme.description}
+        </Text>
+      </View>
+
+      {/* Badge "Actuel" pour le thème sélectionné */}
+      {isSelected && (
+        <View style={styles.selectedBadge}>
+          <Icon name="check-circle" size={20} color="#4CAF50" />
+          <Text style={styles.selectedText}>Actuel</Text>
+        </View>
+      )}
+
+      {/* Indicateur de mode sombre/clair */}
+      <View style={[
+        styles.modeBadge,
+        { backgroundColor: theme.isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)' }
+      ]}>
+        <Icon
+          name={theme.isDark ? 'nights-stay' : 'wb-sunny'}
+          size={12}
+          color={theme.isDark ? '#FFD700' : '#FF6B35'}
+        />
+      </View>
+
+      {/* Bordure de sélection */}
+      {isSelected && (
+        <View style={[
+          styles.selectionBorder,
+          { borderColor: theme.colors.accent.primary }
+        ]} />
+      )}
+    </TouchableOpacity>
+  );
+};
+
+const styles = StyleSheet.create({
+  card: {
+    height: 140,
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+    position: 'relative',
+  },
+
+  selectedCard: {
+    transform: [{ scale: 1.02 }],
+  },
+
+  gradientPreview: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+
+  accentDot: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+
+  cardContent: {
+    flex: 1,
+    padding: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+
+  iconContainer: {
+    marginBottom: 8,
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+
+  themeName: {
+    fontSize: 16,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 4,
+    textShadowColor: 'rgba(0,0,0,0.7)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+
+  themeDescription: {
+    fontSize: 11,
+    textAlign: 'center',
+    lineHeight: 14,
+    textShadowColor: 'rgba(0,0,0,0.7)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+
+  selectedBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(76, 175, 80, 0.9)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+
+  selectedText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '600',
+    marginLeft: 2,
+  },
+
+  modeBadge: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  selectionBorder: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderWidth: 3,
+    borderRadius: 16,
+  },
+});
+
+export default ThemePreviewCard;

@@ -255,6 +255,7 @@ class CacheIntegrationService {
       if (data) {
         console.log(
           `🔗 Cache hit for ${cacheKey} in ${accessTime.toFixed(2)}ms`,
+        );
 
         // Adaptive predictive loading
         const pattern = this.usagePatterns.get(cacheKey);

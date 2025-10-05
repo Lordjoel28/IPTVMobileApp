@@ -57,8 +57,12 @@ class FuzzySearchEngine {
       Array(str2.length + 1).fill(0),
     );
 
-    for (let i = 0; i <= str1.length; i++) {matrix[i][0] = i;}
-    for (let j = 0; j <= str2.length; j++) {matrix[0][j] = j;}
+    for (let i = 0; i <= str1.length; i++) {
+      matrix[i][0] = i;
+    }
+    for (let j = 0; j <= str2.length; j++) {
+      matrix[0][j] = j;
+    }
 
     for (let i = 1; i <= str1.length; i++) {
       for (let j = 1; j <= str2.length; j++) {
@@ -78,8 +82,12 @@ class FuzzySearchEngine {
    * Score de similarité fuzzy (0-1)
    */
   static fuzzyScore(query: string, target: string): number {
-    if (query === target) {return 1;}
-    if (query.length === 0) {return 0;}
+    if (query === target) {
+      return 1;
+    }
+    if (query.length === 0) {
+      return 0;
+    }
 
     const distance = this.levenshteinDistance(
       query.toLowerCase(),
@@ -162,7 +170,9 @@ class SearchIndex {
       channel.groupTitle || '',
       channel.language || '',
       channel.country || '',
-    ].join(' ').toLowerCase();
+    ]
+      .join(' ')
+      .toLowerCase();
 
     // Générer N-grammes
     const ngrams = FuzzySearchEngine.generateNGrams(searchableText);
@@ -174,10 +184,18 @@ class SearchIndex {
     }
 
     // Index facettes
-    if (channel.category) {this.categories.add(channel.category);}
-    if (channel.quality) {this.qualities.add(channel.quality);}
-    if (channel.language) {this.languages.add(channel.language);}
-    if (channel.country) {this.countries.add(channel.country);}
+    if (channel.category) {
+      this.categories.add(channel.category);
+    }
+    if (channel.quality) {
+      this.qualities.add(channel.quality);
+    }
+    if (channel.language) {
+      this.languages.add(channel.language);
+    }
+    if (channel.country) {
+      this.countries.add(channel.country);
+    }
   }
 
   /**
@@ -476,7 +494,9 @@ export class SearchManager {
     // Score chaque candidate
     for (const channelId of candidateIds) {
       const channel = this.searchIndex.getChannel(channelId);
-      if (!channel) {continue;}
+      if (!channel) {
+        continue;
+      }
 
       // Vérifier filtres de base
       if (!this.matchesBasicFilters(channel, options)) {
@@ -557,9 +577,15 @@ export class SearchManager {
     const normalizedQuery = query.toLowerCase();
     const normalizedTarget = target.toLowerCase();
 
-    if (normalizedTarget === normalizedQuery) {return 1.0;}
-    if (normalizedTarget.startsWith(normalizedQuery)) {return 0.9;}
-    if (normalizedTarget.includes(normalizedQuery)) {return 0.7;}
+    if (normalizedTarget === normalizedQuery) {
+      return 1.0;
+    }
+    if (normalizedTarget.startsWith(normalizedQuery)) {
+      return 0.9;
+    }
+    if (normalizedTarget.includes(normalizedQuery)) {
+      return 0.7;
+    }
 
     return 0;
   }
@@ -601,7 +627,9 @@ export class SearchManager {
   ): SearchResult[] {
     return results.filter(result => {
       const fieldValue = result.channel[filter.field] as string;
-      if (!fieldValue) {return false;}
+      if (!fieldValue) {
+        return false;
+      }
 
       const normalized = filter.value.toLowerCase();
       const target = fieldValue.toLowerCase();
@@ -622,7 +650,9 @@ export class SearchManager {
   }
 
   private highlightMatches(text: string, query: string): string {
-    if (!query || query.length < 2) {return text;}
+    if (!query || query.length < 2) {
+      return text;
+    }
 
     const regex = new RegExp(`(${query})`, 'gi');
     return text.replace(regex, '<mark>$1</mark>');
@@ -663,7 +693,9 @@ export class SearchManager {
   }
 
   private isCacheValid(cached: any, maxAgeHours: number): boolean {
-    if (!cached.timestamp) {return false;}
+    if (!cached.timestamp) {
+      return false;
+    }
     const ageHours = (Date.now() - cached.timestamp) / (1000 * 60 * 60);
     return ageHours < maxAgeHours;
   }

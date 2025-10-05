@@ -127,7 +127,9 @@ export const FastScrollIndicator: React.FC<FastScrollIndicatorProps> = ({
     }).start();
   }, [visible, isScrolling, animatedOpacity]);
 
-  if (!visible && !isScrolling) {return null;}
+  if (!visible && !isScrolling) {
+    return null;
+  }
 
   return (
     <View style={styles.container}>
@@ -189,7 +191,7 @@ export const FastScrollIndicator: React.FC<FastScrollIndicatorProps> = ({
               <FastImage
                 source={{
                   uri: currentChannel.logo,
-                  priority: FastImage.priority.high, 
+                  priority: FastImage.priority.high,
                 }}
                 style={styles.previewImage}
                 resizeMode={FastImage.resizeMode.cover}

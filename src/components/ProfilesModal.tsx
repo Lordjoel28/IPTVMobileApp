@@ -4,11 +4,13 @@
  */
 
 import React, {useState, useEffect} from 'react';
+import {PlaylistService} from '../services/PlaylistService'; // Pré-charger pour éviter délais
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
+  Pressable,
   Modal,
   Alert,
   Dimensions,
@@ -84,21 +86,24 @@ const ProfilesModal: React.FC<ProfilesModalProps> = ({
     try {
       setLoading(true);
 
-      // Charger M3U playlists
-      const m3uData = await AsyncStorage.getItem('saved_m3u_playlists');
-      const m3uPlaylists: PlaylistItem[] = m3uData ? JSON.parse(m3uData) : [];
+      // 🚀 CHARGER DEPUIS WATERMELONDB (nouveau système unifié - pré-chargé)
+      const playlistService = PlaylistService.getInstance();
 
-      // Charger Xtream playlists
-      const xtreamData = await AsyncStorage.getItem('saved_xtream_playlists');
-      const xtreamPlaylists: PlaylistItem[] = xtreamData
-        ? JSON.parse(xtreamData)
-        : [];
+      const watermelonPlaylists = await playlistService.getAllPlaylists();
 
-      // Combiner et calculer le statut
-      const allPlaylists = [...m3uPlaylists, ...xtreamPlaylists]
-        .map(playlist => ({
-          ...playlist,
-          status: calculateStatus(playlist.expirationDate),
+      console.log('📋 Playlists WatermelonDB:', watermelonPlaylists.length);
+
+      // Convertir au format PlaylistItem attendu par le composant
+      const allPlaylists = watermelonPlaylists
+        .map(p => ({
+          id: p.id,
+          name: p.name,
+          url: p.url,
+          type: p.type as 'M3U' | 'XTREAM',
+          channelsCount: p.channelsCount,
+          createdAt: p.createdAt,
+          dateAdded: p.createdAt, // Compatibilité
+          status: calculateStatus(undefined), // Pas d'expiration pour M3U
         }))
         .sort(
           (a, b) =>
@@ -118,7 +123,9 @@ const ProfilesModal: React.FC<ProfilesModalProps> = ({
   const calculateStatus = (
     expirationDate?: string,
   ): 'active' | 'expiring' | 'expired' => {
-    if (!expirationDate) {return 'active';}
+    if (!expirationDate) {
+      return 'active';
+    }
 
     let expDate: Date;
 
@@ -132,20 +139,28 @@ const ProfilesModal: React.FC<ProfilesModalProps> = ({
     }
 
     // Vérifier si la date est valide
-    if (isNaN(expDate.getTime())) {return 'active';}
+    if (isNaN(expDate.getTime())) {
+      return 'active';
+    }
 
     const now = new Date();
     const diffTime = expDate.getTime() - now.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-    if (diffDays < 0) {return 'expired';}
-    if (diffDays <= 3) {return 'expiring';}
+    if (diffDays < 0) {
+      return 'expired';
+    }
+    if (diffDays <= 3) {
+      return 'expiring';
+    }
     return 'active';
   };
 
   // Formater la date d'expiration
   const formatExpirationDate = (expirationDate?: string) => {
-    if (!expirationDate) {return 'Unlimited';}
+    if (!expirationDate) {
+      return 'Unlimited';
+    }
 
     let expDate: Date;
 
@@ -159,16 +174,26 @@ const ProfilesModal: React.FC<ProfilesModalProps> = ({
     }
 
     // Vérifier si la date est valide
-    if (isNaN(expDate.getTime())) {return 'Invalid';}
+    if (isNaN(expDate.getTime())) {
+      return 'Invalid';
+    }
 
     const now = new Date();
     const diffTime = expDate.getTime() - now.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-    if (diffDays < 0) {return 'Expired';}
-    if (diffDays === 0) {return 'Today';}
-    if (diffDays === 1) {return 'Tomorrow';}
-    if (diffDays <= 30) {return `${diffDays}d left`;}
+    if (diffDays < 0) {
+      return 'Expired';
+    }
+    if (diffDays === 0) {
+      return 'Today';
+    }
+    if (diffDays === 1) {
+      return 'Tomorrow';
+    }
+    if (diffDays <= 30) {
+      return `${diffDays}d left`;
+    }
 
     return expDate.toLocaleDateString('fr-FR');
   };
@@ -191,7 +216,7 @@ const ProfilesModal: React.FC<ProfilesModalProps> = ({
         'rgba(16, 185, 129, 0.95)',
         'rgba(5, 150, 105, 0.9)',
         'rgba(4, 120, 87, 0.85)',
-      ]
+      ],
     };
 
     if (item.status === 'expired') {
@@ -218,13 +243,13 @@ const ProfilesModal: React.FC<ProfilesModalProps> = ({
       M3U: [
         'rgba(71, 85, 105, 0.75)', // Gris-bleu foncé plus transparent
         'rgba(51, 65, 85, 0.7)', // Gris-bleu moyen plus transparent
-        'rgba(30, 41, 59, 0.65)',     // Gris-bleu très foncé plus transparent
+        'rgba(30, 41, 59, 0.65)', // Gris-bleu très foncé plus transparent
       ],
       XTREAM: [
         'rgba(75, 85, 99, 0.75)', // Gris chaud plus transparent
         'rgba(55, 65, 81, 0.7)', // Gris moyen plus transparent
-        'rgba(31, 41, 55, 0.65)',     // Gris foncé plus transparent
-      ]
+        'rgba(31, 41, 55, 0.65)', // Gris foncé plus transparent
+      ],
     };
 
     // Variations selon le statut
@@ -232,14 +257,14 @@ const ProfilesModal: React.FC<ProfilesModalProps> = ({
       return [
         'rgba(87, 83, 78, 0.95)', // Gris-brun
         'rgba(68, 64, 60, 0.9)', // Brun foncé
-        'rgba(41, 37, 36, 0.85)',     // Très foncé
+        'rgba(41, 37, 36, 0.85)', // Très foncé
       ];
     }
     if (item.status === 'expiring') {
       return [
         'rgba(120, 113, 108, 0.95)', // Gris-beige
         'rgba(87, 83, 78, 0.9)', // Gris-brun
-        'rgba(68, 64, 60, 0.85)',     // Brun moyen
+        'rgba(68, 64, 60, 0.85)', // Brun moyen
       ];
     }
 
@@ -290,7 +315,9 @@ const ProfilesModal: React.FC<ProfilesModalProps> = ({
   };
 
   const handleDelete = async () => {
-    if (!contextMenu.playlist) {return;}
+    if (!contextMenu.playlist) {
+      return;
+    }
 
     const playlist = contextMenu.playlist;
     hideContextMenu();
@@ -298,7 +325,9 @@ const ProfilesModal: React.FC<ProfilesModalProps> = ({
   };
 
   const confirmDelete = async () => {
-    if (!deleteModal.playlist) {return;}
+    if (!deleteModal.playlist) {
+      return;
+    }
 
     const playlist = deleteModal.playlist;
     setDeleteModal({visible: false, playlist: null});
@@ -390,7 +419,6 @@ const ProfilesModal: React.FC<ProfilesModalProps> = ({
 
       // Appeler immédiatement la fonction parent qui gère l'animation complète
       onPlaylistSelect(item);
-
     } catch (error) {
       console.error('Erreur sélection playlist:', error);
       showNotification('Erreur lors de la sélection', 'error', 3000);
@@ -420,14 +448,16 @@ const ProfilesModal: React.FC<ProfilesModalProps> = ({
             opacity: isBeingSelected ? selectedCardOpacity : 1,
           },
         ]}>
-        <TouchableOpacity
-          style={[styles.playlistCard]}
+        <Pressable
+          style={({pressed}) => [
+            styles.playlistCard,
+            pressed && {transform: [{scale: 0.96}]},
+          ]}
           onPress={() => handlePlaylistSelect(item)}
           onLongPress={event => {
             const {pageX, pageY} = event.nativeEvent;
             showContextMenu(item, pageX, pageY);
-          }}
-          activeOpacity={0.8}>
+          }}>
           <LinearGradient
             colors={getSoberGradientColors(item)}
             start={{x: 0, y: 0}}
@@ -486,12 +516,14 @@ const ProfilesModal: React.FC<ProfilesModalProps> = ({
               </Text>
             </View>
           </LinearGradient>
-        </TouchableOpacity>
+        </Pressable>
       </Animated.View>
     );
   };
 
-  if (!visible) {return null;}
+  if (!visible) {
+    return null;
+  }
 
   return (
     <Modal
@@ -512,17 +544,23 @@ const ProfilesModal: React.FC<ProfilesModalProps> = ({
             <Text style={styles.headerTitle}>Mes Playlists</Text>
             <View style={styles.headerButtons}>
               {onAddPlaylist && (
-                <TouchableOpacity
+                <Pressable
                   onPress={onAddPlaylist}
-                  style={styles.addButtonModern}>
+                  style={({pressed}) => [
+                    styles.addButtonModern,
+                    pressed && {transform: [{scale: 0.9}]},
+                  ]}>
                   <Icon name="playlist-add" size={24} color="#e2e8f0" />
-                </TouchableOpacity>
+                </Pressable>
               )}
-              <TouchableOpacity
+              <Pressable
                 onPress={onClose}
-                style={styles.closeButtonModern}>
+                style={({pressed}) => [
+                  styles.closeButtonModern,
+                  pressed && {transform: [{scale: 0.9}]},
+                ]}>
                 <Icon name="close" size={26} color="#e2e8f0" />
-              </TouchableOpacity>
+              </Pressable>
             </View>
           </View>
 
@@ -551,10 +589,7 @@ const ProfilesModal: React.FC<ProfilesModalProps> = ({
               contentContainerStyle={styles.gridContentContainer}>
               <View style={styles.gridRow}>
                 {playlists.map((item, index) => (
-                  <View
-                    key={item.id}
-                    style={styles.gridItemContainer}
-                  >
+                  <View key={`${item.id}_${index}`} style={styles.gridItemContainer}>
                     {renderPlaylist({item, index})}
                   </View>
                 ))}

@@ -22,10 +22,30 @@ export type RootStackParamList = {
   };
   Player: {channel: Channel; playlist?: Playlist};
   Settings: undefined;
+  ThemeSettings: undefined;
+  VideoPlayerSettings: undefined;
+  TVGuideSettings: undefined;
   PlaylistDetail: {playlist: Playlist};
   Search: undefined;
   UserProfile: undefined;
   ParentalControl: undefined;
+  EPGCategoriesScreen: {
+    allCategories: Category[];
+    allChannels: Channel[];
+    playlistId: string;
+    playlistName: string;
+  };
+  EPGFullScreen: {
+    category: {
+      id: string;
+      name: string;
+      channelCount: number;
+      channels: Channel[];
+      icon: string;
+    };
+    playlistId: string;
+    playlistName: string;
+  };
 };
 
 export type BottomTabParamList = {
@@ -50,6 +70,10 @@ export interface Channel {
   quality?: string;
   isAdult?: boolean;
   epgId?: string;
+  // 🎯 Propriété pour highlighting des résultats de recherche exacte
+  isHighlighted?: boolean;
+  // 🎬 Propriété pour continuer la lecture depuis multiscreen
+  seekTime?: number;
 }
 
 // Category Types
@@ -166,12 +190,10 @@ export type ThemeType =
   | 'light'
   | 'dark'
   | 'auto'
-  | 'blue'
+  | 'gray'
+  | 'brown'
   | 'green'
-  | 'purple'
-  | 'orange'
-  | 'red'
-  | 'pink';
+  | 'purple';
 
 export interface CustomTheme {
   colors: {

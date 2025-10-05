@@ -155,7 +155,9 @@ export class UserManager {
    * Initialisation avec chargement utilisateurs
    */
   async initialize(): Promise<void> {
-    if (this.isInitialized) {return;}
+    if (this.isInitialized) {
+      return;
+    }
     if (this.isInitializing) {
       console.log('⏳ UserManager already initializing, waiting...');
       return; // Éviter l'attente active qui peut créer des problèmes
@@ -310,7 +312,9 @@ export class UserManager {
   async logout(userId?: string): Promise<boolean> {
     try {
       const targetUserId = userId || this.currentSession?.userId;
-      if (!targetUserId) {return false;}
+      if (!targetUserId) {
+        return false;
+      }
 
       // Terminer session
       const session = this.sessions.get(targetUserId);
@@ -401,7 +405,9 @@ export class UserManager {
 
     try {
       const user = this.users.get(userId);
-      if (!user) {return false;}
+      if (!user) {
+        return false;
+      }
 
       // Vérifier qu'il reste au moins un admin
       if (user.type === 'admin') {
@@ -440,7 +446,9 @@ export class UserManager {
 
       // Éviter doublons
       const exists = favorites.find((fav: Channel) => fav.id === channel.id);
-      if (exists) {return true;}
+      if (exists) {
+        return true;
+      }
 
       favorites.push(channel);
       await this.storage.set(`favorites_${userId}`, favorites);
@@ -579,7 +587,9 @@ export class UserManager {
   }
 
   private isSessionValid(session: Session): boolean {
-    if (!session.isActive) {return false;}
+    if (!session.isActive) {
+      return false;
+    }
 
     // Session expire après 8 heures d'inactivité
     const maxIdleTime = 8 * 60 * 60 * 1000; // 8h en ms
@@ -589,8 +599,12 @@ export class UserManager {
   }
 
   private isAccessAllowed(user: User): boolean {
-    if (user.type === 'admin') {return true;}
-    if (!user.restrictions?.timeRestrictions) {return true;}
+    if (user.type === 'admin') {
+      return true;
+    }
+    if (!user.restrictions?.timeRestrictions) {
+      return true;
+    }
 
     const now = new Date();
     const currentDay = now.getDay();

@@ -53,7 +53,9 @@ class AdaptiveLRUCache {
 
   get(key: string): CachedImageInfo | null {
     const item = this.cache.get(key);
-    if (!item) {return null;}
+    if (!item) {
+      return null;
+    }
 
     // Update access time (LRU)
     this.accessTimes.set(key, Date.now());
@@ -445,7 +447,6 @@ export class ImageCacheService {
 
       this.imageCache.set(uri, imageInfo);
       await this.saveCacheInfo(uri, imageInfo);
-
     } catch (error) {
       console.warn(`⚠️ Failed to preload image: ${uri}`, error);
     }
@@ -455,12 +456,16 @@ export class ImageCacheService {
    * Vérifier si une URL d'image est valide
    */
   private isValidImageUrl(uri: string): boolean {
-    if (!uri || typeof uri !== 'string') {return false;}
+    if (!uri || typeof uri !== 'string') {
+      return false;
+    }
 
     const trimmedUri = uri.trim();
 
     // Vérifier le format de l'URL
-    if (!trimmedUri.startsWith('http')) {return false;}
+    if (!trimmedUri.startsWith('http')) {
+      return false;
+    }
 
     // Vérifier les extensions d'image communes
     const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'];
@@ -671,7 +676,9 @@ export class ImageCacheService {
       let currentSize = this.diskCacheSize;
 
       for (const {key, info} of images) {
-        if (currentSize <= targetSize) {break;}
+        if (currentSize <= targetSize) {
+          break;
+        }
 
         await AsyncStorage.removeItem(key);
         currentSize -= info.size || 50000;
@@ -683,7 +690,6 @@ export class ImageCacheService {
           currentSize / 1024 / 1024,
         )}MB restants`,
       );
-
     } catch (error) {
       console.warn('⚠️ Erreur nettoyage cache:', error);
     }
@@ -745,7 +751,6 @@ export class ImageCacheService {
       console.log(
         `✅ Cache nettoyé: ${cacheKeys.length} entrées supprimées, ${oldStats.diskUsage}MB libérés en ${elapsed}ms`,
       );
-
     } catch (error) {
       console.warn('⚠️ Erreur nettoyage cache:', error);
     }
@@ -756,7 +761,9 @@ export class ImageCacheService {
    * Adapte la vitesse selon la performance du réseau et device
    */
   async intelligentPreload(uris: string[]): Promise<void> {
-    if (uris.length === 0) {return;}
+    if (uris.length === 0) {
+      return;
+    }
 
     // Test vitesse réseau avec premiers URLs
     const testSample = uris.slice(0, 3);

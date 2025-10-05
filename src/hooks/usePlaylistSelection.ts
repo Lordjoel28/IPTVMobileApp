@@ -28,6 +28,7 @@ export const usePlaylistSelection = () => {
         console.log(
           '🎬 Début sélection playlist avec animation:',
           playlistName,
+        );
 
 
         // 🚀 ANIMATION IMMÉDIATE - Aucun délai !

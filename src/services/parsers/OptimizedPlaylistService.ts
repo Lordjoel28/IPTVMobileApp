@@ -49,6 +49,7 @@ export class OptimizedPlaylistService {
       callbacks?.onStatusChange(
         'Téléchargement playlist...',
         `Connexion à ${url}`,
+      );
 
       const content = await networkService.fetchText(url, {
         timeout:

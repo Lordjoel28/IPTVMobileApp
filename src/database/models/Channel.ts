@@ -25,23 +25,18 @@ export default class Channel extends Model {
   @field('logo_url') logoUrl?: string;
   @field('group_title') groupTitle?: string;
 
-  // Champs TVG (Electronic Program Guide)
+  // Champs TVG (Electronic Program Guide) - OPTIMISÉ
   @field('tvg_id') tvgId?: string;
-  @field('tvg_name') tvgName?: string;
-  @field('tvg_logo') tvgLogo?: string;
+  // tvgName supprimé - utiliser name
+  // tvgLogo supprimé - utiliser logoUrl
 
-  // Métadonnées
-  @field('language') language?: string;
-  @field('country') country?: string;
-  @field('quality') quality?: string;
+  // Métadonnées essentielles uniquement
   @field('stream_type') streamType?: string; // 'live' | 'movie' | 'series'
 
-  // Champs Xtream Codes spécifiques
-  @field('num') num?: number;
+  // Champs Xtream Codes spécifiques - OPTIMISÉ
   @field('stream_id') streamId?: string;
-  @field('stream_icon') streamIcon?: string;
-  @field('epg_channel_id') epgChannelId?: string;
-  @field('added') added?: string;
+  // streamIcon supprimé - utiliser logoUrl
+  // num, added, epgChannelId supprimés - rarement utilisés
   @field('is_adult') isAdult?: boolean;
 
   // Métadonnées d'utilisation
@@ -56,23 +51,23 @@ export default class Channel extends Model {
   @relation('playlists', 'playlist_id') playlist: any;
   @relation('categories', 'category_id') category: any;
 
-  // Méthodes utilitaires
+  // Méthodes utilitaires - OPTIMISÉ
   get displayName(): string {
-    return this.name || this.tvgName || `Channel ${this.streamId || this.id}`;
+    return this.name || `Channel ${this.streamId || this.id}`;
   }
 
   get displayLogo(): string {
-    return this.logoUrl || this.tvgLogo || this.streamIcon || '';
+    return this.logoUrl || '';
   }
 
   get isHD(): boolean {
-    if (!this.quality) {
-      return false;
-    }
+    // Détection HD depuis le nom (plus besoin du champ quality)
+    const nameUpper = this.name.toUpperCase();
     return (
-      this.quality.toUpperCase().includes('HD') ||
-      this.quality.toUpperCase().includes('FHD') ||
-      this.quality.toUpperCase().includes('4K')
+      nameUpper.includes('HD') ||
+      nameUpper.includes('FHD') ||
+      nameUpper.includes('4K') ||
+      nameUpper.includes('UHD')
     );
   }
 

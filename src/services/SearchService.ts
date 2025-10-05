@@ -131,26 +131,57 @@ export class SearchService {
   }
 
   /**
-   * Recherche exacte (insensible à la casse)
+   * Recherche exacte (insensible à la casse) avec détection de correspondance parfaite
    */
   private searchExact(channels: Channel[], query: string): Channel[] {
     const lowerQuery = query.toLowerCase().trim();
+    const exactMatches: Channel[] = [];
+    const partialMatches: Channel[] = [];
 
-    return channels.filter(channel => {
-      return (
-        channel.name.toLowerCase().includes(lowerQuery) ||
-        (channel.group && channel.group.toLowerCase().includes(lowerQuery)) ||
-        (channel.category &&
-          channel.category.toLowerCase().includes(lowerQuery)) ||
-        (channel.language &&
-          channel.language.toLowerCase().includes(lowerQuery)) ||
-        (channel.country && channel.country.toLowerCase().includes(lowerQuery))
-      );
+    channels.forEach(channel => {
+      let isExactMatch = false;
+      let hasPartialMatch = false;
+
+      const searchFields = [
+        channel.name,
+        channel.group || '',
+        channel.category || '',
+        channel.language || '',
+        channel.country || '',
+      ];
+
+      // Vérifier correspondance exacte d'abord
+      searchFields.forEach(field => {
+        if (field) {
+          const fieldLower = field.toLowerCase();
+          if (fieldLower === lowerQuery || fieldLower.startsWith(lowerQuery + ' ')) {
+            isExactMatch = true;
+          }
+        }
+      });
+
+      // Si pas de correspondance exacte, vérifier correspondance partielle
+      if (!isExactMatch) {
+        searchFields.forEach(field => {
+          if (field && field.toLowerCase().includes(lowerQuery)) {
+            hasPartialMatch = true;
+          }
+        });
+      }
+
+      if (isExactMatch) {
+        exactMatches.push({ ...channel, isHighlighted: true });
+      } else if (hasPartialMatch) {
+        partialMatches.push(channel);
+      }
     });
+
+    // Retourner correspondances exactes en premier, puis partielles
+    return [...exactMatches, ...partialMatches];
   }
 
   /**
-   * Recherche fuzzy avec tolérance aux fautes de frappe
+   * Recherche fuzzy avec tolérance aux fautes de frappe et détection de correspondance exacte
    * Utilise la distance de Levenshtein
    */
   private searchFuzzy(
@@ -159,10 +190,11 @@ export class SearchService {
     tolerance: number = 2,
   ): Channel[] {
     const lowerQuery = query.toLowerCase().trim();
-    const results: {channel: Channel; score: number}[] = [];
+    const results: {channel: Channel; score: number; isExactMatch: boolean}[] = [];
 
     channels.forEach(channel => {
       let bestScore = Infinity;
+      let isExactMatch = false;
       const searchFields = [
         channel.name,
         channel.group || '',
@@ -174,6 +206,13 @@ export class SearchService {
       searchFields.forEach(field => {
         if (field) {
           const fieldLower = field.toLowerCase();
+
+          // 🎯 Détecter correspondance exacte ou début exact
+          if (fieldLower === lowerQuery || fieldLower.startsWith(lowerQuery + ' ')) {
+            bestScore = -1; // Score spécial pour correspondance exacte
+            isExactMatch = true;
+            return;
+          }
 
           // Recherche de sous-chaîne d'abord (score parfait)
           if (fieldLower.includes(lowerQuery)) {
@@ -190,13 +229,23 @@ export class SearchService {
       });
 
       if (bestScore <= tolerance) {
-        results.push({channel, score: bestScore});
+        const channelWithHighlight = {
+          ...channel,
+          isHighlighted: isExactMatch
+        };
+        results.push({channel: channelWithHighlight, score: bestScore, isExactMatch});
       }
     });
 
-    // Trier par score (meilleur score = plus pertinent)
+    // Trier par score (correspondance exacte en premier, puis meilleur score)
     return results
-      .sort((a, b) => a.score - b.score)
+      .sort((a, b) => {
+        // Correspondances exactes en premier
+        if (a.isExactMatch && !b.isExactMatch) return -1;
+        if (!a.isExactMatch && b.isExactMatch) return 1;
+        // Sinon trier par score
+        return a.score - b.score;
+      })
       .map(result => result.channel);
   }
 

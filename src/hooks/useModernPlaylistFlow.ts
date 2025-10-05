@@ -228,6 +228,7 @@ export const useModernPlaylistFlow = () => {
         // 2. 📋 Service Layer - Business Logic (si nécessaire)
         console.log(
           '📋 SERVICE LAYER - Category filtering logic could go here',
+        );
 
 
         // 3. 🏪 Store Update - State Management

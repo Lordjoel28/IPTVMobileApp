@@ -9,6 +9,7 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
+  Pressable,
   Modal,
   StatusBar,
   Dimensions,
@@ -189,11 +190,16 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
           ]}
           pointerEvents="box-none">
           {/* Bouton fermer */}
-          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+          <Pressable
+            onPress={onClose}
+            style={({pressed}) => [
+              styles.closeButton,
+              pressed && {transform: [{scale: 0.9}]},
+            ]}>
             <View style={styles.closeButtonContent}>
               <Icon name="close" size={28} color="#FFFFFF" />
             </View>
-          </TouchableOpacity>
+          </Pressable>
 
           {/* Titre */}
           <View style={styles.titleContainer}>
@@ -215,10 +221,12 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                       opacity: cardAnim.opacity,
                     },
                   ]}>
-                  <TouchableOpacity
+                  <Pressable
                     onPress={option.onPress}
-                    style={styles.card}
-                    activeOpacity={0.85}>
+                    style={({pressed}) => [
+                      styles.card,
+                      pressed && {transform: [{scale: 0.96}]},
+                    ]}>
                     {/* Fond carte */}
                     <LinearGradient
                       colors={[
@@ -237,7 +245,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
 
                     {/* Texte */}
                     <Text style={styles.cardText}>{option.title}</Text>
-                  </TouchableOpacity>
+                  </Pressable>
                 </Animated.View>
               );
             })}

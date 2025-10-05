@@ -9,6 +9,7 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
+  Pressable,
   StatusBar,
   Animated,
   Image,
@@ -19,7 +20,6 @@ import SystemNavigationBar from 'react-native-system-navigation-bar';
 // Solution native MainActivity.java pour immersif
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import {BlurView} from '@react-native-community/blur';
 import {useNavigation} from '@react-navigation/native';
 import type {StackNavigationProp} from '@react-navigation/stack';
 import VideoPlayer from './src/components/VideoPlayer';
@@ -27,6 +27,7 @@ import ConnectionModal from './src/components/ConnectionModal';
 import XtreamCodeModal from './src/components/XtreamCodeModal';
 import M3UUrlModal from './src/components/M3UUrlModal';
 import ProfilesModal from './src/components/ProfilesModal';
+import MultiScreenView from './src/components/MultiScreenView';
 // import { ServiceTest } from './src/components/ServiceTest'; // Removed for production
 
 // 🔧 DEBUG: Script pour vider le cache EPG (test 1er démarrage TiviMate)
@@ -40,6 +41,9 @@ import { useStatusBar } from './src/hooks/useStatusBar';
 
 // Import des nouveaux services migrés
 import IPTVService from './src/services/IPTVService';
+
+// 🚀 PRÉ-CHARGER PlaylistService pour éviter délais au runtime
+import {PlaylistService} from './src/services/PlaylistService';
 
 // 🏗️ Import du nouveau système d'architecture DI
 import {initializeServiceArchitecture, ServiceMigration} from './src/core';
@@ -111,6 +115,11 @@ const App: React.FC = () => {
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<
     string | undefined
   >();
+  const [playlistInfo, setPlaylistInfo] = useState<{
+    name: string;
+    expirationDate: string | null;
+  } | null>(null);
+  const [showMultiScreen, setShowMultiScreen] = useState(false);
   // 🧪 État pour le test du système DI
   // const [showServiceTest, setShowServiceTest] = useState(false); // Removed for production
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -152,26 +161,10 @@ const App: React.FC = () => {
     // 🏗️ Initialisation du nouveau système d'architecture DI (Phase 2)
     const initializeDIArchitecture = async () => {
       try {
-        console.log('🏗️ Initializing Modern Service Architecture...');
         initializeServiceArchitecture();
-
         // Test de validation des services
-        const status = ServiceMigration.getMigrationStatus();
-        console.log('📊 DI Architecture Status:', status);
-
-        // 🧪 Test automatique de tous les services
-        console.log('🧪 Testing all services automatically...');
-        const testResults = await ServiceMigration.validateAllServices();
-        console.log('📋 Service Test Results:', {
-          passed: testResults.passed.length,
-          failed: testResults.failed.length,
-          passedServices: testResults.passed,
-          failedServices: testResults.failed,
-        });
-
-        console.log('✅ Modern Service Architecture ready');
+        await ServiceMigration.validateAllServices();
       } catch (error) {
-        console.log('⚠️ DI Architecture not ready yet:', error.message);
         // L'app continue avec l'ancienne architecture si besoin
       }
     };
@@ -179,8 +172,6 @@ const App: React.FC = () => {
     // Test d'initialisation des nouveaux services IPTV - INSTANCE UNIQUE
     const testServices = async () => {
       try {
-        console.log('🚀 Initialisation des services IPTV...');
-
         // Utiliser toujours la même instance
         if (!iptvServiceRef.current) {
           iptvServiceRef.current = IPTVService.getInstance({
@@ -193,20 +184,7 @@ const App: React.FC = () => {
 
         const iptv = iptvServiceRef.current;
         await iptv.initialize();
-        console.log('✅ Services IPTV initialisés avec succès!');
-
-        // Obtenir stats pour validation
-        const stats = await iptv.getServiceStats();
-        console.log('📊 Stats services:', {
-          isReady: stats.initialization.isReady,
-          users: stats.users.totalUsers,
-          playlists: stats.playlists.totalPlaylists,
-        });
       } catch (error) {
-        console.log(
-          '⚠️ Services pas encore complètement prêts:',
-          error.message,
-        );
         // L'app continue de fonctionner normalement
       }
     };
@@ -224,7 +202,7 @@ const App: React.FC = () => {
     // 🎯 IPTV SMARTERS PRO STYLE : Restaurer la playlist active au démarrage
     const restoreActivePlaylist = async () => {
       try {
-        console.log('🔄 Restauration playlist active via IPTVService...');
+        console.log('🔄 Restauration playlist active depuis WatermelonDB...');
 
         // Récupérer l'ID de la dernière playlist sélectionnée
         const AsyncStorage = await import('@react-native-async-storage/async-storage');
@@ -233,11 +211,10 @@ const App: React.FC = () => {
         if (lastSelectedId) {
           console.log('🎯 ID playlist précédemment sélectionnée:', lastSelectedId);
 
-          // Utiliser les méthodes disponibles d'IPTVService
-          const iptv = IPTVService.getInstance();
-          await iptv.initialize();
+          // 🚀 CHARGER DEPUIS WATERMELONDB (nouveau système - pré-chargé)
+          const playlistService = PlaylistService.getInstance();
 
-          const playlists = await iptv.getAllPlaylists();
+          const playlists = await playlistService.getAllPlaylists();
           const targetPlaylist = playlists.find(p => p.id === lastSelectedId);
 
           if (targetPlaylist) {
@@ -280,6 +257,35 @@ const App: React.FC = () => {
       // Pas de cleanup nécessaire avec SystemBars
     };
   }, []);
+
+  // 📊 Récupérer les infos de la playlist active pour le footer
+  useEffect(() => {
+    const loadPlaylistInfo = async () => {
+      if (!selectedPlaylistId) {
+        setPlaylistInfo(null);
+        return;
+      }
+
+      try {
+        const database = await import('./src/database');
+        const {Playlist} = await import('./src/database/models');
+
+        const playlist = await database.default
+          .get<typeof Playlist>('playlists')
+          .find(selectedPlaylistId);
+
+        setPlaylistInfo({
+          name: playlist.name,
+          expirationDate: playlist.formattedExpirationDate,
+        });
+      } catch (error) {
+        console.log('⚠️ Playlist non trouvée dans WatermelonDB pour footer');
+        setPlaylistInfo(null);
+      }
+    };
+
+    loadPlaylistInfo();
+  }, [selectedPlaylistId]);
 
   // Animations supprimées pour assurer clics fonctionnels
 
@@ -995,116 +1001,61 @@ const App: React.FC = () => {
       0,
     );
 
-    // 🚀 TEST COMPLET DES SERVICES IPTV - UTILISER L'INSTANCE EXISTANTE
+    // 🚀 IMPORT DIRECT WATERMELONDB - UN SEUL SYSTÈME UNIFIÉ
     try {
-      console.log('🚀 Utilisation des services IPTV...');
+      console.log('🚀 Import DIRECT WatermelonDB (sans ancien système)...');
 
-      // Simuler progression de téléchargement
-      updateLoading({progress: 10, subtitle: 'Connexion au serveur...'});
+      // Étape 1: Télécharger le contenu M3U
+      updateLoading({progress: 10, subtitle: 'Téléchargement de la playlist...'});
       await new Promise(resolve => setTimeout(resolve, 200));
 
-      // Utiliser l'instance déjà initialisée
-      const iptv =
-        iptvServiceRef.current ||
-        IPTVService.getInstance({
-          enableParentalControl: true,
-          enableUserManagement: true,
-          enableAdvancedSearch: true,
-          enablePerformanceMonitoring: true,
-        });
+      const playlistUrl = source.source || source.url;
+      console.log('🌐 Téléchargement depuis:', playlistUrl);
 
-      // Sauvegarder la référence si pas déjà fait
-      if (!iptvServiceRef.current) {
-        iptvServiceRef.current = iptv;
+      const response = await fetch(playlistUrl);
+      if (!response.ok) {
+        throw new Error(`Erreur téléchargement: ${response.status}`);
       }
 
-      // Vérifier si déjà initialisé
-      if (!iptv.isReady) {
-        console.log('⏳ Initialisation du service...');
-        updateLoading({
-          progress: 25,
-          subtitle: 'Initialisation des services...',
-        });
-        await iptv.initialize();
-        console.log('✅ Service initialisé:', iptv.isReady);
-      }
+      const m3uContent = await response.text();
+      console.log(`📥 Téléchargé: ${Math.round(m3uContent.length / 1024)}KB`);
 
-      // Test import playlist avec progression
-      console.log('📥 Import playlist depuis:', source.source || source.url);
-      updateLoading({progress: 40, subtitle: 'Téléchargement playlist...'});
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // Étape 2: Import DIRECT dans WatermelonDB (un seul système - pré-chargé)
+      updateLoading({progress: 40, subtitle: 'Import dans la base de données...'});
 
-      const result = await iptv.importPlaylistFromUrl(
-        source.source || source.url,
-        source.name || 'Test Playlist',
-        {
-          validateUrls: false, // Skip validation pour test rapide
-          chunkSize: 500,
-          maxChannels: 25000,
-          enableCache: true,
-          parserMode: 'ultra',
+      const playlistService = PlaylistService.getInstance();
+
+      const newPlaylistId = await playlistService.addPlaylist(
+        source.name || 'Playlist M3U',
+        m3uContent,
+        playlistUrl,
+        (progress, message) => {
+          // Progress callback pour mise à jour UI
+          updateLoading({
+            progress: 40 + Math.floor(progress / 2), // 40% → 90%
+            subtitle: message,
+          });
         },
       );
 
-      // Progression parsing
-      updateLoading({progress: 70, subtitle: 'Analyse des chaînes...'});
-      await new Promise(resolve => setTimeout(resolve, 400));
+      console.log('✅ Playlist importée dans WatermelonDB:', newPlaylistId);
 
-      console.log('✅ Import IPTV SUCCESS:', {
-        totalChannels: result.playlist.channels.length,
-        parseTime: result.stats?.parseTime,
-        categories: result.stats?.categories?.length,
-        success: result.success,
-      });
+      // Récupérer les infos de la playlist pour affichage
+      const WatermelonM3UService = (await import('./src/services/WatermelonM3UService')).default;
+      const playlistInfo = await WatermelonM3UService.getPlaylistWithChannels(newPlaylistId, 1, 0);
+      const channelsCount = playlistInfo.totalChannels || 0;
 
-      // 💾 Sauvegarde de la playlist dans AsyncStorage pour ProfilesModal
-      console.log('💾 Sauvegarde de la playlist...');
-      updateLoading({progress: 90, subtitle: 'Sauvegarde...'});
-      await new Promise(resolve => setTimeout(resolve, 200));
+      // Étape 3: Définir comme playlist active
+      setSelectedPlaylistId(newPlaylistId);
 
+      // Étape 4: Synchroniser avec AsyncStorage (juste l'ID)
+      updateLoading({progress: 95, subtitle: 'Finalisation...'});
       try {
-        // Importer AsyncStorage
-        const AsyncStorage = (
-          await import('@react-native-async-storage/async-storage')
-        ).default;
-
-        // Créer l'objet playlist pour ProfilesModal
-        const playlistForProfiles = {
-          id: result.playlist.id,
-          name: source.name || 'Playlist M3U',
-          type: 'M3U' as const,
-          url: source.source || source.url,
-          dateAdded: new Date().toISOString(),
-          channelsCount: result.playlist.channels.length,
-          status: 'active' as const,
-        };
-
-        // Récupérer les playlists existantes
-        const existingPlaylists = await AsyncStorage.getItem(
-          'saved_m3u_playlists',
-        );
-        const playlists = existingPlaylists
-          ? JSON.parse(existingPlaylists)
-          : [];
-
-        // Ajouter la nouvelle playlist
-        playlists.push(playlistForProfiles);
-
-        // Sauvegarder
-        await AsyncStorage.setItem(
-          'saved_m3u_playlists',
-          JSON.stringify(playlists),
-        );
-        console.log(
-          '💾 Playlist sauvegardée:',
-          playlistForProfiles.name,
-          `(${playlistForProfiles.channelsCount} chaînes)`,
-        );
-
-        // Définir comme playlist active
-        setSelectedPlaylistId(result.playlist.id);
-      } catch (saveError) {
-        console.error('❌ Erreur sauvegarde playlist:', saveError);
+        const AsyncStorage = await import('@react-native-async-storage/async-storage');
+        await AsyncStorage.default.setItem('last_selected_playlist_id', newPlaylistId);
+        console.log('💾 ID playlist synchronisé:', newPlaylistId);
+      } catch (syncError) {
+        console.error('❌ Erreur synchronisation AsyncStorage:', syncError);
       }
 
       // 🎯 FINALISATION - CACHER LOADING ET AFFICHER NOTIFICATION SUCCESS
@@ -1114,7 +1065,7 @@ const App: React.FC = () => {
 
       // 🎉 NOTIFICATION SUCCESS POPUP
       showNotification(
-        `Playlist ajoutée ! ${result.playlist.channels.length} chaînes importées`,
+        `Playlist ajoutée ! ${channelsCount} chaînes importées`,
         'success',
         4000,
       );
@@ -1268,30 +1219,120 @@ const App: React.FC = () => {
     navigation.navigate('Settings');
   };
 
+  const handleMultiScreenPress = () => {
+    const startTime = performance.now();
+    console.log('📺 Multi-écran CLICKED - Ouverture INSTANTANÉE');
+
+    if (!selectedPlaylistId) {
+      Alert.alert(
+        '📺 Aucune playlist',
+        'Veuillez d\'abord importer et sélectionner une playlist.',
+        [{text: 'OK'}],
+      );
+      return;
+    }
+
+    // ⚡ Ouvrir le modal INSTANTANÉMENT - Pas de chargement préalable !
+    setShowMultiScreen(true);
+
+    // Log du temps d'ouverture
+    requestAnimationFrame(() => {
+      const endTime = performance.now();
+      console.log(`⏱️ [PERF] Modal ouvert en ${(endTime - startTime).toFixed(2)}ms`);
+    });
+  };
+
+  const handleMultiScreenClose = () => {
+    console.log('🚪 Fermeture multi-écran');
+    setShowMultiScreen(false);
+  };
+
+  const handleMultiScreenFullscreen = (channel: Channel) => {
+    console.log('🎬 Passage en fullscreen depuis multi-écran:', channel.name);
+    setCurrentChannel(channel);
+    setShowVideoPlayer(true);
+    setShowMultiScreen(false);
+  };
+
   return (
     <LinearGradient
-      colors={['#253a58', '#2d4663', '#405E87', '#E67E22']}
-      locations={[0, 0.3, 0.65, 1]}
-      start={{x: 0, y: 0}}
-      end={{x: 1, y: 1}}
+      colors={['#0a0e1a', '#12182e', '#1a2440', '#233052']}
+      locations={[0, 0.3, 0.7, 1]}
+      start={{x: 0.5, y: 0}}
+      end={{x: 0.5, y: 1}}
       style={styles.container}>
+      {/* Effet grain de sable (noise texture) */}
+      <View
+        style={[styles.absoluteFill, {
+          backgroundColor: 'transparent',
+          opacity: 0.08
+        }]}
+        pointerEvents="none">
+        <View style={[styles.absoluteFill, {
+          backgroundColor: '#000',
+          opacity: 0.5,
+        }]} />
+      </View>
+
+      {/* Dégradé radial - lumière centrale */}
+      <LinearGradient
+        colors={[
+          'rgba(60, 100, 160, 0.25)',
+          'rgba(50, 90, 150, 0.18)',
+          'rgba(40, 80, 140, 0.12)',
+          'rgba(30, 70, 130, 0.08)',
+          'rgba(20, 60, 120, 0.04)',
+          'transparent',
+        ]}
+        locations={[0, 0.2, 0.4, 0.6, 0.8, 1]}
+        start={{x: 0.5, y: 0.3}}
+        end={{x: 0.5, y: 1}}
+        style={styles.absoluteFill}
+        pointerEvents="none"
+      />
+
+      {/* Effet de lumière du bas gauche - plus prononcé */}
+      <LinearGradient
+        colors={[
+          'rgba(90, 140, 220, 0.45)',
+          'rgba(80, 130, 210, 0.38)',
+          'rgba(70, 120, 200, 0.30)',
+          'rgba(60, 110, 190, 0.22)',
+          'rgba(50, 100, 180, 0.15)',
+          'rgba(40, 90, 170, 0.10)',
+          'rgba(30, 80, 160, 0.06)',
+          'rgba(20, 70, 150, 0.03)',
+          'transparent',
+        ]}
+        locations={[0, 0.10, 0.20, 0.32, 0.45, 0.60, 0.75, 0.88, 1]}
+        start={{x: 0, y: 1}}
+        end={{x: 0.65, y: 0.2}}
+        style={styles.absoluteFill}
+        pointerEvents="none"
+      />
       {/* StatusBar gérée par StatusBarManager centralisé */}
 
       <View style={styles.header}>
         <View style={styles.headerRight}>
-          <TouchableOpacity
-            style={styles.headerIconButton}
+          <Pressable
+            style={({pressed}) => [
+              styles.headerIconButton,
+              pressed && {transform: [{scale: 0.9}]},
+            ]}
             onPress={() => {
               console.log('🔥 BOUTON CONNEXION!');
               setShowConnectionModal(true);
             }}>
             <Icon name="person" size={24} color="#FFFFFF" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.headerIconButton}
+          </Pressable>
+          <Pressable
+            style={({pressed}) => [
+              styles.headerIconButton,
+              pressed && {transform: [{scale: 0.9}]},
+            ]}
             onPress={handleSettingsPress}>
             <Icon name="settings" size={24} color="#FFFFFF" />
-          </TouchableOpacity>
+          </Pressable>
         </View>
       </View>
 
@@ -1299,235 +1340,310 @@ const App: React.FC = () => {
         <View style={styles.mainCardsSection}>
           <View style={styles.leftColumn}>
             <View style={{flex: 1}}>
-              <TouchableOpacity
-                style={styles.cardTV}
-                onPress={handleTVCardPress}
-                activeOpacity={0.8}>
-                <BlurView
-                  style={styles.absoluteFill}
-                  blurType="light"
-                  blurAmount={15}
-                  reducedTransparencyFallbackColor="rgba(255,255,255,0.15)"
-                  pointerEvents="none"
-                />
-                <LinearGradient
-                  colors={[
-                    'rgba(28, 138, 208, 0.7)',
-                    'rgba(20, 100, 160, 0.5)',
-                    'rgba(15, 76, 117, 0.8)',
-                  ]}
-                  locations={[0, 0.5, 1]}
-                  start={{x: 0, y: 0}}
-                  end={{x: 1, y: 1}}
-                  style={styles.absoluteFill}
-                  pointerEvents="none"
-                />
-                <LinearGradient
-                  colors={[
-                    'rgba(50, 120, 255, 0.3)',
-                    'rgba(30, 90, 200, 0.15)',
-                    'transparent',
-                  ]}
-                  locations={[0, 0.6, 1]}
-                  start={{x: 0, y: 0}}
-                  end={{x: 1, y: 1}}
-                  style={styles.absoluteFill}
-                  pointerEvents="none"
-                />
-                <LinearGradient
-                  colors={[
-                    'rgba(255, 255, 255, 0.6)',
-                    'rgba(255, 255, 255, 0.2)',
-                    'transparent',
-                  ]}
-                  locations={[0, 0.2, 1]}
-                  style={styles.premiumReflectionEffect}
-                  pointerEvents="none"
-                />
-                <View style={styles.cardContent} pointerEvents="box-none">
-                  <View style={styles.premiumIconWrapper}>
-                    <Image source={iconMap.tv} style={styles.iconImageLg} />
-                  </View>
-                  <Text style={styles.modernTvTitle}>TV EN DIRECT</Text>
-                  <Text style={styles.modernSubtitle}>Streaming Live</Text>
-                </View>
-              </TouchableOpacity>
+              <Pressable
+                style={({pressed}) => [
+                  styles.cardTV,
+                  pressed && {transform: [{scale: 0.97}]},
+                ]}
+                onPress={handleTVCardPress}>
+                {({pressed}) => (
+                  <>
+                    <LinearGradient
+                      colors={[
+                        '#153963',
+                        '#334e71',
+                        '#506a7f',
+                      ]}
+                      locations={[0, 0.5, 1]}
+                      start={{x: 1, y: 0}}
+                      end={{x: 0, y: 1}}
+                      style={styles.absoluteFill}
+                      pointerEvents="none"
+                    />
+                    <LinearGradient
+                      colors={[
+                        'rgba(130, 165, 205, 0.38)',
+                        'rgba(125, 160, 200, 0.34)',
+                        'rgba(120, 155, 195, 0.30)',
+                        'rgba(115, 150, 190, 0.26)',
+                        'rgba(110, 145, 185, 0.22)',
+                        'rgba(100, 135, 175, 0.18)',
+                        'rgba(90, 125, 165, 0.14)',
+                        'rgba(80, 115, 155, 0.10)',
+                        'rgba(70, 105, 145, 0.07)',
+                        'rgba(60, 95, 135, 0.04)',
+                        'rgba(50, 85, 125, 0.02)',
+                        'transparent',
+                      ]}
+                      locations={[0, 0.08, 0.15, 0.22, 0.28, 0.35, 0.42, 0.50, 0.60, 0.70, 0.85, 1]}
+                      start={{x: 0, y: 1}}
+                      end={{x: 1, y: 0}}
+                      style={styles.absoluteFill}
+                      pointerEvents="none"
+                    />
+                    {pressed && (
+                      <View
+                        style={[
+                          styles.absoluteFill,
+                          {backgroundColor: 'rgba(0, 0, 0, 0.2)'},
+                        ]}
+                        pointerEvents="none"
+                      />
+                    )}
+                    <View style={styles.cardContent} pointerEvents="box-none">
+                      <View style={styles.premiumIconWrapper}>
+                        <Image source={iconMap.tv} style={styles.iconImageLg} />
+                      </View>
+                      <Text style={styles.modernTvTitle}>TV EN DIRECT</Text>
+                      <Text style={styles.modernSubtitle}>Streaming Live</Text>
+                    </View>
+                  </>
+                )}
+              </Pressable>
             </View>
           </View>
 
           <View style={styles.rightColumn}>
             <View style={styles.topRow}>
               <View style={{flex: 1}}>
-                <TouchableOpacity
-                  style={styles.cardFilms}
+                <Pressable
+                  style={({pressed}) => [
+                    styles.cardFilms,
+                    pressed && {transform: [{scale: 0.97}]},
+                  ]}
                   onPress={() => {
                     console.log('🎬 Films CLICKED! - NAVIGATION FUTURE');
-                  }}
-                  activeOpacity={0.8}>
-                  <BlurView
-                    style={styles.absoluteFill}
-                    blurType="light"
-                    blurAmount={15}
-                    reducedTransparencyFallbackColor="rgba(255,255,255,0.15)"
-                    pointerEvents="none"
-                  />
-                  <LinearGradient
-                    colors={[
-                      'rgba(241, 106, 32, 0.7)',
-                      'rgba(230, 81, 0, 0.5)',
-                      'rgba(200, 60, 0, 0.8)',
-                    ]}
-                    locations={[0, 0.5, 1]}
-                    start={{x: 0, y: 0}}
-                    end={{x: 1, y: 1}}
-                    style={styles.absoluteFill}
-                    pointerEvents="none"
-                  />
-                  <LinearGradient
-                    colors={[
-                      'rgba(240, 55, 55, 0.3)',
-                      'rgba(170, 30, 30, 0.15)',
-                      'transparent',
-                    ]}
-                    locations={[0, 0.6, 1]}
-                    start={{x: 0, y: 0}}
-                    end={{x: 1, y: 1}}
-                    style={styles.absoluteFill}
-                    pointerEvents="none"
-                  />
-                  <LinearGradient
-                    colors={[
-                      'rgba(255, 255, 255, 0.6)',
-                      'rgba(255, 255, 255, 0.2)',
-                      'transparent',
-                    ]}
-                    locations={[0, 0.2, 1]}
-                    style={styles.premiumReflectionEffect}
-                    pointerEvents="none"
-                  />
-                  <View style={styles.cardContent} pointerEvents="box-none">
-                    <View style={styles.premiumIconWrapperFilms}>
-                      <Image
-                        source={iconMap.films}
-                        style={styles.iconImageMd}
+                  }}>
+                  {({pressed}) => (
+                    <>
+                      <LinearGradient
+                        colors={[
+                          '#d97d3f',
+                          '#e38d4d',
+                          '#ed9d5b',
+                        ]}
+                        locations={[0, 0.5, 1]}
+                        start={{x: 1, y: 0}}
+                        end={{x: 0, y: 1}}
+                        style={styles.absoluteFill}
+                        pointerEvents="none"
                       />
-                    </View>
-                    <Text style={styles.modernCardTitle}>FILMS</Text>
-                  </View>
-                </TouchableOpacity>
+                      <LinearGradient
+                        colors={[
+                          'rgba(255, 180, 120, 0.38)',
+                          'rgba(250, 175, 115, 0.34)',
+                          'rgba(245, 170, 110, 0.30)',
+                          'rgba(240, 165, 105, 0.26)',
+                          'rgba(235, 160, 100, 0.22)',
+                          'rgba(230, 155, 95, 0.18)',
+                          'rgba(225, 150, 90, 0.14)',
+                          'rgba(220, 145, 85, 0.10)',
+                          'rgba(215, 140, 80, 0.07)',
+                          'rgba(210, 135, 75, 0.04)',
+                          'rgba(205, 130, 70, 0.02)',
+                          'transparent',
+                        ]}
+                        locations={[0, 0.08, 0.15, 0.22, 0.28, 0.35, 0.42, 0.50, 0.60, 0.70, 0.85, 1]}
+                        start={{x: 0, y: 1}}
+                        end={{x: 1, y: 0}}
+                        style={styles.absoluteFill}
+                        pointerEvents="none"
+                      />
+                      {pressed && (
+                        <View
+                          style={[
+                            styles.absoluteFill,
+                            {backgroundColor: 'rgba(0, 0, 0, 0.2)'},
+                          ]}
+                          pointerEvents="none"
+                        />
+                      )}
+                      <View style={styles.cardContent} pointerEvents="box-none">
+                        <View style={styles.premiumIconWrapperFilms}>
+                          <Image
+                            source={iconMap.films}
+                            style={styles.iconImageMd}
+                          />
+                        </View>
+                        <Text style={styles.modernCardTitle}>FILMS</Text>
+                      </View>
+                    </>
+                  )}
+                </Pressable>
               </View>
 
               <View style={{flex: 1}}>
-                <TouchableOpacity
-                  style={styles.cardSeries}
+                <Pressable
+                  style={({pressed}) => [
+                    styles.cardSeries,
+                    pressed && {transform: [{scale: 0.97}]},
+                  ]}
                   onPress={() => {
                     console.log('📺 Series CLICKED! - NAVIGATION FUTURE');
-                  }}
-                  activeOpacity={0.8}>
-                  <BlurView
-                    style={styles.absoluteFill}
-                    blurType="light"
-                    blurAmount={15}
-                    reducedTransparencyFallbackColor="rgba(255,255,255,0.15)"
-                    pointerEvents="none"
-                  />
-                  <LinearGradient
-                    colors={[
-                      'rgba(130, 100, 160, 0.7)',
-                      'rgba(110, 85, 140, 0.5)',
-                      'rgba(95, 70, 125, 0.8)',
-                    ]}
-                    locations={[0, 0.5, 1]}
-                    start={{x: 0, y: 0}}
-                    end={{x: 1, y: 1}}
-                    style={styles.absoluteFill}
-                    pointerEvents="none"
-                  />
-                  <LinearGradient
-                    colors={[
-                      'rgba(160, 90, 255, 0.7)',
-                      'rgba(120, 60, 200, 0.5)',
-                      'transparent',
-                    ]}
-                    locations={[0, 0.6, 1]}
-                    start={{x: 0, y: 0}}
-                    end={{x: 1, y: 1}}
-                    style={styles.absoluteFill}
-                    pointerEvents="none"
-                  />
-                  <LinearGradient
-                    colors={[
-                      'rgba(255, 255, 255, 0.6)',
-                      'rgba(255, 255, 255, 0.2)',
-                      'transparent',
-                    ]}
-                    locations={[0, 0.2, 1]}
-                    style={styles.premiumReflectionEffect}
-                    pointerEvents="none"
-                  />
-                  <View style={styles.cardContent} pointerEvents="box-none">
-                    <View style={styles.premiumIconWrapperSeries}>
-                      <Image
-                        source={iconMap.series}
-                        style={styles.iconImageMd}
+                  }}>
+                  {({pressed}) => (
+                    <>
+                      <LinearGradient
+                        colors={[
+                          '#5d6185',
+                          '#4d5178',
+                          '#3d416b',
+                        ]}
+                        locations={[0, 0.5, 1]}
+                        start={{x: 0, y: 0}}
+                        end={{x: 1, y: 1}}
+                        style={styles.absoluteFill}
+                        pointerEvents="none"
                       />
-                    </View>
-                    <Text style={styles.modernCardTitle}>SERIES</Text>
-                  </View>
-                </TouchableOpacity>
+                      <LinearGradient
+                        colors={[
+                          'rgba(140, 160, 200, 0.3)',
+                          'transparent',
+                        ]}
+                        locations={[0, 0.5]}
+                        start={{x: 0, y: 0}}
+                        end={{x: 1, y: 0.5}}
+                        style={styles.absoluteFill}
+                        pointerEvents="none"
+                      />
+                      <LinearGradient
+                        colors={[
+                          'rgba(255, 255, 255, 0.2)',
+                          'transparent',
+                        ]}
+                        locations={[0, 0.4]}
+                        style={styles.premiumReflectionEffect}
+                        pointerEvents="none"
+                      />
+                      {pressed && (
+                        <View
+                          style={[
+                            styles.absoluteFill,
+                            {backgroundColor: 'rgba(0, 0, 0, 0.2)'},
+                          ]}
+                          pointerEvents="none"
+                        />
+                      )}
+                      <View style={styles.cardContent} pointerEvents="box-none">
+                        <View style={styles.premiumIconWrapperSeries}>
+                          <Image
+                            source={iconMap.series}
+                            style={styles.iconImageMd}
+                          />
+                        </View>
+                        <Text style={styles.modernCardTitle}>SERIES</Text>
+                      </View>
+                    </>
+                  )}
+                </Pressable>
               </View>
             </View>
 
             <View style={styles.bottomRow}>
               {bottomRowCards.map(card => (
                 <View key={card.key} style={{flex: 1}}>
-                  <TouchableOpacity
-                    style={[styles.cardBottom, styles.liquidGlassCard]}
+                  <Pressable
+                    style={({pressed}) => [
+                      styles.cardBottom,
+                      styles.liquidGlassCard,
+                      pressed && {transform: [{scale: 0.97}]},
+                    ]}
                     onPress={() => {
-                      console.log(`${card.title} CLICKED! - NAVIGATION FUTURE`);
-                    }}
-                    activeOpacity={0.8}>
-                    <BlurView
-                      style={styles.absoluteFill}
-                      blurType="light"
-                      blurAmount={8}
-                      reducedTransparencyFallbackColor="rgba(255,255,255,0.18)"
-                      pointerEvents="none"
-                    />
-                    <LinearGradient
-                      colors={[
-                        'rgba(65, 85, 75, 0.7)',
-                        'rgba(55, 70, 60, 0.5)',
-                        'rgba(45, 60, 50, 0.8)',
-                      ]}
-                      locations={[0, 0.5, 1]}
-                      start={{x: 0, y: 0}}
-                      end={{x: 1, y: 1}}
-                      style={styles.absoluteFill}
-                      pointerEvents="none"
-                    />
-                    <View style={styles.cardContent} pointerEvents="box-none">
-                      <View
-                        style={[
-                          styles.iconWrapper,
-                          styles.liquidGlassIconWrapper,
-                        ]}>
-                        <Image
-                          source={iconMap[card.key as keyof typeof iconMap]}
-                          style={[styles.iconImageSm, styles.liquidGlassIcon]}
+                      if (card.key === 'multi') {
+                        handleMultiScreenPress();
+                      } else {
+                        console.log(`${card.title} CLICKED! - NAVIGATION FUTURE`);
+                      }
+                    }}>
+                    {({pressed}) => (
+                      <>
+                        <LinearGradient
+                          colors={[
+                            '#3a404a',
+                            '#424852',
+                            '#4a525c',
+                          ]}
+                          locations={[0, 0.5, 1]}
+                          start={{x: 0, y: 0}}
+                          end={{x: 1, y: 1}}
+                          style={styles.absoluteFill}
+                          pointerEvents="none"
                         />
-                      </View>
-                      <Text style={styles.modernSmallTitle}>{card.title}</Text>
-                      <Text style={styles.modernSmallSubtitle}>
-                        {card.subtitle}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
+                        <LinearGradient
+                          colors={[
+                            'rgba(140, 150, 165, 0.18)',
+                            'rgba(130, 140, 155, 0.14)',
+                            'rgba(120, 130, 145, 0.10)',
+                            'rgba(110, 120, 135, 0.08)',
+                            'rgba(100, 110, 125, 0.06)',
+                            'rgba(90, 100, 115, 0.04)',
+                            'rgba(80, 90, 105, 0.02)',
+                            'transparent',
+                          ]}
+                          locations={[0, 0.15, 0.30, 0.45, 0.60, 0.75, 0.90, 1]}
+                          start={{x: 0, y: 1}}
+                          end={{x: 1, y: 0}}
+                          style={styles.absoluteFill}
+                          pointerEvents="none"
+                        />
+                        {pressed && (
+                          <View
+                            style={[
+                              styles.absoluteFill,
+                              {backgroundColor: 'rgba(0, 0, 0, 0.2)'},
+                            ]}
+                            pointerEvents="none"
+                          />
+                        )}
+                        <View style={styles.cardContent} pointerEvents="box-none">
+                          <View
+                            style={[
+                              styles.iconWrapper,
+                              styles.liquidGlassIconWrapper,
+                            ]}>
+                            <Image
+                              source={iconMap[card.key as keyof typeof iconMap]}
+                              style={[styles.iconImageSm, styles.liquidGlassIcon]}
+                            />
+                          </View>
+                          <Text style={styles.modernSmallTitle}>{card.title}</Text>
+                        </View>
+                      </>
+                    )}
+                  </Pressable>
                 </View>
               ))}
             </View>
           </View>
         </View>
+      </View>
+
+      {/* Footer avec informations playlist et utilisateur */}
+      <View style={styles.footerSpace}>
+        {playlistInfo ? (
+          <View style={styles.footerContent}>
+            {/* Section gauche: Date d'expiration */}
+            <View style={styles.footerLeft}>
+              <Text style={styles.footerLabel}>Expiration: </Text>
+              <Text style={styles.footerValue}>{playlistInfo.expirationDate}</Text>
+            </View>
+
+            {/* Section centre: Nom utilisateur */}
+            <View style={styles.footerCenter}>
+              <Icon name="person" size={18} color="rgba(255, 255, 255, 0.9)" />
+              <Text style={styles.footerUsername}>joel</Text>
+            </View>
+
+            {/* Section droite: Nom playlist */}
+            <View style={styles.footerRight}>
+              <Text style={styles.footerValue} numberOfLines={1} ellipsizeMode="tail">
+                Connecté: {playlistInfo.name}
+              </Text>
+            </View>
+          </View>
+        ) : (
+          <Text style={styles.footerPlaceholder}>Aucune playlist sélectionnée</Text>
+        )}
       </View>
 
       {/* Video Player Modal */}
@@ -1584,6 +1700,15 @@ const App: React.FC = () => {
         onPlaylistSelect={handlePlaylistSelect}
         onAddPlaylist={handleAddPlaylist}
         selectedPlaylistId={selectedPlaylistId}
+      />
+
+      {/* Multi-Screen Modal */}
+      <MultiScreenView
+        visible={showMultiScreen}
+        onClose={handleMultiScreenClose}
+        playlistId={selectedPlaylistId}
+        currentChannel={currentChannel}
+        onChannelFullscreen={handleMultiScreenFullscreen}
       />
 
       {/* Composants de test DI supprimés pour production */}
@@ -1653,14 +1778,75 @@ const styles = StyleSheet.create({
   },
   headerButtonText: {color: '#FFFFFF', fontSize: 14, marginLeft: 8},
   headerIconButton: {padding: 8, marginLeft: 4},
-  content: {flex: 1, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 16},
-  mainCardsSection: {flexDirection: 'row', flex: 1, gap: 16},
-  leftColumn: {flex: 0.8},
-  rightColumn: {flex: 1.1, flexDirection: 'column', gap: 12},
-  topRow: {flexDirection: 'row', flex: 0.65, gap: 12},
-  bottomRow: {flexDirection: 'row', flex: 0.35, gap: 10},
+  content: {flex: 0.85, paddingHorizontal: 40, paddingTop: 8, paddingBottom: 16},
+  mainCardsSection: {flexDirection: 'row', flex: 1, gap: 20},
+  leftColumn: {flex: 1},
+  rightColumn: {flex: 1.2, flexDirection: 'column', gap: 16},
+  topRow: {flexDirection: 'row', flex: 0.7, gap: 16},
+  bottomRow: {flexDirection: 'row', flex: 0.3, gap: 14},
 
-  // Cards refactorisées - TouchableOpacity Standard
+  // Footer space
+  footerSpace: {
+    flex: 0.15,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  footerContent: {
+    flexDirection: 'row',
+    width: '100%',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  footerLeft: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    paddingLeft: 40,
+  },
+  footerCenter: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  footerRight: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    paddingRight: 40,
+  },
+  footerLabel: {
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontSize: 14,
+    fontWeight: '500',
+    marginLeft: 6,
+  },
+  footerValue: {
+    color: 'rgba(255, 255, 255, 0.95)',
+    fontSize: 15,
+    fontWeight: '700',
+    maxWidth: 150,
+  },
+  footerUsername: {
+    color: 'rgba(255, 255, 255, 1)',
+    fontSize: 16,
+    fontWeight: '800',
+    marginLeft: 8,
+  },
+  footerPlaceholder: {
+    color: 'rgba(255, 255, 255, 0.5)',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+
+  // Cards refactorisées - Frosted Glass unifié
   cardTV: {
     flex: 1,
     borderRadius: 24,
@@ -1712,14 +1898,14 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.18)',
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.35)',
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
     shadowColor: '#000000',
-    shadowOffset: {width: 0, height: 18},
-    shadowOpacity: 0.6,
-    shadowRadius: 35,
-    elevation: 30,
+    shadowOffset: {width: 0, height: 14},
+    shadowOpacity: 0.45,
+    shadowRadius: 28,
+    elevation: 22,
   },
   reflectionEffect: {
     position: 'absolute',
@@ -1741,7 +1927,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 8,
+    padding: 6,
   },
   // TouchableOverlay supprimé - fusionné dans les cartes
 
@@ -1749,32 +1935,32 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   premiumIconWrapper: {
-    marginBottom: 8,
+    marginBottom: 6,
     shadowColor: '#4A9EFF',
-    shadowOffset: {width: 0, height: 4},
+    shadowOffset: {width: 0, height: 3},
     shadowOpacity: 1.0,
-    shadowRadius: 16,
-    elevation: 12,
+    shadowRadius: 12,
+    elevation: 10,
   },
   premiumIconWrapperFilms: {
-    marginBottom: 8,
+    marginBottom: 6,
     shadowColor: '#FF6B35',
-    shadowOffset: {width: 0, height: 4},
+    shadowOffset: {width: 0, height: 3},
     shadowOpacity: 1.0,
-    shadowRadius: 16,
-    elevation: 12,
+    shadowRadius: 12,
+    elevation: 10,
   },
   premiumIconWrapperSeries: {
-    marginBottom: 8,
+    marginBottom: 6,
     shadowColor: '#826AA0',
-    shadowOffset: {width: 0, height: 4},
+    shadowOffset: {width: 0, height: 3},
     shadowOpacity: 1.0,
-    shadowRadius: 16,
-    elevation: 12,
+    shadowRadius: 12,
+    elevation: 10,
   },
-  iconImageLg: {width: 95, height: 95, resizeMode: 'contain'},
-  iconImageMd: {width: 75, height: 75, resizeMode: 'contain'},
-  iconImageSm: {width: 45, height: 45, resizeMode: 'contain'},
+  iconImageLg: {width: 70, height: 70, resizeMode: 'contain'},
+  iconImageMd: {width: 55, height: 55, resizeMode: 'contain'},
+  iconImageSm: {width: 35, height: 35, resizeMode: 'contain'},
 
   // Liquid Glass Styles
   liquidGlassCard: {
@@ -1802,37 +1988,31 @@ const styles = StyleSheet.create({
   },
 
   modernTvTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '800',
     color: '#FFFFFF',
     textAlign: 'center',
-    textShadowColor: 'rgba(0,0,0,0.4)',
-    textShadowOffset: {width: 0, height: 2},
-    textShadowRadius: 8,
   },
   modernSubtitle: {
-    fontSize: 12,
+    fontSize: 11,
     color: 'rgba(255,255,255,0.8)',
     textAlign: 'center',
     fontWeight: '500',
   },
   modernCardTitle: {
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: '700',
     color: '#FFFFFF',
     textAlign: 'center',
-    textShadowColor: 'rgba(0,0,0,0.3)',
-    textShadowOffset: {width: 0, height: 1},
-    textShadowRadius: 4,
   },
   modernSmallTitle: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '700',
     color: '#FFFFFF',
     textAlign: 'center',
   },
   modernSmallSubtitle: {
-    fontSize: 9,
+    fontSize: 8,
     color: 'rgba(255,255,255,0.7)',
     textAlign: 'center',
     fontWeight: '500',

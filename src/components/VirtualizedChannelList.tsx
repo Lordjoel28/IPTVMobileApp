@@ -10,12 +10,19 @@ import {
   VirtualizedList,
   TouchableOpacity,
   StyleSheet,
-  Image,
   TextInput,
   useColorScheme,
   Dimensions,
 } from 'react-native';
+import FastImage from 'react-native-fast-image';
 import {Channel} from '../types';
+// 🚀 OPTIMISATION: Utiliser le store optimisé
+import {
+  usePlaylistCategories,
+  useSelectedCategory,
+  useChannelsByCategory,
+  usePlaylistActions,
+} from '../stores/PlaylistStore';
 
 const {height: SCREEN_HEIGHT} = Dimensions.get('window');
 
@@ -60,14 +67,17 @@ const ChannelItem = memo<{
       onPress={handlePress}
       activeOpacity={0.7}>
       <View style={styles.channelContent}>
-        {/* Logo optimisé avec fallback rapide */}
+        {/* Logo optimisé avec FastImage et cache agressif */}
         <View style={styles.logoContainer}>
           {item.logo ? (
-            <Image
-              source={{uri: item.logo}}
+            <FastImage
+              source={{
+                uri: item.logo,
+                priority: FastImage.priority.normal,
+                cache: FastImage.cacheControl.immutable,
+              }}
               style={styles.channelLogo}
-              resizeMode="cover"
-              fadeDuration={0} // Pas d'animation fade pour perfs
+              resizeMode={FastImage.resizeMode.cover}
             />
           ) : (
             <View style={[styles.channelLogo, styles.channelLogoPlaceholder]}>
@@ -123,37 +133,19 @@ export const VirtualizedChannelList: React.FC<VirtualizedChannelListProps> = ({
   onToggleFavorite,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const isDarkMode = useColorScheme() === 'dark';
 
-  // 🧠 MÉMOIRE : Categories avec useMemo pour éviter recalculs
-  const categories = useMemo(() => {
-    const cats = new Set(['all']);
-    for (let i = 0; i < channels.length; i++) {
-      const channel = channels[i];
-      if (channel.category) {
-        cats.add(channel.category);
-      }
-    }
-    return Array.from(cats);
-  }, [channels]);
+  // 🚀 OPTIMISATION: Utiliser le store
+  const categories = usePlaylistCategories();
+  const selectedCategoryFromStore = useSelectedCategory();
+  const {selectCategory} = usePlaylistActions();
 
-  // 🔍 FILTRAGE OPTIMISÉ : Index et recherche fuzzy
+  // 🚀 OPTIMISATION: Récupérer channels depuis l'index (O(1))
+  const categoryChannels = useChannelsByCategory(selectedCategoryFromStore || 'TOUS');
+
+  // 🚀 OPTIMISATION: Filtrage recherche seulement (catégorie déjà filtrée par le store)
   const filteredChannels = useMemo(() => {
-    let filtered = channels;
-
-    // Filtre par catégorie (O(n) unavoidable)
-    if (selectedCategory !== 'all') {
-      if (selectedCategory === 'favorites') {
-        // Créer Set des favoris pour lookup O(1)
-        const favoriteSet = new Set(favorites);
-        filtered = channels.filter(channel => favoriteSet.has(channel.id));
-      } else {
-        filtered = channels.filter(
-          channel => channel.category === selectedCategory,
-        );
-      }
-    }
+    let filtered = categoryChannels;
 
     // Recherche par nom (case insensitive)
     if (searchQuery.trim()) {
@@ -166,7 +158,7 @@ export const VirtualizedChannelList: React.FC<VirtualizedChannelListProps> = ({
     }
 
     return filtered;
-  }, [channels, selectedCategory, searchQuery, favorites]);
+  }, [categoryChannels, searchQuery]);
 
   // 🎯 CALLBACKS OPTIMISÉS : useCallback pour éviter re-renders
   const handleChannelSelect = useCallback(
@@ -232,7 +224,7 @@ export const VirtualizedChannelList: React.FC<VirtualizedChannelListProps> = ({
 
   // 🎨 RENDER CATEGORIES BAR
   const renderCategoryButton = (category: string) => {
-    const isSelected = selectedCategory === category;
+    const isSelected = selectedCategoryFromStore === category;
     const displayName =
       category === 'all'
         ? 'Toutes'
@@ -248,7 +240,7 @@ export const VirtualizedChannelList: React.FC<VirtualizedChannelListProps> = ({
           isDarkMode && styles.categoryButtonDark,
           isSelected && styles.categoryButtonSelected,
         ]}
-        onPress={() => setSelectedCategory(category)}>
+        onPress={() => selectCategory(category)}>
         <Text
           style={[
             styles.categoryButtonText,
@@ -296,7 +288,7 @@ export const VirtualizedChannelList: React.FC<VirtualizedChannelListProps> = ({
         <VirtualizedList
           horizontal
           showsHorizontalScrollIndicator={false}
-          data={['all', 'favorites', ...categories.filter(c => c !== 'all')]}
+          data={categories.map(c => c.name)}
           initialNumToRender={5}
           windowSize={10}
           maxToRenderPerBatch={5}

@@ -21,6 +21,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { useThemeColors } from '../contexts/ThemeContext';
 import {
   FullEPGData,
   EPGChannel,
@@ -54,51 +55,82 @@ interface CompactProgram {
 // Utilisation du cache EPG centralisé
 const epgCache = EPGCacheManager;
 
-// Composant pour afficher une icône avec texte
-const IconText: React.FC<{icon: string; text: string; color?: string; size?: number}> = ({
-  icon,
-  text,
-  color = '#FFFFFF',
-  size = 16,
-}) => (
-  <View style={styles.iconTextContainer}>
-    <Icon name={icon} size={size} color={color} style={styles.iconTextIcon} />
-    <Text style={[styles.iconTextLabel, {color}]}>{text}</Text>
-  </View>
-);
+// 🚀 Cache des matches EPG réussis pour éviter les recherches répétées
+const channelMatchCache = new Map<string, string>(); // channelName -> epgChannelId
 
-// Composant pour afficher un statut avec icône appropriée
-const StatusText: React.FC<{status: string}> = ({status}) => {
-  const getStatusIcon = (status: string) => {
-    if (status.includes('disponible')) return 'check-circle';
-    if (status.includes('Vérification') || status.includes('indexé')) return 'search';
-    if (status.includes('Erreur')) return 'error';
-    if (status.includes('Pas de Guide') || status.includes('non chargé')) return 'cloud-download';
-    if (status.includes('Aucun programme')) return 'info';
-    if (status.includes('se charge') || status.includes('Initialisation')) return 'hourglass-empty';
-    if (status.includes('Recherche')) return 'search';
-    return 'tv';
-  };
+// IconText sera défini à l'intérieur du composant EPGCompact
 
-  const getStatusColor = (status: string) => {
-    if (status.includes('disponible')) return '#4CAF50';
-    if (status.includes('Erreur')) return '#F44336';
-    if (status.includes('Pas de Guide') || status.includes('non chargé')) return '#FF9800';
-    if (status.includes('Aucun programme')) return '#FFC107';
-    return '#888';
-  };
-
-  return (
-    <IconText
-      icon={getStatusIcon(status)}
-      text={status}
-      color={getStatusColor(status)}
-      size={16}
-    />
-  );
-};
+// StatusText sera défini à l'intérieur du composant EPGCompact
 
 const EPGCompact: React.FC<EPGCompactProps> = ({selectedChannel, height, playlistId, playlistMetadata}) => {
+  const colors = useThemeColors();
+  const styles = createStyles(colors);
+
+  // Composant pour afficher une icône avec texte
+  const IconText: React.FC<{icon: string; text: string; color?: string; size?: number; textSize?: number}> = ({
+    icon,
+    text,
+    color = '#FFFFFF',
+    size = 16,
+    textSize,
+  }) => (
+    <View style={styles.iconTextContainer}>
+      <Icon name={icon} size={size} color={color} style={styles.iconTextIcon} />
+      <Text style={[styles.iconTextLabel, {color, fontSize: textSize || 14}]}>{text}</Text>
+    </View>
+  );
+
+  // Composant pour afficher un statut avec icône appropriée
+  const StatusText: React.FC<{status: string}> = ({status}) => {
+    const getStatusIcon = (status: string) => {
+      if (status.includes('disponible')) return 'check-circle';
+      if (status.includes('Vérification') || status.includes('indexé')) return 'search';
+      if (status.includes('Erreur')) return 'error';
+      if (status.includes('Pas de Guide') || status.includes('non chargé')) return 'cloud-download';
+      if (status.includes('Aucun programme')) return 'info';
+      if (status.includes('se charge') || status.includes('Initialisation')) return 'hourglass-empty';
+      if (status.includes('Recherche')) return 'search';
+      return 'tv';
+    };
+
+    const getStatusColor = (status: string) => {
+      if (status.includes('disponible')) return '#4CAF50';
+      if (status.includes('Erreur')) return '#F44336';
+      // Tous les messages spécifiques au guide en gris discret
+      if (status.includes('Pas de Guide') ||
+          status.includes('non chargé') ||
+          status.includes('Aucun programme') ||
+          status.includes('trouvé pour') ||
+          status.includes('Vérification') ||
+          status.includes('indexé') ||
+          status.includes('Initialisation') ||
+          status.includes('Recherche') ||
+          status.includes('se charge') ||
+          status.includes('Patientez')) return '#666666';
+      return '#888';
+    };
+
+    const isGuideSpecificMessage = status.includes('trouvé pour') ||
+                                   status.includes('Aucun programme') ||
+                                   status.includes('Pas de Guide') ||
+                                   status.includes('non chargé') ||
+                                   status.includes('Vérification') ||
+                                   status.includes('indexé') ||
+                                   status.includes('Initialisation') ||
+                                   status.includes('Recherche') ||
+                                   status.includes('se charge') ||
+                                   status.includes('Patientez');
+
+    return (
+      <IconText
+        icon={getStatusIcon(status)}
+        text={status}
+        color={getStatusColor(status)}
+        size={isGuideSpecificMessage ? 14 : 16}
+        textSize={isGuideSpecificMessage ? 12 : 14}
+      />
+    );
+  };
   const [programs, setPrograms] = useState<CompactProgram[]>([]);
   const [epgStatus, setEpgStatus] = useState("Guide TV prêt");
   const currentChannelRef = useRef<string | null>(null);
@@ -108,6 +140,44 @@ const EPGCompact: React.FC<EPGCompactProps> = ({selectedChannel, height, playlis
   const [isLoadingEPG, setIsLoadingEPG] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [isCacheReady, setIsCacheReady] = useState(false); // ✅ NOUVEL ÉTAT
+
+  // 🔄 État pour les mises à jour en temps réel
+  const [now, setNow] = useState(new Date());
+
+  // Effet pour la mise à jour de la progression et la transition de programme
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const newNow = new Date();
+      setNow(newNow);
+
+      const liveProgram = programs.find(p => p.isLive);
+      if (liveProgram && newNow.getTime() >= liveProgram.endTime.getTime()) {
+        console.log('[EPGCompact] Le programme en cours est terminé. Rafraîchissement du guide.');
+        if (selectedChannel) {
+          loadChannelPrograms(selectedChannel);
+        }
+      }
+    }, 15000); // Mise à jour toutes les 15 secondes
+
+    return () => clearInterval(interval);
+  }, [programs, selectedChannel]);
+
+  // 📊 La fonction de calcul de la progression utilise l'état 'now'
+  const calculateLiveProgress = (program: CompactProgram): number => {
+    if (!program.isLive) return 0;
+
+    const startTime = program.startTime.getTime();
+    const endTime = program.endTime.getTime();
+
+    if (now.getTime() < startTime) return 0;
+    if (now.getTime() >= endTime) return 100;
+
+    const duration = endTime - startTime;
+    if (duration <= 0) return 0;
+
+    const elapsed = now.getTime() - startTime;
+    return Math.max(0, Math.min(100, (elapsed / duration) * 100));
+  };
 
   // 🚀 TiviMate Style : Chargement EPG à la demande
   useEffect(() => {
@@ -238,6 +308,32 @@ const EPGCompact: React.FC<EPGCompactProps> = ({selectedChannel, height, playlis
       // Déporter le calcul pour ne pas bloquer l'UI
       setTimeout(async () => {
         try {
+          // 🔍 DEBUG DÉTAILLÉ: Informations de la chaîne
+          console.log(`🔍 [EPGCompact] ANALYSE CHANNEL:`, {
+            name: channel.name,
+            tvgId: channel.tvgId || 'N/A',
+            epgId: channel.epgId || 'N/A',
+            group: channel.group || 'N/A',
+            category: channel.category || 'N/A'
+          });
+
+          // 0. Vérification du cache de matches (super-rapide)
+          const cacheKey = `${channel.name}|${channel.tvgId || ''}|${channel.epgId || ''}`;
+          if (channelMatchCache.has(cacheKey)) {
+            const cachedEpgId = channelMatchCache.get(cacheKey)!;
+            console.log(`⚡ [EPGCompact] Match trouvé dans cache: ${channel.name} -> ${cachedEpgId}`);
+
+            // Rechercher la chaîne EPG correspondante
+            const cachedEpgChannel = epgCache.fullEPG?.channels.find(ch => ch.id === cachedEpgId);
+            if (cachedEpgChannel) {
+              const programs = processPrograms(
+                epgCache.fullEPG?.programmes.filter(p => p.channel === cachedEpgId) || []
+              );
+              resolve(programs);
+              return;
+            }
+          }
+
           // 1. Recherche O(1) dans l'index
           const normalizedName = normalizeName(channel.name);
           let epgChannel = epgCache.channelIndex.get(normalizedName);
@@ -250,6 +346,12 @@ const EPGCompact: React.FC<EPGCompactProps> = ({selectedChannel, height, playlis
             console.log(`🔍 [EPGCompact] Loading chunked: ${epgCache.isLoadingChunked}`);
             console.log(`🔍 [EPGCompact] Full EPG: ${epgCache.fullEPG ? `${epgCache.fullEPG.channels.length} channels` : 'null'}`);
 
+            // 🔍 DEBUG: Montrer quelques chaînes index pour comparaison
+            if (epgCache.channelIndex.size > 0) {
+              const indexSample = Array.from(epgCache.channelIndex.keys()).slice(0, 5);
+              console.log(`🔍 [EPGCompact] Échantillon index:`, indexSample);
+            }
+
             // 🎯 TiviMate Style : Essayer SQLite d'abord si chargement en cours
             if (epgCache.isLoadingChunked) {
               console.log(`🔄 [EPGCompact] Chargement TiviMate en cours - tentative recherche SQLite directe pour: ${channel.name}`);
@@ -258,7 +360,7 @@ const EPGCompact: React.FC<EPGCompactProps> = ({selectedChannel, height, playlis
               try {
                 const sqliteStorage = new SQLiteEPGStorage();
                 const sqliteChannels = await sqliteStorage.getAllChannels();
-                epgChannel = findBestMatchingChannel(channel.name, sqliteChannels) || undefined;
+                epgChannel = findBestMatchingChannel(channel.name, sqliteChannels, channel.tvgId, channel.epgId) || undefined;
                 if (epgChannel) {
                   console.log(`✅ [EPGCompact] Chaîne trouvée dans SQLite: "${epgChannel.displayName}" (ID: ${epgChannel.id})`);
                 }
@@ -270,7 +372,7 @@ const EPGCompact: React.FC<EPGCompactProps> = ({selectedChannel, height, playlis
             // Fallback sur cache mémoire si pas trouvé dans SQLite
             if (!epgChannel && epgCache.fullEPG && epgCache.fullEPG.channels.length > 0) {
               console.log(`🔍 [EPGCompact] Recherche dans cache mémoire pour: ${channel.name}`);
-              epgChannel = findBestMatchingChannel(channel.name, epgCache.fullEPG.channels) || undefined;
+              epgChannel = findBestMatchingChannel(channel.name, epgCache.fullEPG.channels, channel.tvgId, channel.epgId) || undefined;
 
               if (epgChannel) {
                 console.log(`✅ [EPGCompact] Similarité trouvée dans cache: "${epgChannel.displayName}" (ID: ${epgChannel.id})`);
@@ -291,6 +393,10 @@ const EPGCompact: React.FC<EPGCompactProps> = ({selectedChannel, height, playlis
 
           console.log(`✅ [EPGCompact] Chaîne EPG trouvée: ${epgChannel.displayName} pour ${channel.name}`);
           console.log(`🔍 [EPGCompact] État EPGCache - isLoadingChunked: ${epgCache.isLoadingChunked}, fullEPG: ${epgCache.fullEPG ? 'Disponible' : 'null'}`);
+
+          // 💾 Sauvegarder le match dans le cache pour les futures recherches
+          channelMatchCache.set(cacheKey, epgChannel.id);
+          console.log(`💾 [EPGCompact] Match sauvegardé dans cache: ${channel.name} -> ${epgChannel.id}`);
 
           // 🎯 TiviMate Style : Chercher directement dans SQLite si chargement en cours
           let channelPrograms: any[] = [];
@@ -330,34 +436,130 @@ const EPGCompact: React.FC<EPGCompactProps> = ({selectedChannel, height, playlis
 
   // Fonctions utilitaires optimisées
 
+  // 🚀 ALGORITHME MATCHING EPG ROBUSTE basé sur standards IPTV
   const findBestMatchingChannel = (
     m3uChannelName: string,
     epgChannels: EPGChannel[],
+    tvgId?: string, // Paramètre pour tvg-id
+    epgId?: string  // Paramètre pour epg-id (alternative)
   ): EPGChannel | null => {
+    console.log(`🔍 [EPGCompact] Recherche EPG pour: "${m3uChannelName}" | tvg-id: "${tvgId || 'N/A'}" | epg-id: "${epgId || 'N/A'}"`);
+
+    // 🥇 PRIORITÉ 1A: Matching par TVG-ID (norme IPTV principale)
+    if (tvgId && tvgId.trim() !== '') {
+      console.log(`🔍 [EPGCompact] Recherche par TVG-ID: "${tvgId}"`);
+
+      for (const epgChannel of epgChannels) {
+        // Comparaison exacte avec l'ID du channel EPG
+        if (epgChannel.id === tvgId) {
+          console.log(`🎯 [EPGCompact] MATCH PARFAIT TVG-ID: "${epgChannel.displayName}" (ID: ${epgChannel.id})`);
+          return epgChannel;
+        }
+
+        // Comparaison case-insensitive pour plus de robustesse
+        if (epgChannel.id.toLowerCase() === tvgId.toLowerCase()) {
+          console.log(`🎯 [EPGCompact] MATCH TVG-ID (case-insensitive): "${epgChannel.displayName}" (ID: ${epgChannel.id})`);
+          return epgChannel;
+        }
+      }
+
+      console.log(`⚠️ [EPGCompact] Aucun match TVG-ID trouvé pour: "${tvgId}"`);
+    }
+
+    // 🥇 PRIORITÉ 1B: Matching par EPG-ID (alternative au tvg-id)
+    if (epgId && epgId.trim() !== '') {
+      console.log(`🔍 [EPGCompact] Recherche par EPG-ID: "${epgId}"`);
+
+      for (const epgChannel of epgChannels) {
+        // Comparaison exacte avec l'ID du channel EPG
+        if (epgChannel.id === epgId) {
+          console.log(`🎯 [EPGCompact] MATCH PARFAIT EPG-ID: "${epgChannel.displayName}" (ID: ${epgChannel.id})`);
+          return epgChannel;
+        }
+
+        // Comparaison case-insensitive
+        if (epgChannel.id.toLowerCase() === epgId.toLowerCase()) {
+          console.log(`🎯 [EPGCompact] MATCH EPG-ID (case-insensitive): "${epgChannel.displayName}" (ID: ${epgChannel.id})`);
+          return epgChannel;
+        }
+      }
+
+      console.log(`⚠️ [EPGCompact] Aucun match EPG-ID trouvé pour: "${epgId}"`);
+    }
+
+    // 🥈 PRIORITÉ 2: Matching par display-name exact
     const normalizedM3UName = normalizeName(m3uChannelName);
-    let bestMatch: EPGChannel | null = null;
-    let highestScore = 0;
-    let partialMatches: Array<{name: string, score: number}> = [];
+    console.log(`🔍 [EPGCompact] Recherche par nom normalisé: "${normalizedM3UName}"`);
 
-    console.log(`🔍 [EPGCompact] Recherche similitude pour: "${m3uChannelName}" → "${normalizedM3UName}"`);
-
-    // Recherche rapide d'abord - correspondance exacte
     for (const epgChannel of epgChannels) {
       const normalizedEPGName = normalizeName(epgChannel.displayName);
 
       if (normalizedEPGName === normalizedM3UName) {
-        console.log(`🎯 [EPGCompact] Match exact trouvé: "${epgChannel.displayName}"`);
-        return epgChannel; // Match parfait trouvé
+        console.log(`🎯 [EPGCompact] MATCH EXACT display-name: "${epgChannel.displayName}"`);
+        return epgChannel;
       }
+    }
 
-      // Match partiel simple (plus rapide que edit distance)
+    // 🥉 PRIORITÉ 3: Fuzzy matching intelligent avec multiple critères
+    let bestMatch: EPGChannel | null = null;
+    let highestScore = 0;
+    let matchDetails: Array<{name: string, id: string, score: number, method: string}> = [];
+
+    for (const epgChannel of epgChannels) {
+      const normalizedEPGName = normalizeName(epgChannel.displayName);
+      let score = 0;
+      let method = '';
+
+      // Méthode 1: Inclusion mutuelle (comme avant)
       if (normalizedEPGName.includes(normalizedM3UName) || normalizedM3UName.includes(normalizedEPGName)) {
-        const score = Math.max(
+        score = Math.max(
           normalizedM3UName.length / normalizedEPGName.length,
           normalizedEPGName.length / normalizedM3UName.length
         );
+        method = 'inclusion';
+      }
 
-        partialMatches.push({name: epgChannel.displayName, score: parseFloat(score.toFixed(2))});
+      // Méthode 2: Similarité par mots-clés (nouveau)
+      const m3uWords = m3uChannelName.toLowerCase().split(/\s+|[^a-z0-9]+/).filter(w => w.length > 2);
+      const epgWords = epgChannel.displayName.toLowerCase().split(/\s+|[^a-z0-9]+/).filter(w => w.length > 2);
+
+      if (m3uWords.length > 0 && epgWords.length > 0) {
+        const commonWords = m3uWords.filter(word => epgWords.some(epgWord =>
+          epgWord.includes(word) || word.includes(epgWord)
+        ));
+        const keywordScore = commonWords.length / Math.max(m3uWords.length, epgWords.length);
+
+        if (keywordScore > score) {
+          score = keywordScore;
+          method = 'keywords';
+        }
+      }
+
+      // Méthode 3: Similarité phonétique simple (suppression voyelles)
+      const phoneticM3U = normalizedM3UName.replace(/[aeiou]/g, '');
+      const phoneticEPG = normalizedEPGName.replace(/[aeiou]/g, '');
+
+      if (phoneticM3U.length > 3 && phoneticEPG.length > 3) {
+        if (phoneticEPG.includes(phoneticM3U) || phoneticM3U.includes(phoneticEPG)) {
+          const phoneticScore = Math.max(
+            phoneticM3U.length / phoneticEPG.length,
+            phoneticEPG.length / phoneticM3U.length
+          ) * 0.8; // Score légèrement réduit car moins précis
+
+          if (phoneticScore > score) {
+            score = phoneticScore;
+            method = 'phonetic';
+          }
+        }
+      }
+
+      if (score > 0) {
+        matchDetails.push({
+          name: epgChannel.displayName,
+          id: epgChannel.id,
+          score: parseFloat(score.toFixed(3)),
+          method
+        });
 
         if (score > highestScore) {
           highestScore = score;
@@ -366,17 +568,35 @@ const EPGCompact: React.FC<EPGCompactProps> = ({selectedChannel, height, playlis
       }
     }
 
-    console.log(`🔍 [EPGCompact] Matches partiels trouvés: ${partialMatches.length}`);
-    if (partialMatches.length > 0) {
-      const topMatches = partialMatches.sort((a, b) => b.score - a.score).slice(0, 3);
-      console.log(`🔍 [EPGCompact] Top 3 matches:`, topMatches);
+    // Debug: Afficher les meilleurs matches
+    if (matchDetails.length > 0) {
+      const topMatches = matchDetails.sort((a, b) => b.score - a.score).slice(0, 5);
+      console.log(`🔍 [EPGCompact] Top 5 matches fuzzy:`, topMatches);
     }
 
-    if (bestMatch && highestScore > 0.7) {
-      console.log(`✅ [EPGCompact] Meilleur match sélectionné: "${bestMatch.displayName}" (score: ${highestScore.toFixed(2)})`);
+    // Seuils adaptatifs selon la méthode
+    const getThreshold = (method: string) => {
+      switch (method) {
+        case 'inclusion': return 0.7;
+        case 'keywords': return 0.6;
+        case 'phonetic': return 0.75;
+        default: return 0.7;
+      }
+    };
+
+    const finalMatch = matchDetails.find(m => m.score === highestScore);
+    const threshold = finalMatch ? getThreshold(finalMatch.method) : 0.7;
+
+    if (bestMatch && highestScore >= threshold) {
+      console.log(`✅ [EPGCompact] MATCH FUZZY sélectionné: "${bestMatch.displayName}" (score: ${highestScore.toFixed(3)}, méthode: ${finalMatch?.method})`);
       return bestMatch;
     } else {
-      console.log(`❌ [EPGCompact] Aucun match suffisant (seuil: 0.7, meilleur: ${highestScore.toFixed(2)})`);
+      console.log(`❌ [EPGCompact] Aucun match suffisant (seuil: ${threshold}, meilleur: ${highestScore.toFixed(3)})`);
+
+      // Debug: Montrer quelques chaînes EPG disponibles pour aider au debug
+      const sampleChannels = epgChannels.slice(0, 3).map(ch => `"${ch.displayName}" (ID: ${ch.id})`);
+      console.log(`🔍 [EPGCompact] Exemples chaînes EPG disponibles: ${sampleChannels.join(', ')}`);
+
       return null;
     }
   };
@@ -385,127 +605,114 @@ const EPGCompact: React.FC<EPGCompactProps> = ({selectedChannel, height, playlis
     name.toLowerCase().replace(/[^a-z0-9]/g, '');
 
 
-  const parseXMLTVTime = (xmltvTime: string): Date => {
-    const match = xmltvTime.match(
+
+  const parseXMLTVTime = (xmltvTime: string): Date | null => {
+    if (!xmltvTime || typeof xmltvTime !== 'string') {
+      return null;
+    }
+
+    // Support pour les deux formats:
+    // Format 1: "20250929233600 +0000" (standard XMLTV)
+    // Format 2: "20250929T233600Z +0000" (format ISO avec timezone)
+    const cleanedTime = xmltvTime.replace(/T|Z/g, '').trim();
+
+    const match = cleanedTime.match(
       /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})\s*([+-]\d{4})?$/,
     );
+
     if (!match) {
-      return new Date();
+      // Log seulement en mode debug pour éviter spam
+      if (__DEV__) {
+        console.warn(`[EPGCompact] Format de temps XMLTV invalide, ignoré: "${xmltvTime}"`);
+      }
+      return null;
     }
+
     const [, year, month, day, hour, minute, second, timezone] = match;
     const dateStr = `${year}-${month}-${day}T${hour}:${minute}:${second}`;
+
     if (timezone) {
       const sign = timezone[0];
       const tzHours = timezone.substring(1, 3);
       const tzMinutes = timezone.substring(3, 5);
       return new Date(`${dateStr}${sign}${tzHours}:${tzMinutes}`);
     }
-    return new Date(dateStr + 'Z');
+
+    return new Date(dateStr + 'Z'); // Fuseau horaire UTC par défaut
   };
 
   const processPrograms = (programs: EPGProgramme[]): CompactProgram[] => {
     try {
-      const now = new Date();
-      const processed: CompactProgram[] = [];
-      const sorted = programs.sort(
-        (a, b) =>
-          parseXMLTVTime(a.start).getTime() - parseXMLTVTime(b.start).getTime(),
-      );
-
-      // 🔍 DEBUG : Analyser les programmes reçus
-      console.log(`🔍 [EPGCompact] processPrograms: ${programs.length} programmes à analyser`);
-      if (programs.length > 0) {
-        const firstProg = programs[0];
-        const lastProg = programs[programs.length - 1];
-        console.log(`🔍 [EPGCompact] Premier programme: ${firstProg.title} (${firstProg.start})`);
-        console.log(`🔍 [EPGCompact] Dernier programme: ${lastProg.title} (${lastProg.start})`);
-        console.log(`🔍 [EPGCompact] Maintenant: ${now.toISOString()}`);
-      }
-
-      // Trouver le programme actuel et les 4-5 programmes suivants
-      let foundCurrent = false;
-      let addedPrograms = 0;
-      const maxPrograms = 6; // Programme actuel + 5 suivants
-
-      for (const prog of sorted) {
-        const startTime = parseXMLTVTime(prog.start);
-        const endTime = parseXMLTVTime(prog.stop);
-
-        // Programme actuel (en cours)
-        if (startTime <= now && now < endTime) {
-          foundCurrent = true;
-          const progress = ((now.getTime() - startTime.getTime()) / (endTime.getTime() - startTime.getTime())) * 100;
-
-          processed.push({
-            id: `${prog.channel}-${prog.start}`,
-            title: prog.title,
-            description: prog.desc || generateDescription(prog.title),
-            startTime,
-            endTime,
-            isLive: true,
-            progress: Math.max(0, Math.min(100, progress)),
-            duration: (endTime.getTime() - startTime.getTime()) / 60000,
-            category: extractCategory(prog.title),
-          });
-          addedPrograms++;
-        }
-        // Programmes suivants
-        else if (startTime > now && addedPrograms < maxPrograms) {
-          processed.push({
-            id: `${prog.channel}-${prog.start}`,
-            title: prog.title,
-            description: prog.desc || generateDescription(prog.title),
-            startTime,
-            endTime,
-            isLive: false,
-            duration: (endTime.getTime() - startTime.getTime()) / 60000,
-            category: extractCategory(prog.title),
-          });
-          addedPrograms++;
-        }
-
-        // Arrêter si on a assez de programmes
-        if (addedPrograms >= maxPrograms) break;
-      }
-
-      // Si aucun programme actuel trouvé, prendre les prochains programmes
-      if (!foundCurrent && processed.length === 0) {
-        console.log(`🔍 [EPGCompact] Aucun programme actuel/futur trouvé - fallback sur programmes récents`);
-
-        // ✅ NOUVEAU : Fallback sur les programmes récents (dernières 24h + prochaines 24h)
-        const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-        const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-
-        const recentPrograms = sorted.filter(prog => {
-          const startTime = parseXMLTVTime(prog.start);
-          return startTime >= yesterday && startTime <= tomorrow;
-        }).slice(0, maxPrograms);
-
-        console.log(`🔍 [EPGCompact] Fallback: ${recentPrograms.length} programmes dans fenêtre 48h trouvés`);
-
-        recentPrograms.forEach(prog => {
+      // NOTE: This 'now' is for the initial processing. The 'now' state handles real-time updates for progress.
+      const initialNow = new Date(); 
+      
+      const cleanedAndSortedPrograms = programs
+        .map(prog => {
           const startTime = parseXMLTVTime(prog.start);
           const endTime = parseXMLTVTime(prog.stop);
-          processed.push({
-            id: `${prog.channel}-${prog.start}`,
-            title: prog.title,
-            description: prog.desc || generateDescription(prog.title),
-            startTime,
-            endTime,
-            isLive: false,
-            duration: (endTime.getTime() - startTime.getTime()) / 60000,
-            category: extractCategory(prog.title),
-          });
+          if (!startTime || !endTime || endTime <= startTime) return null;
+          return { ...prog, _startTime: startTime, _endTime: endTime };
+        })
+        .filter((prog): prog is NonNullable<typeof prog> => prog !== null)
+        .sort((a, b) => a._startTime.getTime() - b._startTime.getTime());
+
+      console.log(`🔍 [EPGCompact] processPrograms: ${cleanedAndSortedPrograms.length} programmes valides. Heure initiale: ${initialNow.toISOString()}`);
+
+      if (cleanedAndSortedPrograms.length === 0) return [];
+
+      const processed: CompactProgram[] = [];
+      let liveProgramFound = false;
+  
+      // --- Étape 1: Trouver le programme en cours et les suivants ---
+      const startIndex = cleanedAndSortedPrograms.findIndex(p => p._endTime > initialNow);
+
+      if (startIndex === -1) {
+        console.log(`[EPGCompact] Aucune donnée de programme futur disponible.`);
+        return []; // No future programs at all
+      }
+
+      // Check if the first future program is actually live now
+      const potentialLiveProgram = cleanedAndSortedPrograms[startIndex];
+      if (potentialLiveProgram._startTime <= initialNow) {
+        liveProgramFound = true;
+        const liveProgram = potentialLiveProgram;
+        const progress = ((initialNow.getTime() - liveProgram._startTime.getTime()) / (liveProgram._endTime.getTime() - liveProgram._startTime.getTime())) * 100;
+
+        processed.push({
+          id: `${liveProgram.channel}-${liveProgram.start}`,
+          title: liveProgram.title,
+          description: liveProgram.desc || generateDescription(liveProgram.title),
+          startTime: liveProgram._startTime,
+          endTime: liveProgram._endTime,
+          isLive: true,
+          progress: Math.max(0, Math.min(100, progress)),
+          duration: (liveProgram._endTime.getTime() - liveProgram._startTime.getTime()) / 60000,
+          category: extractCategory(liveProgram.title),
         });
       }
 
-      console.log(`✅ [EPGCompact] processPrograms terminé: ${processed.length} programmes traités`);
+      // --- Étape 2: Ajouter les programmes suivants ---
+      const nextProgramsStartIndex = liveProgramFound ? startIndex + 1 : startIndex;
+      const maxPrograms = 6;
+
+      for (let i = nextProgramsStartIndex; i < cleanedAndSortedPrograms.length && processed.length < maxPrograms; i++) {
+        const prog = cleanedAndSortedPrograms[i];
+        processed.push({
+          id: `${prog.channel}-${prog.start}`,
+          title: prog.title,
+          description: prog.desc || generateDescription(prog.title),
+          startTime: prog._startTime,
+          endTime: prog._endTime,
+          isLive: false,
+          duration: (prog._endTime.getTime() - prog._startTime.getTime()) / 60000,
+          category: extractCategory(prog.title),
+        });
+      }
+  
+      console.log(`✅ [EPGCompact] processPrograms terminé: ${processed.length} programmes traités.`);
       return processed;
     } catch (error) {
-      console.error(
-        '❌ [EPGCompact] Erreur lors du traitement des programmes:',
-        error,
-      );
+      console.error('❌ [EPGCompact] Erreur lors du traitement des programmes:', error);
       return [];
     }
   };
@@ -568,14 +775,14 @@ const EPGCompact: React.FC<EPGCompactProps> = ({selectedChannel, height, playlis
             <View key={`live-${program.id}`} style={styles.currentSectionCompact}>
               <View style={styles.sectionHeaderWithProgress}>
                 <Text style={styles.sectionHeader}>MAINTENANT</Text>
-                {/* Barre de progression en haut */}
-                {program.progress !== undefined && (
+                {/* Barre de progression en haut - TEMPS RÉEL */}
+                {program.isLive && (
                   <View style={styles.progressBarContainerTop}>
                     <View style={styles.progressBarSmall}>
-                      <View style={[styles.progressBarFillSmall, {width: `${Math.round(program.progress)}%`}]} />
+                      <View style={[styles.progressBarFillSmall, {width: `${Math.round(calculateLiveProgress(program))}%`}]} />
                     </View>
                     <Text style={styles.progressPercentageSmall}>
-                      {Math.round(program.progress)}%
+                      {Math.round(calculateLiveProgress(program))}%
                     </Text>
                   </View>
                 )}
@@ -637,15 +844,10 @@ const EPGCompact: React.FC<EPGCompactProps> = ({selectedChannel, height, playlis
         </ScrollView>
       ) : (
         <View style={styles.emptyState}>
-          {/* 🚀 Interface de chargement intelligente */}
+          {/* 🚀 Interface de chargement simple */}
           {isLoadingEPG ? (
             <View style={styles.loadingContainer}>
-              <IconText
-                icon="tv"
-                text="Chargement du Guide TV"
-                color="#FFFFFF"
-                size={18}
-              />
+              <Text style={styles.loadingText}>Chargement du Guide TV</Text>
               <View style={styles.progressContainer}>
                 <View style={styles.progressBarLoading}>
                   <View
@@ -654,25 +856,25 @@ const EPGCompact: React.FC<EPGCompactProps> = ({selectedChannel, height, playlis
                       { width: `${loadingProgress}%` }
                     ]}
                   />
-                  <View style={styles.progressGlow} />
                 </View>
                 <Text style={styles.progressText}>{loadingProgress}%</Text>
               </View>
-              <IconText
-                icon="settings"
-                text="Préparation des programmes TV en arrière-plan"
-                color="#CCCCCC"
-                size={14}
-              />
-              <IconText
-                icon={loadingProgress < 50 ? "flash-on" : "list"}
-                text={loadingProgress < 50 ? "Lecture des chaînes..." : "Indexation des programmes..."}
-                color="#888888"
-                size={12}
-              />
             </View>
           ) : (
-            <StatusText status={epgStatus} />
+            <View style={styles.statusContainer}>
+              <StatusText status={epgStatus} />
+
+              {/* 🚨 AVERTISSEMENT QUALITÉ EPG */}
+              {epgStatus.includes('programmes trouvés') && (
+                <View style={styles.warningContainer}>
+                  <Icon name="warning" size={20} color="#FF9500" style={styles.warningIcon} />
+                  <Text style={styles.warningText}>
+                    Les données EPG peuvent être incorrectes ou obsolètes.
+                    {'\n'}Vérifiez avec votre fournisseur IPTV.
+                  </Text>
+                </View>
+              )}
+            </View>
           )}
         </View>
       )}
@@ -680,13 +882,13 @@ const EPGCompact: React.FC<EPGCompactProps> = ({selectedChannel, height, playlis
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
-    backgroundColor: '#1A1A1A', // Plus sombre et moderne
-    borderRadius: 16, // Plus arrondi
+    backgroundColor: colors.surface.primary,
+    borderRadius: 16,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#2A2A2A', // Bordure subtile
+    borderColor: colors.ui.border,
   },
 
   // Liste des programmes - moderne avec gradient
@@ -700,24 +902,24 @@ const styles = StyleSheet.create({
 
   // Section MAINTENANT - style carte moderne
   currentSection: {
-    backgroundColor: 'rgba(0, 212, 170, 0.08)', // Fond subtil accent
+    backgroundColor: colors.accent.primary + '14', // 8% opacity
     marginBottom: 20,
     paddingVertical: 16,
     paddingHorizontal: 16,
     borderRadius: 12,
     borderLeftWidth: 4,
-    borderLeftColor: '#00D4AA',
+    borderLeftColor: colors.accent.primary,
   },
 
   // Section MAINTENANT - Version compacte avec plus d'espace
   currentSectionCompact: {
-    backgroundColor: 'rgba(0, 212, 170, 0.06)', // Fond plus subtil
+    backgroundColor: colors.accent.primary + '0F', // 6% opacity
     marginBottom: 16,
-    paddingVertical: 16, // Augmenté pour plus d'espace
+    paddingVertical: 16,
     paddingHorizontal: 12,
     borderRadius: 8,
     borderLeftWidth: 3,
-    borderLeftColor: '#00D4AA',
+    borderLeftColor: colors.accent.primary,
   },
 
   // Section ENSUITE - espacements améliorés
@@ -729,7 +931,7 @@ const styles = StyleSheet.create({
   // Headers de sections - typographie moderne
   sectionHeader: {
     fontSize: 11,
-    color: '#00D4AA',
+    color: colors.accent.primary,
     fontWeight: '800',
     marginBottom: 12,
     textTransform: 'uppercase',
@@ -762,7 +964,7 @@ const styles = StyleSheet.create({
   programTime: {
     fontFamily: 'monospace',
     fontSize: 12,
-    color: '#00D4AA',
+    color: colors.accent.primary,
     fontWeight: '700',
     minWidth: 44,
     marginRight: 16,
@@ -772,7 +974,7 @@ const styles = StyleSheet.create({
   programTimeCompact: {
     fontFamily: 'monospace',
     fontSize: 11,
-    color: '#00D4AA',
+    color: colors.accent.primary,
     fontWeight: '600',
   },
 
@@ -788,7 +990,7 @@ const styles = StyleSheet.create({
   programTimeEnd: {
     fontFamily: 'monospace',
     fontSize: 9,
-    color: '#888',
+    color: colors.text.tertiary,
     fontWeight: '500',
     marginTop: 1,
   },
@@ -821,7 +1023,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: colors.text.primary,
     lineHeight: 20,
   },
 
@@ -830,7 +1032,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 12,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: colors.text.primary,
     lineHeight: 16,
   },
 
@@ -839,7 +1041,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: colors.text.primary,
     lineHeight: 18,
   },
 
@@ -855,7 +1057,7 @@ const styles = StyleSheet.create({
   liveIndicator: {
     width: 8,
     height: 8,
-    backgroundColor: '#FF3B30',
+    backgroundColor: colors.accent.error,
     borderRadius: 4,
     shadowColor: '#FF3B30',
     shadowOffset: {width: 0, height: 0},
@@ -868,7 +1070,7 @@ const styles = StyleSheet.create({
   liveIndicatorCompact: {
     width: 6,
     height: 6,
-    backgroundColor: '#FF3B30',
+    backgroundColor: colors.accent.error,
     borderRadius: 3,
     shadowColor: '#FF3B30',
     shadowOffset: {width: 0, height: 0},
@@ -880,7 +1082,7 @@ const styles = StyleSheet.create({
   // Progression simple - style moderne
   progressSimple: {
     fontSize: 11,
-    color: '#FF3B30',
+    color: colors.accent.error,
     fontWeight: '800',
     minWidth: 35,
     textAlign: 'right',
@@ -889,7 +1091,7 @@ const styles = StyleSheet.create({
   // Progression - Version compacte
   progressCompact: {
     fontSize: 10,
-    color: '#FF3B30',
+    color: colors.accent.error,
     fontWeight: '700',
     minWidth: 30,
     textAlign: 'right',
@@ -898,7 +1100,7 @@ const styles = StyleSheet.create({
   // Sous-titre du programme - espacement moderne
   programSubtitle: {
     fontSize: 11,
-    color: '#B0B0B0',
+    color: colors.text.secondary,
     marginLeft: 60,
     marginTop: 4,
     fontStyle: 'italic',
@@ -908,7 +1110,7 @@ const styles = StyleSheet.create({
   // Sous-titre du programme - Version compacte avec plus d'espace
   programSubtitleCompact: {
     fontSize: 11,
-    color: '#B0B0B0',
+    color: colors.text.secondary,
     marginLeft: 55, // Aligné avec le titre
     marginTop: 6, // Plus d'espace au-dessus
     fontStyle: 'italic',
@@ -976,14 +1178,14 @@ const styles = StyleSheet.create({
   // Remplissage de la barre de progression petite
   progressBarFillSmall: {
     height: '100%',
-    backgroundColor: '#00D4AA',
+    backgroundColor: colors.accent.primary,
     borderRadius: 1,
   },
 
   // Pourcentage de progression petit
   progressPercentageSmall: {
     fontSize: 8,
-    color: '#00D4AA',
+    color: colors.accent.primary,
     fontWeight: '600',
     minWidth: 24,
     textAlign: 'right',
@@ -1010,14 +1212,14 @@ const styles = StyleSheet.create({
   // Remplissage de la barre de progression
   progressBarFill: {
     height: '100%',
-    backgroundColor: '#FF3B30',
+    backgroundColor: colors.accent.error,
     borderRadius: 1.5,
   },
 
   // Pourcentage de progression
   progressPercentage: {
     fontSize: 9,
-    color: '#FF3B30',
+    color: colors.accent.error,
     fontWeight: '600',
     minWidth: 28,
     textAlign: 'right',
@@ -1026,7 +1228,7 @@ const styles = StyleSheet.create({
   // Description du programme suivant
   upcomingDescription: {
     fontSize: 11,
-    color: '#B0B0B0',
+    color: colors.text.secondary,
     lineHeight: 16,
     marginLeft: 44,
     fontStyle: 'italic',
@@ -1034,7 +1236,7 @@ const styles = StyleSheet.create({
 
   // Badge catégorie - style moderne
   categoryBadgeSmall: {
-    backgroundColor: '#333333',
+    backgroundColor: colors.surface.elevated,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
@@ -1044,7 +1246,7 @@ const styles = StyleSheet.create({
   },
 
   categoryTextSmall: {
-    color: '#CCCCCC',
+    color: colors.text.secondary,
     fontSize: 9,
     fontWeight: '700',
     letterSpacing: 0.5,
@@ -1059,99 +1261,57 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   emptyText: {
-    color: '#888',
+    color: colors.text.tertiary,
     fontSize: 13,
     fontWeight: '400',
     textAlign: 'center',
     fontStyle: 'italic',
   },
 
-  // 🚀 TiviMate Style : Styles pour interface de chargement progressive
+  // 🚀 Interface de chargement simple et discrète
   loadingContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 30,
-    paddingHorizontal: 20,
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    minHeight: 80,
   },
 
-  loadingTitle: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'center',
-    marginBottom: 20,
+  loadingText: {
+    color: colors.text.secondary,
+    fontSize: 13,
+    fontWeight: '500',
+    marginBottom: 12,
   },
 
   progressContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     width: '100%',
-    maxWidth: 200,
-    marginBottom: 15,
+    maxWidth: 160,
   },
 
   progressBarLoading: {
     flex: 1,
-    height: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: 4,
-    marginRight: 12,
+    height: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 2,
+    marginRight: 8,
     overflow: 'hidden',
-    position: 'relative',
-    borderWidth: 1,
-    borderColor: 'rgba(0, 212, 170, 0.3)',
   },
 
   progressFill: {
     height: '100%',
-    backgroundColor: '#00D4AA',
-    borderRadius: 3,
-    position: 'relative',
-    shadowColor: '#00D4AA',
-    shadowOffset: {width: 0, height: 0},
-    shadowOpacity: 0.8,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-
-  progressGlow: {
-    position: 'absolute',
-    top: 0,
-    right: -2,
-    width: 4,
-    height: '100%',
-    backgroundColor: '#00FFCC',
+    backgroundColor: colors.accent.primary,
     borderRadius: 2,
-    opacity: 0.8,
   },
 
   progressText: {
-    color: '#00D4AA',
-    fontSize: 14,
-    fontWeight: '700',
-    minWidth: 40,
-    textAlign: 'right',
-    textShadowColor: 'rgba(0, 212, 170, 0.5)',
-    textShadowOffset: {width: 0, height: 0},
-    textShadowRadius: 4,
-  },
-
-  loadingSubtitle: {
-    color: '#CCCCCC',
-    fontSize: 13,
-    fontWeight: '500',
-    textAlign: 'center',
-    marginTop: 8,
-    lineHeight: 18,
-  },
-
-  loadingDetails: {
     color: '#888888',
     fontSize: 11,
-    fontWeight: '400',
-    textAlign: 'center',
-    marginTop: 4,
-    fontStyle: 'italic',
+    fontWeight: '500',
+    minWidth: 28,
+    textAlign: 'right',
   },
 
   // Styles pour les composants d'icônes Material Design
@@ -1159,6 +1319,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    marginVertical: 4, // Espacement vertical entre les éléments
   },
 
   iconTextIcon: {
@@ -1167,6 +1328,41 @@ const styles = StyleSheet.create({
 
   iconTextLabel: {
     fontSize: 14,
+    fontWeight: '500',
+  },
+
+  // Conteneur pour les statuts non-chargement
+  statusContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+    paddingHorizontal: 12,
+    minHeight: 80,
+  },
+
+  // 🚨 Styles pour l'avertissement qualité EPG
+  warningContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: 'rgba(255, 149, 0, 0.1)',
+    borderColor: '#FF9500',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 16,
+    maxWidth: '100%',
+  },
+
+  warningIcon: {
+    marginRight: 8,
+    marginTop: 2,
+  },
+
+  warningText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#FF9500',
+    lineHeight: 16,
     fontWeight: '500',
   },
 

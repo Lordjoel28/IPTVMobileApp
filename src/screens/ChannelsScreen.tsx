@@ -13,7 +13,6 @@ import {
   StatusBar,
   TouchableOpacity,
   Dimensions,
-  FlatList,
   TextInput,
   Image,
   Animated,
@@ -22,9 +21,11 @@ import {
   Modal,
   Platform,
 } from 'react-native';
+import {FlashList} from '@shopify/flash-list';
 import { useImmersiveScreen } from '../hooks/useStatusBar';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import LinearGradient from 'react-native-linear-gradient';
+import FastImage from 'react-native-fast-image'; // ✅ Import pour préchargement
 import ChannelCard from '../components/ChannelCard';
 import type {Category} from '../types';
 import {usePlayerStore} from '../stores/PlayerStore';
@@ -55,7 +56,7 @@ interface ChannelsScreenProps {
     params: {
       playlistId: string;
       channelsCount?: number;
-      useWatermelonDB?: boolean;
+      playlistType?: 'M3U' | 'XTREAM';
     };
   };
   navigation: any;
@@ -205,6 +206,9 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
       categoryItemSelected: {
         backgroundColor: colors.surface.elevated,
+        borderLeftWidth: 5,
+        borderLeftColor: colors.accent.primary,
+        paddingLeft: 12, // Compenser la bordure
         borderRadius: 8,
       },  categoryIcon: {
     marginRight: 12,
@@ -368,7 +372,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 2000,
+    zIndex: 1500, // Réduit pour ne pas dépasser player fullscreen
   },
   sortModalBackdrop: {
     position: 'absolute',
@@ -482,16 +486,14 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({route, navigation}) => {
   const {
     playlistId,
     channelsCount = 0,
-    useWatermelonDB = false,
+    playlistType = 'M3U', // 'M3U' ou 'XTREAM'
   } = route.params || {};
 
-  // 🔧 CORRECTION: Respecter l'architecture originale
-  // M3U → Legacy (useWatermelonDB: false)
-  // Xtream → WatermelonDB (useWatermelonDB: true)
-  console.log('🔧 Architecture respectée:', {
-    useWatermelonDB,
+  // 🚀 NOUVELLE ARCHITECTURE: Tout en WatermelonDB (M3U + Xtream)
+  console.log('🚀 Architecture WatermelonDB unifiée:', {
+    playlistType,
     channelsCount,
-    type: useWatermelonDB ? 'Xtream (WatermelonDB)' : 'M3U (Legacy)',
+    storage: 'WatermelonDB (SQLite)',
   });
 
   // États
@@ -505,7 +507,7 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({route, navigation}) => {
     null,
   );
   const fadeAnim = useRef(new Animated.Value(1)).current;
-  const flatListRef = useRef<FlatList>(null);
+  const flashListRef = useRef<FlashList<Channel>>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const [displayedChannels, setDisplayedChannels] = useState<Channel[]>([]);
@@ -697,13 +699,11 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({route, navigation}) => {
   useEffect(() => {
     console.log('🔄 useEffect ChannelsScreen - DÉMARRAGE');
     console.log('🔄 playlistId:', playlistId);
-    console.log('🔄 useWatermelonDB:', useWatermelonDB);
+    console.log('🔄 playlistType:', playlistType);
 
     // Mode de chargement identifié
     console.log(
-      `🔄 Mode: ${
-        useWatermelonDB ? 'Xtream (WatermelonDB)' : 'M3U (Legacy)'
-      } - ${channelsCount} chaînes`,
+      `🔄 Mode: ${playlistType} (WatermelonDB) - ${channelsCount} chaînes`,
     );
 
     const loadChannels = async () => {
@@ -715,18 +715,11 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({route, navigation}) => {
 
       try {
         console.log('📺 ChannelsScreen - Chargement playlist:', playlistId);
-        console.log('🍉 useWatermelonDB flag:', useWatermelonDB);
+        console.log('🍉 Type:', playlistType);
 
-        // 🍉 NOUVELLE LOGIQUE: WatermelonDB ou ancien système selon le flag
-        if (useWatermelonDB) {
-          console.log('🍉🍉🍉 USING WATERMELONDB for channels loading');
-          await loadChannelsFromWatermelonDB();
-          return;
-        } else {
-          console.log('📦 USING LEGACY SYSTEM for channels loading');
-          await loadChannelsFromLegacySystem();
-          return;
-        }
+        // 🚀 TOUJOURS WatermelonDB (M3U ou Xtream)
+        console.log('🍉 USING WATERMELONDB for channels loading');
+        await loadChannelsFromWatermelonDB();
       } catch (error) {
         console.error('❌ Erreur récupération chaînes:', error);
         Alert.alert(
@@ -739,7 +732,7 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({route, navigation}) => {
     };
 
     loadChannels();
-  }, [playlistId, useWatermelonDB]);
+  }, [playlistId, playlistType]);
 
   // Fonction pour normaliser les URLs de logos Xtream
   const normalizeXtreamLogoUrl = (
@@ -770,28 +763,90 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({route, navigation}) => {
       console.log('🍉 WatermelonDB function CALLED - début chargement');
       const startTime = Date.now();
 
-      // Importer le service WatermelonDB
-      const WatermelonXtreamService = (
-        await import('../services/WatermelonXtreamService')
-      ).default;
+      // 🚀 Importer le bon service selon le type de playlist
+      const WatermelonService = playlistType === 'XTREAM'
+        ? (await import('../services/WatermelonXtreamService')).default
+        : (await import('../services/WatermelonM3UService')).default;
 
-      // Pagination WatermelonDB optimisée - Charger par pages de 100
-      const result = await WatermelonXtreamService.getPlaylistWithChannels(
-        playlistId,
-        100,
-        0,
-      );
-      console.log(`⏱️ WatermelonDB Query Time: ${Date.now() - startTime}ms`);
+      console.log(`🍉 Using ${playlistType === 'XTREAM' ? 'Xtream' : 'M3U'} WatermelonDB Service`);
 
-      console.log('🍉 WatermelonDB result:', {
-        playlist: result.playlist?.name,
-        channels: result.channels?.length,
-        categories: result.categories?.length,
-        totalChannels: result.totalChannels,
-      });
+      let result;
+      try {
+        // Pagination WatermelonDB optimisée - Charger première page (500 items)
+        result = await WatermelonService.getPlaylistWithChannels(
+          playlistId,
+          CHANNELS_PER_PAGE, // 500 items cohérent avec le reste
+          0,
+        );
+        console.log(`⏱️ WatermelonDB Query Time: ${Date.now() - startTime}ms`);
 
-      if (!result.playlist) {
-        throw new Error('Playlist WatermelonDB introuvable');
+        console.log('🍉 WatermelonDB result:', {
+          playlist: result.playlist?.name,
+          channels: result.channels?.length,
+          categories: result.categories?.length,
+          totalChannels: result.totalChannels,
+        });
+
+        if (!result.playlist) {
+          throw new Error('Playlist WatermelonDB introuvable');
+        }
+      } catch (watermelonError: any) {
+        console.log('⚠️ Playlist non trouvée dans WatermelonDB:', watermelonError.message);
+        console.log('🔄 Migration automatique depuis AsyncStorage...');
+
+        // Migration automatique en arrière-plan (sans dialogue utilisateur)
+        try {
+          // Importer PlaylistService
+          const {PlaylistService} = await import('../services/PlaylistService');
+          const playlistService = PlaylistService.getInstance();
+
+          console.log('🔄 Début migration automatique...');
+
+          // Lancer la migration (silencieuse)
+          const newPlaylistId = await playlistService.migratePlaylistToWatermelon(
+            playlistId,
+            (progress, message) => {
+              console.log(`📊 Migration: ${progress}% - ${message}`);
+            },
+          );
+
+          console.log(`✅ Migration automatique terminée: ${playlistId} → ${newPlaylistId}`);
+
+          // 🔧 CORRECTION: Mettre à jour AsyncStorage avec le nouveau ID
+          try {
+            const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+            await AsyncStorage.setItem('last_selected_playlist_id', newPlaylistId);
+            console.log(`💾 ID playlist mis à jour dans AsyncStorage: ${newPlaylistId}`);
+          } catch (updateError) {
+            console.error('❌ Erreur mise à jour AsyncStorage:', updateError);
+          }
+
+          // Recharger automatiquement avec le nouveau ID (sans alert)
+          navigation.replace('ChannelsScreen', {
+            playlistId: newPlaylistId,
+            channelsCount: 0,
+            playlistType: 'M3U',
+          });
+
+          return;
+        } catch (migrationError: any) {
+          console.error('❌ Erreur migration automatique:', migrationError);
+
+          // Si migration échoue, afficher une vraie erreur
+          Alert.alert(
+            '❌ Erreur',
+            'Impossible de charger cette playlist. Elle semble corrompue.',
+            [
+              {
+                text: 'OK',
+                onPress: () => navigation.goBack(),
+              },
+            ],
+          );
+
+          setIsLoading(false);
+          return;
+        }
       }
 
       // Récupérer le serveur Xtream pour normaliser les logos
@@ -918,6 +973,23 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({route, navigation}) => {
       setCategories(categoriesWithCounts);
       setSelectedCategory(categoriesWithCounts[0]); // Sélectionner "TOUT"
       setDisplayedChannels(convertedChannels);
+
+      // 🚀 OPTIMISATION: Précharger les logos des 30 premières chaînes
+      setTimeout(() => {
+        const logosToPreload = convertedChannels
+          .slice(0, 30) // Plus de logos au démarrage
+          .filter(ch => ch.logo && ch.logo.trim())
+          .map(ch => ({
+            uri: ch.logo!,
+            priority: FastImage.priority.high,
+            cache: FastImage.cacheControl.immutable,
+          }));
+
+        if (logosToPreload.length > 0) {
+          FastImage.preload(logosToPreload);
+          console.log(`🚀 ${logosToPreload.length} logos préchargés`);
+        }
+      }, 100);
 
       // Configurer la pagination
       setCurrentPage(0);
@@ -1093,21 +1165,14 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({route, navigation}) => {
   // 🔧 UNIFIED LOADING: Un seul useEffect unifié (Best Practice 2024)
   useEffect(() => {
     console.log(
-      '🔄 UNIFIED DATA LOADING - Mode:',
-      useWatermelonDB ? 'WatermelonDB' : 'Legacy',
+      '🔄 UNIFIED DATA LOADING - Mode: WatermelonDB (M3U ou Xtream)',
     );
 
-    if (useWatermelonDB) {
-      // WatermelonDB géré par son propre chargement initial - PAS de regroupement ici
-      console.log(
-        '📺 WatermelonDB: Chargement déjà effectué dans loadChannelsFromWatermelonDB',
-      );
-    } else if (!useWatermelonDB && channels.length > 0) {
-      // Legacy: Effectuer le regroupement SEULEMENT après chargement des données
-      console.log('📺 Legacy: Regroupement avec', channels.length, 'chaînes');
-      groupChannelsByCategories();
-    }
-  }, [channels, useWatermelonDB]);
+    // WatermelonDB géré par son propre chargement initial
+    console.log(
+      '📺 WatermelonDB: Chargement effectué dans loadChannelsFromWatermelonDB',
+    );
+  }, [channels, playlistType]);
 
   // Timer cleanup removed for simplicity
 
@@ -1298,7 +1363,7 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({route, navigation}) => {
       initialCategory: selectedCategory || categories[0] || { id: 'all', name: 'Toutes', count: allChannels.length, channels: allChannels },
       initialChannels: allChannels,
       playlistName: playlistName || 'Recherche',
-      useWatermelonDB: false
+      playlistType: playlistType || 'M3U'
     };
 
     // Utiliser le PlayerStore pour passer les données
@@ -1355,7 +1420,7 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({route, navigation}) => {
             initialCategory: fallbackSelected || unifiedCategory,
             initialChannels: fallbackChannels,
             playlistName,
-            useWatermelonDB,
+            playlistType: playlistType || 'M3U',
           });
 
           console.log(
@@ -1394,7 +1459,7 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({route, navigation}) => {
             initialCategory: safeSelected || unifiedCategory,
             initialChannels: safeChannels,
             playlistName,
-            useWatermelonDB,
+            playlistType: playlistType || 'M3U',
           });
 
           console.log(
@@ -1489,7 +1554,7 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({route, navigation}) => {
         initialChannels: safeChannels,
         selectedChannel: channel,
         playlistName,
-        useWatermelonDB,
+        playlistType: playlistType || 'M3U',
       });
     };
 
@@ -1501,146 +1566,101 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({route, navigation}) => {
   };
 
   const handleCategorySelect = async (category: Category) => {
-    console.log('📂 Catégorie sélectionnée:', category.name);
+    console.log(`📂 Catégorie sélectionnée: ${category.name} (${category.count} chaînes)`);
 
     // Déclencher l'animation de transition
     animateCategoryTransition();
 
-    if (!useWatermelonDB) {
-      let allChannels = category.channels || [];
-
-      // 🎯 CAS SPÉCIAL: RÉCENTS - charger les vraies chaînes récentes depuis AsyncStorage
-      if (
-        category.name.toLowerCase().includes('récent') ||
-        category.name.includes('📺') ||
-        category.id.includes('recent') ||
-        category.id.includes('history')
-      ) {
-        console.log(
-          `🕰️ [ChannelsScreen] Catégorie RÉCENTS détectée, chargement des vraies chaînes récentes...`,
-        );
-
-        try {
-          const AsyncStorage = (
-            await import('@react-native-async-storage/async-storage')
-          ).default;
-          const recentKey = `recent_channels_${playlistId}`;
-          console.log(`🔑 [ChannelsScreen] Clé recherchée: ${recentKey}`);
-
-          const recentData = await AsyncStorage.getItem(recentKey);
-          if (recentData) {
-            const recentChannelsData = JSON.parse(recentData);
-            allChannels = recentChannelsData;
-            console.log(
-              `✅ [ChannelsScreen] ${recentChannelsData.length} chaînes récentes chargées pour affichage`,
-            );
-          } else {
-            console.log(
-              `❌ [ChannelsScreen] Aucune donnée récente dans ${recentKey}`,
-            );
-            allChannels = [];
-          }
-        } catch (error) {
-          console.error('🚨 [ChannelsScreen] Erreur chargement récents:', error);
-          allChannels = [];
-        }
-      }
-
-      // 🆕 CORRECTION LEGACY: Initialiser pagination correcte
-      console.log(
-        `📦 Legacy: Sélection catégorie "${category.name}" avec ${allChannels.length} chaînes`,
-      );
-
-      setSelectedCategory(category);
-      setCurrentPage(0); // CORRECTION: commencer à 0 pour pagination
-
-      // Charger seulement la première page (500 chaînes)
-      const firstPageChannels = allChannels.slice(0, CHANNELS_PER_PAGE);
-      setDisplayedChannels(firstPageChannels);
-
-      // Configurer pagination
-      const hasMorePages = allChannels.length > CHANNELS_PER_PAGE;
-      setHasMoreChannels(hasMorePages);
-
-      console.log(
-        `📈 Legacy init: Affichage ${firstPageChannels.length}/${allChannels.length} chaînes (hasMore: ${hasMorePages})`,
-      );
-
-      // Scroll vers le haut
-      setTimeout(() => {
-        flatListRef.current?.scrollToOffset({offset: 0, animated: true});
-      }, 100);
-
-      return;
-    }
-
     setSelectedCategory(category);
     setCurrentPage(0);
-    setHasMoreChannels(true);
+    setHasMoreChannels(false); // Désactiver le "+" immédiatement pour éviter le flash
 
     try {
-      const WatermelonXtreamService = (
-        await import('../services/WatermelonXtreamService')
-      ).default;
+      // 🚀 Utiliser le bon service WatermelonDB (M3U ou Xtream)
+      const WatermelonService = playlistType === 'XTREAM'
+        ? (await import('../services/WatermelonXtreamService')).default
+        : (await import('../services/WatermelonM3UService')).default;
 
       let result;
-      if (category.id === 'all') {
-        // Charger toutes les chaînes
-        result = await WatermelonXtreamService.getPlaylistWithChannels(
+
+      // 🎯 CAS SPÉCIAL: FAVORIS - utiliser la méthode dédiée
+      if (category.id === 'favorites') {
+        const favoriteChannels = await WatermelonService.getFavoriteChannels(
           playlistId,
           CHANNELS_PER_PAGE,
           0,
         );
-      } else {
-        // Charger la première page de la catégorie
-        result = await WatermelonXtreamService.getChannelsByCategory(
+        result = {channels: favoriteChannels, playlist: null};
+      }
+      // 🎯 CAS SPÉCIAL: RÉCENTS - utiliser la méthode dédiée
+      else if (category.id === 'history' || category.id.includes('recent')) {
+        const recentChannels = await WatermelonService.getRecentChannels(
+          playlistId,
+          20, // Limité à 20 récents
+        );
+        result = {channels: recentChannels, playlist: null};
+      }
+      // Charger toutes les chaînes
+      else if (category.id === 'all') {
+        result = await WatermelonService.getPlaylistWithChannels(
+          playlistId,
+          CHANNELS_PER_PAGE,
+          0,
+        );
+      }
+      // Charger par catégorie
+      else {
+        const categoryChannels = await WatermelonService.getChannelsByCategory(
           playlistId,
           category.id,
           CHANNELS_PER_PAGE,
           0,
         );
-        // Convertir en format attendu
-        result = {channels: result, playlist: null};
-
-        // 🔧 CORRECTION: Désactiver chargement automatique qui interfere avec pagination normale
-        // if (result.channels && result.channels.length === CHANNELS_PER_PAGE) {
-        //   setTimeout(async () => {
-        //     await loadAllRemainingChannels(category);
-        //   }, 100);
-        // }
-        console.log(
-          '🔍 Catégorie chargée - Pagination normale activee avec hasMoreChannels:',
-          result.channels.length === CHANNELS_PER_PAGE,
-        );
+        result = {channels: categoryChannels, playlist: null};
       }
 
       if (result.channels && result.channels.length > 0) {
-
         const newChannels = result.channels.map((channel: any) => {
-          const rawLogo = channel.logoUrl || channel.streamIcon || '';
-          const normalizedLogo = normalizeXtreamLogoUrl(rawLogo, serverUrl);
+          const rawLogo = channel.logoUrl || channel.streamIcon || channel.logo || '';
+          const normalizedLogo = playlistType === 'XTREAM'
+            ? normalizeXtreamLogoUrl(rawLogo, serverUrl)
+            : rawLogo;
 
           return {
             id: channel.id,
             name: channel.name || 'Sans nom',
             logo: normalizedLogo,
-            group: channel.groupTitle || channel.categoryName || 'Non classé',
-            url: channel.streamUrl || '',
-            type: 'XTREAM' as const,
+            group: channel.groupTitle || channel.categoryName || channel.group || 'Non classé',
+            url: channel.streamUrl || channel.url || '',
+            type: playlistType as 'M3U' | 'XTREAM',
           };
         });
 
         setDisplayedChannels(newChannels);
         setHasMoreChannels(newChannels.length === CHANNELS_PER_PAGE);
 
-        // 🔧 CORRECTION: Scroll vers le haut lors du changement de catégorie
+        // 🚀 OPTIMISATION: Précharger les logos des 20 premières chaînes
         setTimeout(() => {
-          flatListRef.current?.scrollToOffset({offset: 0, animated: true});
+          const logosToPreload = newChannels
+            .slice(0, 20) // Premiers logos visibles
+            .filter(ch => ch.logo && ch.logo.trim())
+            .map(ch => ({
+              uri: ch.logo!,
+              priority: FastImage.priority.high,
+              cache: FastImage.cacheControl.immutable,
+            }));
+
+          if (logosToPreload.length > 0) {
+            FastImage.preload(logosToPreload);
+          }
+        }, 50);
+
+        // Scroll vers le haut
+        setTimeout(() => {
+          flashListRef.current?.scrollToOffset({offset: 0, animated: true});
         }, 100);
 
-        console.log(
-          `✅ Catégorie "${category.name}" chargée: ${newChannels.length} chaînes`,
-        );
+        console.log(`✅ "${category.name}" chargée: ${newChannels.length} chaînes affichées`);
       }
     } catch (error) {
       console.error('❌ Erreur chargement catégorie:', error);
@@ -1677,7 +1697,7 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({route, navigation}) => {
     console.log('🔄 onEndReached déclenché - loadMoreChannels appelé avec:', {
       hasMoreChannels,
       isLoadingMore,
-      useWatermelonDB,
+      playlistType,
       selectedCategory: selectedCategory?.name,
       currentPage,
       displayedCount: displayedChannels.length,
@@ -1688,180 +1708,99 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({route, navigation}) => {
       console.log('⛔ Conditions non remplies pour loadMoreChannels:', {
         hasMoreChannels,
         isLoadingMore,
-        useWatermelonDB,
+        playlistType,
         hasSelectedCategory: !!selectedCategory,
       });
       return;
     }
 
-    // 🆕 CORRECTION LEGACY : Gérer pagination pour système Legacy
-    if (!useWatermelonDB) {
-      console.log(
-        '📦 Système Legacy - Chargement page suivante depuis category.channels',
-      );
-      setIsLoadingMore(true);
-
-      try {
-        const allCategoryChannels = selectedCategory.channels || [];
-        const currentlyDisplayed = displayedChannels.length;
-
-        // 🔧 CORRECTION: Calculer depuis les chaînes déjà affichées
-        const startIndex = currentlyDisplayed;
-        const endIndex = Math.min(
-          startIndex + CHANNELS_PER_PAGE,
-          allCategoryChannels.length,
-        );
-        const newChannels = allCategoryChannels.slice(startIndex, endIndex);
-
-        console.log('📄 Legacy pagination CORRIGÉE:', {
-          totalChannelsInCategory: allCategoryChannels.length,
-          currentlyDisplayed,
-          startIndex,
-          endIndex,
-          newChannelsToAdd: newChannels.length,
-          willHaveTotal: currentlyDisplayed + newChannels.length,
-        });
-
-        if (newChannels.length > 0) {
-          // Ajouter les nouvelles chaînes à l'affichage
-          setDisplayedChannels(prev => {
-            const updated = [...prev, ...newChannels];
-            console.log(
-              `📈 Legacy: ${prev.length} + ${newChannels.length} = ${updated.length} chaînes`,
-            );
-
-            // 🔧 SUPPRESSION du système anti-doublons défaillant
-            // Le système supprimait des chaînes légitimes avec des IDs similaires
-            // Les vraies données M3U n'ont généralement pas de doublons réels
-
-            return updated;
-          });
-
-          setCurrentPage(
-            Math.ceil(
-              (currentlyDisplayed + newChannels.length) / CHANNELS_PER_PAGE,
-            ),
-          );
-
-          // Vérifier s'il reste des chaînes
-          const totalAfterAddition = currentlyDisplayed + newChannels.length;
-          const hasMorePages = totalAfterAddition < allCategoryChannels.length;
-          setHasMoreChannels(hasMorePages);
-
-          console.log(
-            `✅ Legacy: +${newChannels.length} chaînes (Total: ${totalAfterAddition}/${allCategoryChannels.length}, hasMore: ${hasMorePages})`,
-          );
-        } else {
-          console.log('🔚 Legacy: Aucune nouvelle chaîne à charger');
-          setHasMoreChannels(false);
-        }
-      } catch (error) {
-        console.error('❌ Erreur pagination Legacy:', error);
-        setHasMoreChannels(false);
-      } finally {
-        setIsLoadingMore(false);
-      }
-
-      return; // Sortir pour système Legacy
-    }
-
-    // 🍉 SYSTÈME WATERMELONDB : Logique originale
+    // 🚀 WATERMELONDB UNIQUEMENT : Plus de système Legacy
     setIsLoadingMore(true);
     console.log('🍉 WatermelonDB - Démarrage chargement page suivante...');
 
     try {
-      const WatermelonXtreamService = (
-        await import('../services/WatermelonXtreamService')
-      ).default;
+      // 🚀 Utiliser le bon service WatermelonDB (M3U ou Xtream)
+      const WatermelonService = playlistType === 'XTREAM'
+        ? (await import('../services/WatermelonXtreamService')).default
+        : (await import('../services/WatermelonM3UService')).default;
+
       const nextPage = currentPage + 1;
       const offset = nextPage * CHANNELS_PER_PAGE;
 
       console.log(
-        `📄 Chargement page ${nextPage} pour "${selectedCategory.name}" (offset: ${offset}, CHANNELS_PER_PAGE: ${CHANNELS_PER_PAGE})`,
+        `📄 Chargement page ${nextPage} pour "${selectedCategory.name}" (offset: ${offset})`,
       );
 
       let result;
-      if (selectedCategory.id === 'all') {
-        // Charger toutes les chaînes avec offset
-        console.log('🌍 Chargement TOUT avec offset:', offset);
-        result = await WatermelonXtreamService.getPlaylistWithChannels(
+
+      // 🎯 CAS SPÉCIAL: FAVORIS
+      if (selectedCategory.id === 'favorites') {
+        const favoriteChannels = await WatermelonService.getFavoriteChannels(
           playlistId,
           CHANNELS_PER_PAGE,
           offset,
         );
-      } else {
-        // 🔧 CORRECTION: Charger chaînes spécifiques de la catégorie
-        console.log(
-          `📊 Chargement catégorie "${selectedCategory.name}" (ID: ${selectedCategory.id}) avec offset:`,
+        result = {channels: favoriteChannels, playlist: null};
+      }
+      // 🎯 CAS SPÉCIAL: RÉCENTS (pas de pagination, limité à 20)
+      else if (selectedCategory.id === 'history' || selectedCategory.id.includes('recent')) {
+        // Récents n'ont pas de pagination
+        result = {channels: [], playlist: null};
+      }
+      // Toutes les chaînes
+      else if (selectedCategory.id === 'all') {
+        result = await WatermelonService.getPlaylistWithChannels(
+          playlistId,
+          CHANNELS_PER_PAGE,
           offset,
         );
-        const categoryChannels =
-          await WatermelonXtreamService.getChannelsByCategory(
-            playlistId,
-            selectedCategory.id,
-            CHANNELS_PER_PAGE,
-            offset,
-          );
+      }
+      // Par catégorie
+      else {
+        const categoryChannels = await WatermelonService.getChannelsByCategory(
+          playlistId,
+          selectedCategory.id,
+          CHANNELS_PER_PAGE,
+          offset,
+        );
         result = {channels: categoryChannels, playlist: null};
       }
 
-      console.log('🔍 Résultat chargement pagination:', {
-        channelsLoaded: result.channels?.length || 0,
-        expectedChannels: CHANNELS_PER_PAGE,
-        offset,
-        nextPage,
-        isLastPage: (result.channels?.length || 0) < CHANNELS_PER_PAGE,
-      });
-
       if (result.channels && result.channels.length > 0) {
         const newChannels = result.channels.map((channel: any) => {
-          const rawLogo = channel.logoUrl || channel.streamIcon || '';
-          const normalizedLogo = normalizeXtreamLogoUrl(rawLogo, serverUrl);
+          const rawLogo = channel.logoUrl || channel.streamIcon || channel.logo || '';
+          const normalizedLogo = playlistType === 'XTREAM'
+            ? normalizeXtreamLogoUrl(rawLogo, serverUrl)
+            : rawLogo;
 
           return {
-            id:
-              channel.id ||
-              `channel-${channel.streamId || channel.stream_id}-${Date.now()}`,
-            name: channel.name || channel.displayName || 'Sans nom',
+            id: channel.id,
+            name: channel.name || 'Sans nom',
             logo: normalizedLogo,
-            group:
-              channel.groupTitle ||
-              channel.categoryName ||
-              selectedCategory.name,
+            group: channel.groupTitle || channel.categoryName || channel.group || 'Non classé',
             url: channel.streamUrl || channel.url || '',
-            type: 'XTREAM' as const,
+            type: playlistType as 'M3U' | 'XTREAM',
           };
         });
 
-        // 🔧 CORRECTION: Éviter doublons et mise à jour robuste
+        // Ajouter sans doublons
         setDisplayedChannels(prev => {
           const existingIds = new Set(prev.map(ch => ch.id));
-          const uniqueNewChannels = newChannels.filter(
-            ch => !existingIds.has(ch.id),
-          );
-          const updatedChannels = [...prev, ...uniqueNewChannels];
+          const uniqueNewChannels = newChannels.filter(ch => !existingIds.has(ch.id));
+          const updated = [...prev, ...uniqueNewChannels];
 
           console.log(
-            `➕ Ajout de ${uniqueNewChannels.length} nouvelles chaînes uniques (Total: ${updatedChannels.length})`,
+            `➕ Ajout de ${uniqueNewChannels.length} nouvelles chaînes (Total: ${updated.length})`,
           );
-          return updatedChannels;
+          return updated;
         });
 
         setCurrentPage(nextPage);
+        setHasMoreChannels(result.channels.length === CHANNELS_PER_PAGE);
 
-        // 🔧 CORRECTION: Logic plus robuste pour hasMoreChannels
-        const hasMorePages = result.channels.length === CHANNELS_PER_PAGE;
-        setHasMoreChannels(hasMorePages);
-
-        console.log(`✅ Page ${nextPage} chargée avec succès:`, {
-          newChannelsCount: newChannels.length,
-          categoryName: selectedCategory.name,
-          hasMorePages,
-          totalDisplayed: displayedChannels.length + newChannels.length,
-        });
-
+        console.log(`✅ Page ${nextPage} chargée avec succès`);
       } else {
-        console.log('🔚 Aucune nouvelle chaîne trouvée - Fin de pagination');
+        console.log('🔚 Aucune nouvelle chaîne - Fin de pagination');
         setHasMoreChannels(false);
       }
     } catch (error) {
@@ -1871,6 +1810,13 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({route, navigation}) => {
       setIsLoadingMore(false);
       console.log('⚙️ loadMoreChannels terminé');
     }
+  };
+
+  // 🔧 Fonction pour charger toutes les chaînes restantes d'une catégorie
+  const loadAllRemainingChannels = async (category: Category) => {
+    // Cette fonction n'est plus nécessaire avec WatermelonDB
+    // La pagination SQL gère tout automatiquement
+    console.log('ℹ️ loadAllRemainingChannels - Non utilisé avec WatermelonDB');
   };
 
   // NOUVEAU : Rendu avec animation pour compteurs
@@ -2012,8 +1958,9 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({route, navigation}) => {
   };
 
   // Fonction pour charger automatiquement toutes les chaînes restantes d'une catégorie
-  const loadAllRemainingChannels = async (category: Category) => {
-    if (!useWatermelonDB || category.id === 'all') {
+  const loadAllRemainingChannelsOld = async (category: Category) => {
+    // Cette fonction n'est plus utilisée avec WatermelonDB
+    if (category.id === 'all') {
       return;
     }
 
@@ -2199,10 +2146,8 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({route, navigation}) => {
           <Text style={styles.headerTitleCount}>
             (
             {selectedCategory?.id === 'all'
-              ? selectedCategory?.count ||
-                totalChannels ||
-                displayedChannels.length
-              : displayedChannels.length}
+              ? selectedCategory?.count || totalChannels || displayedChannels.length
+              : selectedCategory?.count || displayedChannels.length}
             {hasMoreChannels && selectedCategory?.id !== 'all' ? '+' : ''})
           </Text>
         </Text>
@@ -2383,13 +2328,13 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({route, navigation}) => {
               </TouchableOpacity>
             </View>
 
-          <FlatList
+          <FlashList
               data={categories}
               keyExtractor={(item, index) => `category-${item.id}-${index}`}
               renderItem={renderCategoryItem}
               showsVerticalScrollIndicator={false}
-              style={styles.categoriesList}
-              contentContainerStyle={styles.categoriesListContent}
+              estimatedItemSize={50}
+              extraData={selectedCategory?.id}
             />
           </View>
         )}
@@ -2401,41 +2346,24 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({route, navigation}) => {
             !sidebarVisible && styles.channelsGridFullWidth,
             {opacity: categoryTransitionAnim},
           ]}>
-          <FlatList
-            ref={flatListRef}
+          <FlashList
+            ref={flashListRef}
             data={displayedChannels}
             keyExtractor={keyExtractor}
             renderItem={renderChannelItem}
             numColumns={getOptimalColumns()}
             key={`channels-grid-${sidebarVisible ? 'sidebar' : 'fullscreen'}-${getOptimalColumns()}`}
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={[
-              styles.channelsGridContent,
-              {
-                paddingHorizontal: sidebarVisible ? 6 : 8, // Correspond au containerPadding
-                paddingBottom: 20,
-              }
-            ]}
-            columnWrapperStyle={
-              sidebarVisible
-                ? styles.rowSpacingSidebar
-                : styles.rowSpacingFullscreen
-            }
-            ItemSeparatorComponent={null}
+            contentContainerStyle={{
+              paddingHorizontal: sidebarVisible ? 6 : 8,
+              paddingTop: 8,
+              paddingBottom: 20,
+            }}
             ListEmptyComponent={renderEmptyChannels}
             ListFooterComponent={renderFooter}
-            removeClippedSubviews={true}
-            maxToRenderPerBatch={8}
-            windowSize={4}
-            initialNumToRender={15}
-            updateCellsBatchingPeriod={150}
-            disableVirtualization={false}
-            legacyImplementation={false}
-            getItemLayout={getItemLayout}
-            keyboardShouldPersistTaps="handled"
+            estimatedItemSize={ITEM_HEIGHT}
             onEndReached={hasMoreChannels ? loadMoreChannels : undefined}
             onEndReachedThreshold={0.1}
-            progressViewOffset={50}
             extraData={`${selectedCategory?.id}-${displayedChannels.length}-${hasMoreChannels}`}
           />
         </Animated.View>

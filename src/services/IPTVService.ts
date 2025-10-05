@@ -111,7 +111,9 @@ class PerformanceMonitor {
 
   getAverageTime(operation: string): number {
     const metrics = this.metrics.get(operation);
-    if (!metrics || metrics.length === 0) {return 0;}
+    if (!metrics || metrics.length === 0) {
+      return 0;
+    }
 
     const sum = metrics.reduce((a, b) => a + b, 0);
     return Math.round(sum / metrics.length);
@@ -227,8 +229,12 @@ export class IPTVService {
    */
   async initialize(): Promise<void> {
     // Éviter double initialisation
-    if (this.isInitialized) {return;}
-    if (this.initializationPromise) {return this.initializationPromise;}
+    if (this.isInitialized) {
+      return;
+    }
+    if (this.initializationPromise) {
+      return this.initializationPromise;
+    }
 
     this.initializationPromise = this._doInitialize();
     return this.initializationPromise;
@@ -454,9 +460,7 @@ export class IPTVService {
    * CONTRÔLE PARENTAL
    */
 
-  async checkChannelAccess(
-    channel: Channel,
-  ): Promise<{
+  async checkChannelAccess(channel: Channel): Promise<{
     allowed: boolean;
     reason?: string;
     requiresPin?: boolean;
@@ -504,7 +508,9 @@ export class IPTVService {
     await this.initialize();
 
     const user = await this.getCurrentUser();
-    if (!user) {return false;}
+    if (!user) {
+      return false;
+    }
 
     return this.userManager.addToFavorites(user.id, channel);
   }
@@ -513,7 +519,9 @@ export class IPTVService {
     await this.initialize();
 
     const user = await this.getCurrentUser();
-    if (!user) {return [];}
+    if (!user) {
+      return [];
+    }
 
     return this.userManager.getFavorites(user.id);
   }
@@ -522,7 +530,9 @@ export class IPTVService {
     await this.initialize();
 
     const user = await this.getCurrentUser();
-    if (!user) {return false;}
+    if (!user) {
+      return false;
+    }
 
     return this.userManager.addToHistory(user.id, channel);
   }
@@ -531,7 +541,9 @@ export class IPTVService {
     await this.initialize();
 
     const user = await this.getCurrentUser();
-    if (!user) {return [];}
+    if (!user) {
+      return [];
+    }
 
     return this.userManager.getHistory(user.id, limit);
   }
@@ -629,7 +641,7 @@ export class IPTVService {
         memoryUsageMB: storageStats.memoryUsageMB,
         averageResponseTime: this.performanceMonitor.getOverallAverageTime(),
         errorRate: this.performanceMonitor.getErrorRate(),
-      }
+      },
     };
   }
 

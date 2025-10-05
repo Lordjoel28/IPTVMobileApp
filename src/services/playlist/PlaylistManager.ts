@@ -9,6 +9,8 @@ import UltraOptimizedM3UParser, {
   ParseResult,
   ParseStats,
 } from '../parsers/UltraOptimizedM3UParser';
+import M3UParserWithEPG, { ExtendedParseResult } from '../parsers/M3UParserWithEPG';
+import { EPGSourceManager } from '../epg/EPGSourceManager';
 import StorageAdapter from '../../storage/StorageAdapter';
 import {networkService, NetworkError} from '../NetworkService';
 
@@ -33,6 +35,8 @@ export interface PlaylistMetadata {
   categories?: string[];
   provider?: string;
   version?: string;
+  epgUrl?: string; // URL EPG intégré (url-tvg)
+  epgType?: 'integrated' | 'manual' | 'global' | 'none';
 }
 
 export interface ImportOptions {
@@ -60,54 +64,52 @@ export interface PlaylistStats {
 }
 
 /**
- * Gestionnaire cascade de parsers
+ * Gestionnaire cascade de parsers avec détection EPG
  */
 class ParserCascade {
   private ultraParser: UltraOptimizedM3UParser;
+  private epgParser: M3UParserWithEPG;
   private currentMode: 'ultra' | 'optimized' | 'traditional' = 'ultra';
 
   constructor() {
     this.ultraParser = new UltraOptimizedM3UParser();
+    this.epgParser = new M3UParserWithEPG();
   }
 
-  async parse(content: string, options: ImportOptions): Promise<ParseResult> {
+  async parse(content: string, options: ImportOptions): Promise<ExtendedParseResult> {
     const mode = options.parserMode || this.currentMode;
 
     try {
-      switch (mode) {
-        case 'ultra':
-          console.log('🚀 Using UltraOptimizedParser');
-          return await this.ultraParser.parse(content, options.chunkSize);
+      console.log('🔍 Using M3UParserWithEPG for url-tvg detection');
 
-        case 'optimized':
-          console.log('⚡ Using OptimizedParser (fallback)');
-          // TODO: Implémenter OptimizedParser si nécessaire
-          return await this.ultraParser.parse(content, options.chunkSize);
+      // Utiliser le parser EPG qui hérite d'UltraOptimizedM3UParser
+      const result = await this.epgParser.parseWithEPGDetection(content, options.chunkSize);
 
-        case 'traditional':
-          console.log('📜 Using TraditionalParser (legacy)');
-          // TODO: Implémenter TraditionalParser si nécessaire
-          return await this.ultraParser.parse(content, options.chunkSize);
+      console.log('📺 EPG Detection Result:', {
+        hasEPG: !!result.metadata.epgUrl,
+        epgUrl: result.metadata.epgUrl,
+        epgType: result.metadata.epgType
+      });
 
-        default:
-          return await this.ultraParser.parse(content, options.chunkSize);
-      }
+      return result;
     } catch (error) {
-      console.error(`Parser ${mode} failed:`, error);
+      console.error(`EPG Parser failed, falling back to basic parser:`, error);
 
-      // Auto-fallback vers parser plus simple
-      if (mode === 'ultra') {
-        console.log('↩️ Falling back to optimized parser');
-        return await this.parse(content, {...options, parserMode: 'optimized'});
-      } else if (mode === 'optimized') {
-        console.log('↩️ Falling back to traditional parser');
-        return await this.parse(content, {
-          ...options,
-          parserMode: 'traditional',
-        });
+      // Fallback vers parser basique
+      try {
+        const basicResult = await this.ultraParser.parse(content, options.chunkSize);
+
+        // Créer un ExtendedParseResult compatible
+        return {
+          ...basicResult,
+          metadata: {
+            epgType: 'none'
+          }
+        };
+      } catch (fallbackError) {
+        console.error('Basic parser also failed:', fallbackError);
+        throw fallbackError;
       }
-
-      throw error;
     }
   }
 
@@ -123,6 +125,7 @@ class ParserCascade {
 export class PlaylistManager {
   private storage: StorageAdapter;
   private parserCascade: ParserCascade;
+  private epgManager: EPGSourceManager;
   private playlists: Map<string, Playlist> = new Map();
   private stats: PlaylistStats;
   private isInitialized = false;
@@ -130,6 +133,7 @@ export class PlaylistManager {
   constructor(storageConfig?: any) {
     this.storage = new StorageAdapter(storageConfig);
     this.parserCascade = new ParserCascade();
+    this.epgManager = new EPGSourceManager();
     this.resetStats();
   }
 
@@ -137,7 +141,9 @@ export class PlaylistManager {
    * Initialisation avec chargement playlists sauvegardées
    */
   async initialize(): Promise<void> {
-    if (this.isInitialized) {return;}
+    if (this.isInitialized) {
+      return;
+    }
 
     try {
       console.log('🔄 Initializing PlaylistManager...');
@@ -239,7 +245,7 @@ export class PlaylistManager {
         `📥 Downloaded ${Math.round(contentSize / 1024)}KB of M3U content`,
       );
 
-      // Parse avec cascade
+      // Parse avec cascade et détection EPG
       const parseResult = await this.parserCascade.parse(content, options);
 
       // Validation et filtrage
@@ -257,7 +263,7 @@ export class PlaylistManager {
         warnings.push(`Playlist truncated to ${options.maxChannels} channels`);
       }
 
-      // Créer playlist
+      // Créer playlist avec métadonnées EPG
       const playlist: Playlist = {
         id: this.generatePlaylistId(),
         name,
@@ -268,15 +274,83 @@ export class PlaylistManager {
         dateAdded: new Date().toISOString(),
         lastUpdated: new Date().toISOString(),
         isLocal: false,
-        metadata: this.extractMetadata(content),
+        metadata: parseResult.metadata, // Utiliser métadonnées du parser EPG
       };
 
       // Sauvegarder avec cache intelligent
       await this.savePlaylist(playlist);
 
+      // 📺 Gérer automatiquement la source EPG si détectée
+      if (parseResult.metadata.epgUrl) {
+        console.log('📺 Gestion automatique EPG intégré détecté...');
+        try {
+          // L'EPG intégré sera automatiquement reconnu par EPGSourceManager.getBestEPGSource()
+          // car il est stocké dans playlist.metadata.epgUrl
+          console.log('✅ EPG intégré configuré automatiquement:', parseResult.metadata.epgUrl);
+
+          if (parseResult.metadata.epgUrl) {
+            warnings.push(`EPG intégré détecté: ${parseResult.metadata.epgUrl}`);
+          }
+        } catch (error) {
+          console.error('❌ Erreur configuration EPG automatique:', error);
+          warnings.push('EPG détecté mais configuration automatique échouée');
+        }
+      }
+
+      // 💾 Marquer la playlist comme active via le store Zustand unifié
+      console.log('💾 Marquage playlist comme active via le store...');
+      try {
+        const {usePlaylistStore} = await import('../../stores/PlaylistStore');
+        usePlaylistStore.getState().selectPlaylist(playlist.id);
+        console.log('✅ Playlist marquée comme active dans le store:', playlist.id);
+      } catch (error) {
+        console.error('❌ Erreur marquage playlist active dans le store:', error);
+      }
+
       // 💾 CACHE SÉCURISÉ selon best practices GitHub/Reddit
       if (options.enableCache !== false) {
         await this.cachePlaylistSafely(cacheKey, playlist);
+      }
+
+      // 🎯 CORRECTION CRITIQUE : Sauvegarder dans saved_m3u_playlists avec vraies chaînes
+      try {
+        console.log('💾 Sauvegarde dans saved_m3u_playlists avec chaînes...');
+        const AsyncStorage = await import('@react-native-async-storage/async-storage');
+
+        // Récupérer les playlists existantes (format array)
+        const existingData = await AsyncStorage.default.getItem('saved_m3u_playlists');
+        const playlistsArray = existingData ? JSON.parse(existingData) : [];
+
+        // Assurer que c'est un array (compatibilité ancien format objet)
+        const playlists = Array.isArray(playlistsArray) ? playlistsArray : [];
+
+        // Vérifier si la playlist existe déjà (par URL pour éviter doublons)
+        const existingIndex = playlists.findIndex(p => p.url === playlist.source);
+
+        const playlistData = {
+          id: playlist.id,
+          name: playlist.name,
+          url: playlist.source,
+          channels: playlist.channels, // 🔥 CRUCIAL : Inclure les vraies chaînes
+          totalChannels: playlist.totalChannels,
+          type: 'M3U',
+          dateAdded: playlist.dateAdded,
+          lastUpdated: playlist.lastUpdated,
+          metadata: playlist.metadata // 🎯 PHASE 1.1: Inclure métadonnées EPG
+        };
+
+        if (existingIndex >= 0) {
+          // Mettre à jour playlist existante
+          playlists[existingIndex] = playlistData;
+        } else {
+          // Ajouter nouvelle playlist
+          playlists.push(playlistData);
+        }
+
+        await AsyncStorage.default.setItem('saved_m3u_playlists', JSON.stringify(playlists));
+        console.log(`✅ Playlist sauvegardée dans saved_m3u_playlists avec ${playlist.channels.length} chaînes`);
+      } catch (error) {
+        console.error('❌ Erreur sauvegarde saved_m3u_playlists:', error);
       }
 
       // Mettre à jour stats
@@ -329,7 +403,6 @@ export class PlaylistManager {
       throw new Error(
         'File import not implemented yet - requires react-native-fs',
       );
-
     } catch (error) {
       console.error('❌ File import failed:', error);
       throw error;
@@ -391,7 +464,7 @@ export class PlaylistManager {
           username: credentials.username,
           server: credentials.url || credentials.server,
           accountInfo: xtreamManager.accountInfo,
-        }
+        },
       };
 
       // Sauvegarder la playlist
@@ -411,9 +484,8 @@ export class PlaylistManager {
           duplicates: 0,
           categories: new Set(playlist.channels.map(c => c.group)).size,
           duration: 0, // TODO: calculer temps de traitement
-        }
+        },
       };
-
     } catch (error) {
       console.error('❌ Xtream import failed:', error);
       throw error;
@@ -595,7 +667,9 @@ export class PlaylistManager {
   }
 
   private isCacheValid(cached: any, maxAgeHours: number): boolean {
-    if (!cached.timestamp) {return false;}
+    if (!cached.timestamp) {
+      return false;
+    }
 
     const ageHours = (Date.now() - cached.timestamp) / (1000 * 60 * 60);
     return ageHours < maxAgeHours;
@@ -737,14 +811,13 @@ export class PlaylistManager {
           id: playlist.id || `fallback_${Date.now()}`,
           name: playlist.name || 'Unknown Playlist',
           channels: playlist.channels || [],
-        }
+        },
       };
 
       await this.storage.set(cacheKey, cacheEntry);
       console.log(
         `💾 Cached playlist safely: ${playlist.channels.length} channels`,
       );
-
     } catch (error) {
       console.error('💾 Error caching playlist:', error.message);
       // Ne pas rethrow - cache failing ne doit pas casser l'import
@@ -883,14 +956,29 @@ export class PlaylistManager {
 
     let m3uContent = '#EXTM3U\n';
 
+    // Ajouter url-tvg si présent dans les métadonnées
+    if (playlist.metadata?.epgUrl) {
+      m3uContent = `#EXTM3U url-tvg="${playlist.metadata.epgUrl}"\n`;
+    }
+
     for (const channel of playlist.channels) {
       let extinf = '#EXTINF:-1';
 
-      if (channel.tvgId) {extinf += ` tvg-id="${channel.tvgId}"`;}
-      if (channel.logo) {extinf += ` tvg-logo="${channel.logo}"`;}
-      if (channel.groupTitle) {extinf += ` group-title="${channel.groupTitle}"`;}
-      if (channel.language) {extinf += ` tvg-language="${channel.language}"`;}
-      if (channel.country) {extinf += ` tvg-country="${channel.country}"`;}
+      if (channel.tvgId) {
+        extinf += ` tvg-id="${channel.tvgId}"`;
+      }
+      if (channel.logo) {
+        extinf += ` tvg-logo="${channel.logo}"`;
+      }
+      if (channel.groupTitle) {
+        extinf += ` group-title="${channel.groupTitle}"`;
+      }
+      if (channel.language) {
+        extinf += ` tvg-language="${channel.language}"`;
+      }
+      if (channel.country) {
+        extinf += ` tvg-country="${channel.country}"`;
+      }
 
       extinf += `,${channel.name}\n`;
 
@@ -899,6 +987,44 @@ export class PlaylistManager {
     }
 
     return m3uContent;
+  }
+
+  /**
+   * Teste la détection EPG sur un contenu M3U
+   */
+  async testEPGDetection(content: string): Promise<{
+    hasEPG: boolean;
+    epgUrl?: string;
+    epgType: 'integrated' | 'manual' | 'global' | 'none';
+    detectionMethod?: string;
+  }> {
+    try {
+      const result = await this.parserCascade.parse(content, { chunkSize: 100 });
+      return {
+        hasEPG: !!result.metadata.epgUrl,
+        epgUrl: result.metadata.epgUrl,
+        epgType: result.metadata.epgType || 'none',
+        detectionMethod: result.metadata.epgUrl ? 'url-tvg detection' : undefined
+      };
+    } catch (error) {
+      console.error('❌ EPG detection test failed:', error);
+      return {
+        hasEPG: false,
+        epgType: 'none'
+      };
+    }
+  }
+
+  /**
+   * Obtient la meilleure source EPG pour une playlist
+   */
+  async getBestEPGSource(playlistId: string): Promise<any> {
+    const playlist = await this.getPlaylist(playlistId);
+    if (!playlist) {
+      throw new Error(`Playlist ${playlistId} not found`);
+    }
+
+    return await this.epgManager.getBestEPGSource(playlistId, playlist.metadata);
   }
 }
 

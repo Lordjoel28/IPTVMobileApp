@@ -184,7 +184,9 @@ export class CacheService {
    */
   private getFromL1<T>(key: string): T | null {
     const entry = this.L1Cache.get(key);
-    if (!entry) {return null;}
+    if (!entry) {
+      return null;
+    }
 
     // Vérifier TTL
     if (entry.ttl && Date.now() - entry.timestamp > entry.ttl) {
@@ -261,7 +263,9 @@ export class CacheService {
   private async getFromL2<T>(key: string): Promise<T | null> {
     try {
       const stored = await AsyncStorage.getItem(`cache_L2_${key}`);
-      if (!stored) {return null;}
+      if (!stored) {
+        return null;
+      }
 
       const entry: CacheEntry<T> = JSON.parse(stored);
 
@@ -362,7 +366,7 @@ export class CacheService {
       L3: {
         ...this.stats.L3,
         hitRate: this.calculateHitRate(this.stats.L3),
-      }
+      },
     };
   }
 

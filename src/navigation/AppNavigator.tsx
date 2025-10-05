@@ -19,6 +19,9 @@ import ChannelListScreen from '../screens/ChannelListScreen';
 import ChannelPlayerScreen from '../screens/ChannelPlayerScreen';
 import PlayerScreen from '../screens/PlayerScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import ThemeSettingsScreen from '../screens/ThemeSettingsScreen';
+import VideoPlayerSettingsScreen from '../screens/VideoPlayerSettingsScreen';
+import TVGuideSettingsScreen from '../screens/TVGuideSettingsScreen';
 import PlaylistDetailScreen from '../screens/PlaylistDetailScreen';
 import SearchScreen from '../screens/SearchScreen';
 import UserProfileScreen from '../screens/UserProfileScreen';
@@ -287,15 +290,9 @@ const AppNavigator: React.FC = () => {
         name="Search"
         component={SearchScreen}
         options={{
-          title: 'Recherche Avancée',
-          headerRight: () => (
-            <Icon
-              name="filter-list"
-              size={24}
-              color={theme.colors.onSurface}
-              style={{marginRight: 15}}
-            />
-          ),
+          headerShown: false, // Interface custom dans SearchScreen
+          gestureEnabled: true,
+          presentation: 'modal'
         }}
       />
 
@@ -304,15 +301,37 @@ const AppNavigator: React.FC = () => {
         name="Settings"
         component={SettingsScreen}
         options={{
-          title: 'Paramètres',
-          headerRight: () => (
-            <Icon
-              name="save"
-              size={24}
-              color={theme.colors.onSurface}
-              style={{marginRight: 15}}
-            />
-          ),
+          headerShown: false, // Interface custom dans SettingsScreen
+        }}
+      />
+
+      {/* Paramètres des thèmes */}
+      <Stack.Screen
+        name="ThemeSettings"
+        component={ThemeSettingsScreen}
+        options={{
+          headerShown: false, // Interface custom dans ThemeSettingsScreen
+          gestureEnabled: true,
+        }}
+      />
+
+      {/* Paramètres du lecteur vidéo */}
+      <Stack.Screen
+        name="VideoPlayerSettings"
+        component={VideoPlayerSettingsScreen}
+        options={{
+          headerShown: false, // Interface custom
+          gestureEnabled: true,
+        }}
+      />
+
+      {/* Paramètres du guide TV */}
+      <Stack.Screen
+        name="TVGuideSettings"
+        component={TVGuideSettingsScreen}
+        options={{
+          headerShown: false, // Interface custom
+          gestureEnabled: true,
         }}
       />
 

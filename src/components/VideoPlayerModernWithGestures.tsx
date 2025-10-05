@@ -1,6 +1,6 @@
 /**
  * 🎬 VideoPlayerModern - PHASE 2: Gestures Avancés + Animations
- * 
+ *
  * NOUVELLES FONCTIONNALITÉS PHASE 2:
  * ✅ Double-tap seek avant/arrière (±10s)
  * ✅ Zones gestuelles style YouTube (gauche/droite/centre)
@@ -9,7 +9,7 @@
  * ✅ Gesture.Race pour résoudre conflits single/double tap
  */
 
-import React, { useRef, useState, useEffect } from 'react';
+import React, {useRef, useState, useEffect} from 'react';
 import {
   View,
   StyleSheet,
@@ -24,16 +24,16 @@ import {
 import Video from 'react-native-video';
 import Orientation from 'react-native-orientation-locker';
 import SystemNavigationBar from 'react-native-system-navigation-bar';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, { 
-  useSharedValue, 
-  useAnimatedStyle, 
-  withTiming, 
+import {Gesture, GestureDetector} from 'react-native-gesture-handler';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
   withSpring,
   runOnJS,
-  interpolate
+  interpolate,
 } from 'react-native-reanimated';
-import { Channel } from '../types';
+import {Channel} from '../types';
 
 interface VideoPlayerModernProps {
   channel: Channel | null;
@@ -59,38 +59,47 @@ const VideoPlayerModern: React.FC<VideoPlayerModernProps> = ({
     channelName: channel?.name,
     isVisible,
     isFullscreen,
-    showInfo
+    showInfo,
   });
   const videoRef = useRef<any>(null);
-  
+
   // États de base du lecteur
   const [isLoading, setIsLoading] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
-  
+
   // États des contrôles (PHASE 2: Gestures avancés)
   const [showControls, setShowControls] = useState(true);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [seekFeedback, setSeekFeedback] = useState<{visible: boolean, direction: 'forward' | 'backward', seconds: number}>({visible: false, direction: 'forward', seconds: 0});
-  
+  const [seekFeedback, setSeekFeedback] = useState<{
+    visible: boolean;
+    direction: 'forward' | 'backward';
+    seconds: number;
+  }>({visible: false, direction: 'forward', seconds: 0});
+
   // Valeurs animées pour feedback visuel
   const seekFeedbackOpacity = useSharedValue(0);
   const seekFeedbackScale = useSharedValue(0.8);
   const controlsOpacity = useSharedValue(1);
 
-  const { width, height } = Dimensions.get('window');
+  const {width, height} = Dimensions.get('window');
   const maxRetries = 3;
 
   // 🎯 PHASE 2: Auto-hide contrôles avec animations + DEBUG
   useEffect(() => {
-    console.log('📍 [DEBUG] Auto-hide effect - showControls:', showControls, 'isFullscreen:', isFullscreen);
+    console.log(
+      '📍 [DEBUG] Auto-hide effect - showControls:',
+      showControls,
+      'isFullscreen:',
+      isFullscreen,
+    );
     if (showControls && isFullscreen) {
       const timer = setTimeout(() => {
         console.log('🕐 [DEBUG] Auto-hiding controls after 3s');
         setShowControls(false);
-        controlsOpacity.value = withTiming(0, { duration: 300 });
+        controlsOpacity.value = withTiming(0, {duration: 300});
       }, 3000);
       return () => clearTimeout(timer);
     }
@@ -122,16 +131,13 @@ const VideoPlayerModern: React.FC<VideoPlayerModernProps> = ({
         setIsLoading(true);
       }, 2000);
     } else {
-      const errorMessage = 'Impossible de lire cette chaîne. Veuillez vérifier votre connexion internet.';
+      const errorMessage =
+        'Impossible de lire cette chaîne. Veuillez vérifier votre connexion internet.';
       onError?.(errorMessage);
-      Alert.alert(
-        'Erreur de lecture',
-        errorMessage,
-        [
-          { text: 'Réessayer', onPress: () => handleRetry() },
-          { text: 'OK', style: 'cancel' },
-        ]
-      );
+      Alert.alert('Erreur de lecture', errorMessage, [
+        {text: 'Réessayer', onPress: () => handleRetry()},
+        {text: 'OK', style: 'cancel'},
+      ]);
     }
   };
 
@@ -158,12 +164,15 @@ const VideoPlayerModern: React.FC<VideoPlayerModernProps> = ({
   const togglePlayPause = () => {
     console.log('📍 [DEBUG] togglePlayPause CALLED');
     const newPausedState = !isPaused;
-    console.log(`📍 [DEBUG] ${newPausedState ? '⏸️' : '▶️'} Toggle play/pause:`, newPausedState ? 'PAUSED' : 'PLAYING');
+    console.log(
+      `📍 [DEBUG] ${newPausedState ? '⏸️' : '▶️'} Toggle play/pause:`,
+      newPausedState ? 'PAUSED' : 'PLAYING',
+    );
     setIsPaused(newPausedState);
     setShowControls(true);
     console.log('📍 [DEBUG] Setting showControls to true');
     // Animation fluide des contrôles
-    controlsOpacity.value = withTiming(1, { duration: 300 });
+    controlsOpacity.value = withTiming(1, {duration: 300});
     console.log('📍 [DEBUG] Animation triggered');
   };
 
@@ -174,7 +183,9 @@ const VideoPlayerModern: React.FC<VideoPlayerModernProps> = ({
     console.log('📍 [DEBUG] Setting showControls to:', newShowControls);
     setShowControls(newShowControls);
     // Animation fluide pour montrer/cacher contrôles
-    controlsOpacity.value = withTiming(newShowControls ? 1 : 0, { duration: 300 });
+    controlsOpacity.value = withTiming(newShowControls ? 1 : 0, {
+      duration: 300,
+    });
     console.log('📍 [DEBUG] Controls animation triggered');
   };
 
@@ -184,7 +195,7 @@ const VideoPlayerModern: React.FC<VideoPlayerModernProps> = ({
     console.log('📍 [DEBUG] videoRef.current:', videoRef.current);
     console.log('📍 [DEBUG] duration:', duration);
     console.log('📍 [DEBUG] currentTime:', currentTime);
-    
+
     if (videoRef.current && duration > 0) {
       const newTime = Math.min(currentTime + 10, duration);
       console.log('📍 [DEBUG] Seeking to:', newTime);
@@ -201,7 +212,7 @@ const VideoPlayerModern: React.FC<VideoPlayerModernProps> = ({
     console.log('📍 [DEBUG] videoRef.current:', videoRef.current);
     console.log('📍 [DEBUG] duration:', duration);
     console.log('📍 [DEBUG] currentTime:', currentTime);
-    
+
     if (videoRef.current) {
       const newTime = Math.max(currentTime - 10, 0);
       console.log('📍 [DEBUG] Seeking to:', newTime);
@@ -214,22 +225,29 @@ const VideoPlayerModern: React.FC<VideoPlayerModernProps> = ({
   };
 
   // Feedback visuel pour seek avec LOGS
-  const showSeekFeedback = (direction: 'forward' | 'backward', seconds: number) => {
+  const showSeekFeedback = (
+    direction: 'forward' | 'backward',
+    seconds: number,
+  ) => {
     console.log('📍 [DEBUG] showSeekFeedback CALLED:', direction, seconds);
-    setSeekFeedback({ visible: true, direction, seconds });
-    
+    setSeekFeedback({visible: true, direction, seconds});
+
     // Animation d'apparition
-    seekFeedbackOpacity.value = withTiming(1, { duration: 150 });
-    seekFeedbackScale.value = withSpring(1, { damping: 15, stiffness: 200 });
+    seekFeedbackOpacity.value = withTiming(1, {duration: 150});
+    seekFeedbackScale.value = withSpring(1, {damping: 15, stiffness: 200});
     console.log('📍 [DEBUG] Seek feedback animation started');
-    
+
     // Auto-hide après 1 seconde
     setTimeout(() => {
       console.log('📍 [DEBUG] Hiding seek feedback');
-      seekFeedbackOpacity.value = withTiming(0, { duration: 300 });
-      seekFeedbackScale.value = withTiming(0.8, { duration: 300 });
+      seekFeedbackOpacity.value = withTiming(0, {duration: 300});
+      seekFeedbackScale.value = withTiming(0.8, {duration: 300});
       setTimeout(() => {
-        runOnJS(setSeekFeedback)({ visible: false, direction: 'forward', seconds: 0 });
+        runOnJS(setSeekFeedback)({
+          visible: false,
+          direction: 'forward',
+          seconds: 0,
+        });
       }, 300);
     }, 1000);
   };
@@ -244,7 +262,7 @@ const VideoPlayerModern: React.FC<VideoPlayerModernProps> = ({
       console.log('🔴 [GESTURE] leftDoubleTap END - SEEK BACKWARD');
       runOnJS(handleSeekBackward)();
     });
-  
+
   const rightDoubleTap = Gesture.Tap()
     .numberOfTaps(2)
     .onBegin(() => {
@@ -254,7 +272,7 @@ const VideoPlayerModern: React.FC<VideoPlayerModernProps> = ({
       console.log('🟢 [GESTURE] rightDoubleTap END - SEEK FORWARD');
       runOnJS(handleSeekForward)();
     });
-  
+
   const singleTap = Gesture.Tap()
     .numberOfTaps(1)
     .onBegin(() => {
@@ -264,7 +282,7 @@ const VideoPlayerModern: React.FC<VideoPlayerModernProps> = ({
       console.log('🔵 [GESTURE] singleTap END - TOGGLE CONTROLS');
       runOnJS(handleScreenTouch)();
     });
-  
+
   // Gestures spécifiques pour chaque zone avec LOGS DÉTAILLÉS
   const leftSingleTap = Gesture.Tap()
     .numberOfTaps(1)
@@ -276,7 +294,7 @@ const VideoPlayerModern: React.FC<VideoPlayerModernProps> = ({
       runOnJS(handleScreenTouch)();
     })
     .requireExternalGestureToFail(leftDoubleTap);
-  
+
   const rightSingleTap = Gesture.Tap()
     .numberOfTaps(1)
     .onBegin(() => {
@@ -287,7 +305,7 @@ const VideoPlayerModern: React.FC<VideoPlayerModernProps> = ({
       runOnJS(handleScreenTouch)();
     })
     .requireExternalGestureToFail(rightDoubleTap);
-  
+
   const centerSingleTap = Gesture.Tap()
     .numberOfTaps(1)
     .onBegin(() => {
@@ -302,7 +320,7 @@ const VideoPlayerModern: React.FC<VideoPlayerModernProps> = ({
   const leftSideGesture = Gesture.Race(leftDoubleTap, leftSingleTap);
   const rightSideGesture = Gesture.Race(rightDoubleTap, rightSingleTap);
   const centerGesture = centerSingleTap;
-  
+
   console.log('📍 [DEBUG] All gestures configured with basic API');
 
   const handleExitFullscreen = () => {
@@ -321,7 +339,7 @@ const VideoPlayerModern: React.FC<VideoPlayerModernProps> = ({
   const seekFeedbackAnimatedStyle = useAnimatedStyle(() => {
     return {
       opacity: seekFeedbackOpacity.value,
-      transform: [{ scale: seekFeedbackScale.value }],
+      transform: [{scale: seekFeedbackScale.value}],
     };
   });
 
@@ -336,7 +354,7 @@ const VideoPlayerModern: React.FC<VideoPlayerModernProps> = ({
   console.log('📍 [DEBUG] - channel:', channel?.name || 'null');
   console.log('📍 [DEBUG] - isVisible:', isVisible);
   console.log('📍 [DEBUG] - isFullscreen:', isFullscreen);
-  
+
   // Ne pas rendre si pas de chaîne ou pas visible
   if (!channel || !isVisible) {
     console.log('⚠️ [DEBUG] Not rendering: missing channel or not visible');
@@ -348,8 +366,10 @@ const VideoPlayerModern: React.FC<VideoPlayerModernProps> = ({
     console.log('⚠️ [DEBUG] Not rendering: not fullscreen');
     return null;
   }
-  
-  console.log('✅ [DEBUG] Rendering VideoPlayerModernWithGestures in fullscreen!');
+
+  console.log(
+    '✅ [DEBUG] Rendering VideoPlayerModernWithGestures in fullscreen!',
+  );
   console.log('📍 [DEBUG] showControls state:', showControls);
   console.log('📍 [DEBUG] controlsOpacity value:', controlsOpacity.value);
 
@@ -360,30 +380,41 @@ const VideoPlayerModern: React.FC<VideoPlayerModernProps> = ({
       onRequestClose={handleExitFullscreen}
       supportedOrientations={['landscape-left', 'landscape-right']}
       statusBarTranslucent={true}
-      presentationStyle="fullScreen"
-    >
-      <StatusBar 
+      presentationStyle="fullScreen">
+      <StatusBar
         hidden={true}
         backgroundColor="#000000"
         translucent={true}
         barStyle="light-content"
       />
-      <View style={[styles.fullscreenContainer, { pointerEvents: 'box-none' }]}>
-        <View style={[styles.fullscreenVideoContainer, { pointerEvents: 'box-none' }]}>
-          
+      <View style={[styles.fullscreenContainer, {pointerEvents: 'box-none'}]}>
+        <View
+          style={[
+            styles.fullscreenVideoContainer,
+            {pointerEvents: 'box-none'},
+          ]}>
+
           {/* 🎯 LECTEUR VIDÉO PRINCIPAL */}
           {!hasError ? (
             <Video
               ref={videoRef}
-              source={{ uri: channel.url }}
-              style={[styles.fullscreenVideo, { pointerEvents: 'none' }]}
+              source={{
+                uri: channel.url,
+                headers: {
+                  'User-Agent': 'IPTV Smarters Pro',
+                  Referer: 'https://www.iptvsmarters.com/',
+                  Accept: '*/*',
+                  Connection: 'keep-alive',
+                },
+              }}
+              style={[styles.fullscreenVideo, {pointerEvents: 'none'}]}
               resizeMode="contain"
               controls={false}
               paused={isPaused}
               onLoad={handleLoad}
               onError={handleError}
               onProgress={handleProgress}
-              onBuffer={(data) => setIsLoading(data.isBuffering)}
+              onBuffer={data => setIsLoading(data.isBuffering)}
               bufferConfig={{
                 minBufferMs: 15000,
                 maxBufferMs: 50000,
@@ -401,7 +432,9 @@ const VideoPlayerModern: React.FC<VideoPlayerModernProps> = ({
               <Text style={styles.errorSubText}>
                 Tentative {retryCount + 1}/{maxRetries + 1}
               </Text>
-              <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
+              <TouchableOpacity
+                style={styles.retryButton}
+                onPress={handleRetry}>
                 <Text style={styles.retryButtonText}>🔄 Réessayer</Text>
               </TouchableOpacity>
             </View>
@@ -419,56 +452,149 @@ const VideoPlayerModern: React.FC<VideoPlayerModernProps> = ({
           {console.log('📍 [DEBUG] leftSideGesture:', leftSideGesture)}
           {console.log('📍 [DEBUG] rightSideGesture:', rightSideGesture)}
           {console.log('📍 [DEBUG] centerGesture:', centerGesture)}
-          
+
           {/* Zone gauche avec TEST TOUCHABLE */}
           <GestureDetector gesture={leftSideGesture}>
-            <View style={[styles.gestureZoneLeft, {backgroundColor: 'rgba(255,0,0,0.3)'}]}>
-              <Text style={{color: 'white', position: 'absolute', top: 10, left: 10, fontSize: 16, fontWeight: 'bold'}}>LEFT ZONE</Text>
-              <Text style={{color: 'white', position: 'absolute', bottom: 40, left: 10, fontSize: 12}}>Double-tap: -10s</Text>
+            <View
+              style={[
+                styles.gestureZoneLeft,
+                {backgroundColor: 'rgba(255,0,0,0.3)'},
+              ]}>
+              <Text
+                style={{
+                  color: 'white',
+                  position: 'absolute',
+                  top: 10,
+                  left: 10,
+                  fontSize: 16,
+                  fontWeight: 'bold',
+                }}>
+                LEFT ZONE
+              </Text>
+              <Text
+                style={{
+                  color: 'white',
+                  position: 'absolute',
+                  bottom: 40,
+                  left: 10,
+                  fontSize: 12,
+                }}>
+                Double-tap: -10s
+              </Text>
               {/* TEST TOUCHABLE SIMPLE */}
-              <TouchableOpacity 
-                style={{position: 'absolute', bottom: 10, left: 10, backgroundColor: 'red', padding: 5, borderRadius: 3}}
-                onPress={() => {
-                  console.log('🔴 [TOUCHABLE TEST] LEFT TouchableOpacity PRESSED!');
-                  handleSeekBackward();
+              <TouchableOpacity
+                style={{
+                  position: 'absolute',
+                  bottom: 10,
+                  left: 10,
+                  backgroundColor: 'red',
+                  padding: 5,
+                  borderRadius: 3,
                 }}
-              >
+                onPress={() => {
+                  console.log(
+                    '🔴 [TOUCHABLE TEST] LEFT TouchableOpacity PRESSED!',
+                  );
+                  handleSeekBackward();
+                }}>
                 <Text style={{color: 'white', fontSize: 10}}>TEST -10s</Text>
               </TouchableOpacity>
             </View>
           </GestureDetector>
-          
+
           {/* Zone droite avec TEST TOUCHABLE */}
           <GestureDetector gesture={rightSideGesture}>
-            <View style={[styles.gestureZoneRight, {backgroundColor: 'rgba(0,255,0,0.3)'}]}>
-              <Text style={{color: 'white', position: 'absolute', top: 10, right: 10, fontSize: 16, fontWeight: 'bold'}}>RIGHT ZONE</Text>
-              <Text style={{color: 'white', position: 'absolute', bottom: 40, right: 10, fontSize: 12}}>Double-tap: +10s</Text>
+            <View
+              style={[
+                styles.gestureZoneRight,
+                {backgroundColor: 'rgba(0,255,0,0.3)'},
+              ]}>
+              <Text
+                style={{
+                  color: 'white',
+                  position: 'absolute',
+                  top: 10,
+                  right: 10,
+                  fontSize: 16,
+                  fontWeight: 'bold',
+                }}>
+                RIGHT ZONE
+              </Text>
+              <Text
+                style={{
+                  color: 'white',
+                  position: 'absolute',
+                  bottom: 40,
+                  right: 10,
+                  fontSize: 12,
+                }}>
+                Double-tap: +10s
+              </Text>
               {/* TEST TOUCHABLE SIMPLE */}
-              <TouchableOpacity 
-                style={{position: 'absolute', bottom: 10, right: 10, backgroundColor: 'green', padding: 5, borderRadius: 3}}
-                onPress={() => {
-                  console.log('🟢 [TOUCHABLE TEST] RIGHT TouchableOpacity PRESSED!');
-                  handleSeekForward();
+              <TouchableOpacity
+                style={{
+                  position: 'absolute',
+                  bottom: 10,
+                  right: 10,
+                  backgroundColor: 'green',
+                  padding: 5,
+                  borderRadius: 3,
                 }}
-              >
+                onPress={() => {
+                  console.log(
+                    '🟢 [TOUCHABLE TEST] RIGHT TouchableOpacity PRESSED!',
+                  );
+                  handleSeekForward();
+                }}>
                 <Text style={{color: 'white', fontSize: 10}}>TEST +10s</Text>
               </TouchableOpacity>
             </View>
           </GestureDetector>
-          
+
           {/* Zone centrale avec TEST TOUCHABLE */}
           <GestureDetector gesture={centerGesture}>
-            <View style={[styles.gestureZoneCenter, {backgroundColor: 'rgba(0,0,255,0.3)'}]}>
-              <Text style={{color: 'white', position: 'absolute', top: 10, alignSelf: 'center', fontSize: 16, fontWeight: 'bold'}}>CENTER ZONE</Text>
-              <Text style={{color: 'white', position: 'absolute', bottom: 40, alignSelf: 'center', fontSize: 12}}>Tap: Toggle controls</Text>
+            <View
+              style={[
+                styles.gestureZoneCenter,
+                {backgroundColor: 'rgba(0,0,255,0.3)'},
+              ]}>
+              <Text
+                style={{
+                  color: 'white',
+                  position: 'absolute',
+                  top: 10,
+                  alignSelf: 'center',
+                  fontSize: 16,
+                  fontWeight: 'bold',
+                }}>
+                CENTER ZONE
+              </Text>
+              <Text
+                style={{
+                  color: 'white',
+                  position: 'absolute',
+                  bottom: 40,
+                  alignSelf: 'center',
+                  fontSize: 12,
+                }}>
+                Tap: Toggle controls
+              </Text>
               {/* TEST TOUCHABLE SIMPLE */}
-              <TouchableOpacity 
-                style={{position: 'absolute', bottom: 10, alignSelf: 'center', backgroundColor: 'blue', padding: 5, borderRadius: 3}}
-                onPress={() => {
-                  console.log('🔵 [TOUCHABLE TEST] CENTER TouchableOpacity PRESSED!');
-                  handleScreenTouch();
+              <TouchableOpacity
+                style={{
+                  position: 'absolute',
+                  bottom: 10,
+                  alignSelf: 'center',
+                  backgroundColor: 'blue',
+                  padding: 5,
+                  borderRadius: 3,
                 }}
-              >
+                onPress={() => {
+                  console.log(
+                    '🔵 [TOUCHABLE TEST] CENTER TouchableOpacity PRESSED!',
+                  );
+                  handleScreenTouch();
+                }}>
                 <Text style={{color: 'white', fontSize: 10}}>TEST TOGGLE</Text>
               </TouchableOpacity>
             </View>
@@ -481,22 +607,27 @@ const VideoPlayerModern: React.FC<VideoPlayerModernProps> = ({
                 styles.seekFeedbackContainer,
                 seekFeedbackAnimatedStyle,
                 {
-                  left: seekFeedback.direction === 'backward' ? '20%' : undefined,
-                  right: seekFeedback.direction === 'forward' ? '20%' : undefined,
-                }
-              ]}
-            >
+                  left:
+                    seekFeedback.direction === 'backward' ? '20%' : undefined,
+                  right:
+                    seekFeedback.direction === 'forward' ? '20%' : undefined,
+                },
+              ]}>
               <Text style={styles.seekFeedbackIcon}>
                 {seekFeedback.direction === 'forward' ? '⏭️' : '⏮️'}
               </Text>
               <Text style={styles.seekFeedbackText}>
-                {seekFeedback.direction === 'forward' ? '+' : '-'}{seekFeedback.seconds}s
+                {seekFeedback.direction === 'forward' ? '+' : '-'}
+                {seekFeedback.seconds}s
               </Text>
             </Animated.View>
           )}
 
           {/* 🎯 OVERLAY CONTRÔLES TIVIMATE ANIMÉS */}
-          {console.log('📍 [DEBUG] Rendering controls overlay, showControls:', showControls)}
+          {console.log(
+            '📍 [DEBUG] Rendering controls overlay, showControls:',
+            showControls,
+          )}
           <Animated.View
             style={[
               styles.controlsOverlay,
@@ -504,70 +635,99 @@ const VideoPlayerModern: React.FC<VideoPlayerModernProps> = ({
               {
                 pointerEvents: showControls ? 'auto' : 'none',
                 backgroundColor: 'rgba(255,255,0,0.1)',
-              }
-            ]}
-          >
-          {showControls && (
-            <>
-              {console.log('📍 [DEBUG] Rendering controls content inside overlay')}
-              {/* HEADER: Bouton retour moderne + Info chaîne */}
-              <View style={[styles.tiviMateHeader, {backgroundColor: 'rgba(255,0,255,0.3)'}]}>
-                <TouchableOpacity
-                  style={styles.backButtonModern}
-                  onPress={handleExitFullscreen}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.backIconContainer}>
-                    <View style={styles.backArrowModern} />
-                    <View style={styles.backLineModern} />
-                  </View>
-                </TouchableOpacity>
-                
-                <View style={styles.headerChannelInfo}>
-                  <Text style={styles.headerChannelName}>{channel.name}</Text>
-                  {channel.category && (
-                    <Text style={styles.headerChannelCategory}>{channel.category}</Text>
-                  )}
-                </View>
-              </View>
+              },
+            ]}>
+            {showControls && (
+              <>
+                {console.log(
+                  '📍 [DEBUG] Rendering controls content inside overlay',
+                )}
+                {/* HEADER: Bouton retour moderne + Info chaîne */}
+                <View
+                  style={[
+                    styles.tiviMateHeader,
+                    {backgroundColor: 'rgba(255,0,255,0.3)'},
+                  ]}>
+                  <TouchableOpacity
+                    style={styles.backButtonModern}
+                    onPress={handleExitFullscreen}
+                    activeOpacity={0.7}>
+                    <View style={styles.backIconContainer}>
+                      <View style={styles.backArrowModern} />
+                      <View style={styles.backLineModern} />
+                    </View>
+                  </TouchableOpacity>
 
-              {/* CENTER: Bouton Play/Pause TiviMate style */}
-              {console.log('📍 [DEBUG] Rendering play/pause button, isPaused:', isPaused)}
-              <View style={[styles.centerControls, {backgroundColor: 'rgba(0,255,255,0.2)'}]}>
-                <TouchableOpacity
-                  style={[styles.playPauseButton, {backgroundColor: 'rgba(255,255,255,0.8)'}]}
-                  onPress={() => {
-                    console.log('📍 [DEBUG] Play/Pause button PRESSED!');
-                    togglePlayPause();
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.playPauseIcon}>
-                    {isPaused ? (
-                      <View style={[styles.playTriangle, {borderLeftColor: '#000'}]} />
-                    ) : (
-                      <View style={styles.pauseContainer}>
-                        <View style={[styles.pauseBar, {backgroundColor: '#000'}]} />
-                        <View style={[styles.pauseBar, {backgroundColor: '#000'}]} />
-                      </View>
+                <View style={styles.headerChannelInfo}>
+                    <Text style={styles.headerChannelName}>{channel.name}</Text>
+                    {channel.category && (
+                      <Text style={styles.headerChannelCategory}>
+                        {channel.category}
+                      </Text>
                     )}
                   </View>
-                </TouchableOpacity>
-              </View>
-
-              {/* FOOTER: Timeline seulement */}
-              <View style={styles.tiviMateFooter}>
-                <View style={styles.progressBarContainer}>
-                  <View 
-                    style={[
-                      styles.progressBar,
-                      { width: duration > 0 ? `${(currentTime / duration) * 100}%` : '0%' }
-                    ]} 
-                  />
                 </View>
-              </View>
-            </>
-          )}
+
+                {/* CENTER: Bouton Play/Pause TiviMate style */}
+                {console.log(
+                  '📍 [DEBUG] Rendering play/pause button, isPaused:',
+                  isPaused,
+                )}
+                <View
+                  style={[
+                    styles.centerControls,
+                    {backgroundColor: 'rgba(0,255,255,0.2)'},
+                  ]}>
+                  <TouchableOpacity
+                    style={[
+                      styles.playPauseButton,
+                      {backgroundColor: 'rgba(255,255,255,0.8)'},
+                    ]}
+                    onPress={() => {
+                      console.log('📍 [DEBUG] Play/Pause button PRESSED!');
+                      togglePlayPause();
+                    }}
+                    activeOpacity={0.7}>
+                    <View style={styles.playPauseIcon}>
+                      {isPaused ? (
+                        <View
+                          style={[
+                            styles.playTriangle,
+                            {borderLeftColor: '#000'},
+                          ]}
+                        />
+                      ) : (
+                        <View style={styles.pauseContainer}>
+                          <View
+                            style={[styles.pauseBar, {backgroundColor: '#000'}]}
+                          />
+                          <View
+                            style={[styles.pauseBar, {backgroundColor: '#000'}]}
+                          />
+                        </View>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                </View>
+
+                {/* FOOTER: Timeline seulement */}
+                <View style={styles.tiviMateFooter}>
+                  <View style={styles.progressBarContainer}>
+                    <View
+                      style={[
+                        styles.progressBar,
+                        {
+                          width:
+                            duration > 0
+                              ? `${(currentTime / duration) * 100}%`
+                              : '0%',
+                        },
+                      ]}
+                    />
+                  </View>
+                </View>
+              </>
+            )}
           </Animated.View>
         </View>
       </View>
@@ -591,7 +751,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0D0F12',
   },
-  
+
   // 🎯 ZONES GESTUELLES (Style YouTube/TiviMate) - AVEC DEBUG VISUEL
   gestureZoneLeft: {
     position: 'absolute',
@@ -600,7 +760,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: '30%',
     zIndex: 10,
-    backgroundColor: 'rgba(255,0,0,0.15)', // DEBUG: Visible pour test
+    backgroundColor: 'transparent',
   },
   gestureZoneRight: {
     position: 'absolute',
@@ -609,7 +769,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: '30%',
     zIndex: 10,
-    backgroundColor: 'rgba(0,255,0,0.15)', // DEBUG: Visible pour test
+    backgroundColor: 'transparent',
   },
   gestureZoneCenter: {
     position: 'absolute',
@@ -618,9 +778,9 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     zIndex: 5,
-    backgroundColor: 'rgba(0,0,255,0.15)', // DEBUG: Visible pour test
+    backgroundColor: 'transparent',
   },
-  
+
   // 🎯 FEEDBACK VISUEL SEEK
   seekFeedbackContainer: {
     position: 'absolute',
@@ -646,10 +806,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     textShadowColor: 'rgba(0,0,0,0.8)',
-    textShadowOffset: { width: 1, height: 1 },
+    textShadowOffset: {width: 1, height: 1},
     textShadowRadius: 2,
   },
-  
+
   // 🎯 OVERLAY CONTRÔLES AVEC ANIMATIONS
   controlsOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -723,7 +883,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.4,
     shadowRadius: 4,
     elevation: 6,
@@ -791,7 +951,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.4,
     shadowRadius: 6,
     elevation: 8,

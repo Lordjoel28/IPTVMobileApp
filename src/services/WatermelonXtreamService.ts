@@ -34,7 +34,6 @@ export interface XtreamCategory {
 }
 
 class WatermelonXtreamService {
-
   /**
    * 🚀 Import complet d'une playlist Xtream Codes dans WatermelonDB
    * Utilise batch operations pour optimiser les 25K+ chaînes
@@ -114,7 +113,7 @@ class WatermelonXtreamService {
           playlist.status = 'active';
           playlist.isActive = false; // Sera activé après import complet
 
-        // Date d'expiration Xtream Codes
+          // Date d'expiration Xtream Codes
           if (accountInfo?.user_info?.exp_date) {
             const expTimestamp = parseInt(accountInfo.user_info.exp_date);
             if (!isNaN(expTimestamp)) {
@@ -129,6 +128,8 @@ class WatermelonXtreamService {
 
       // 2. Créer les catégories par batch
       const categoryBatches = this.chunkArray(categories, BATCH_SIZE);
+      const createdCategories: Category[] = [];
+
       for (let i = 0; i < categoryBatches.length; i++) {
         const batch = categoryBatches[i];
 
@@ -144,7 +145,16 @@ class WatermelonXtreamService {
         );
 
         await database.batch(categoryRecords);
+        createdCategories.push(...categoryRecords);
       }
+
+      // Créer un map: Xtream categoryId -> WatermelonDB Category ID
+      const xtreamCategoryIdMap = new Map<string, string>();
+      createdCategories.forEach(cat => {
+        xtreamCategoryIdMap.set(cat.categoryId!, cat.id);
+      });
+
+      console.log(`🗺️ Map catégories créée: ${xtreamCategoryIdMap.size} entrées`);
 
       onProgress?.(
         70,
@@ -167,7 +177,11 @@ class WatermelonXtreamService {
         const channelRecords = batch.map(channel =>
           database.get<Channel>('channels').prepareCreate(ch => {
             ch.playlistId = playlist.id;
-            ch.categoryId = channel.category_id;
+
+            // Mapper Xtream categoryId vers WatermelonDB Category ID
+            const watermelonCategoryId = xtreamCategoryIdMap.get(channel.category_id);
+            ch.categoryId = watermelonCategoryId || null;
+
             ch.name = channel.name || 'Sans nom';
             ch.streamUrl = this.buildXtreamStreamUrl(
               credentials,
@@ -274,19 +288,21 @@ class WatermelonXtreamService {
   }
 
   /**
-   * 🔍 Recherche de chaînes avec lazy loading
+   * 🔍 Recherche de chaînes avec lazy loading et tri optimisé
    */
   async searchChannels(
     playlistId: string,
     query: string,
-    limit: number = 25000,
+    limit: number = 500, // Réduit de 25000 à 500 pour cohérence pagination
   ) {
     try {
+      const sanitized = Q.sanitizeLikeString(query);
       return await database
         .get<Channel>('channels')
         .query(
           Q.where('playlist_id', playlistId),
-          Q.where('name', Q.like(`%${Q.sanitizeLikeString(query)}%`)),
+          Q.where('name', Q.like(`%${sanitized}%`)),
+          Q.sortBy('name', Q.asc), // Tri alphabétique pour UX
           Q.take(limit),
         )
         .fetch();
@@ -302,7 +318,7 @@ class WatermelonXtreamService {
   async getChannelsByCategory(
     playlistId: string,
     categoryId: string,
-    limit: number = 25000,
+    limit: number = 500,
     offset: number = 0,
   ) {
     try {
@@ -317,6 +333,54 @@ class WatermelonXtreamService {
         .fetch();
     } catch (error) {
       console.error('❌ Erreur récupération chaînes par catégorie:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * ⭐ Récupérer les chaînes favorites avec SQL rapide
+   */
+  async getFavoriteChannels(
+    playlistId: string,
+    limit: number = 500,
+    offset: number = 0,
+  ) {
+    try {
+      return await database
+        .get<Channel>('channels')
+        .query(
+          Q.where('playlist_id', playlistId),
+          Q.where('is_favorite', true),
+          Q.sortBy('last_watched', Q.desc), // Favoris récents en premier
+          Q.skip(offset),
+          Q.take(limit),
+        )
+        .fetch();
+    } catch (error) {
+      console.error('❌ Erreur récupération favoris WatermelonDB:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 📺 Récupérer l'historique de visionnage avec SQL rapide
+   */
+  async getRecentChannels(
+    playlistId: string,
+    limit: number = 20,
+  ) {
+    try {
+      return await database
+        .get<Channel>('channels')
+        .query(
+          Q.where('playlist_id', playlistId),
+          Q.where('last_watched', Q.notEq(null)),
+          Q.sortBy('last_watched', Q.desc), // Plus récents en premier
+          Q.take(limit),
+        )
+        .fetch();
+    } catch (error) {
+      console.error('❌ Erreur récupération historique WatermelonDB:', error);
       throw error;
     }
   }
@@ -398,7 +462,9 @@ class WatermelonXtreamService {
   }
 
   private normalizeCategoryName(categoryName: string): string {
-    if (!categoryName || categoryName.trim() === '') {return 'Non classé';}
+    if (!categoryName || categoryName.trim() === '') {
+      return 'Non classé';
+    }
 
     return categoryName
       .trim()

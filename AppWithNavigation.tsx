@@ -13,10 +13,12 @@ import {PaperProvider} from 'react-native-paper';
 // import { PlaylistProvider } from './src/context/PlaylistContext';
 import LoadingOverlay from './src/components/LoadingOverlay';
 import NotificationToast from './src/components/NotificationToast';
+import GlobalVideoPlayer from './src/components/GlobalVideoPlayer'; // Import du lecteur global
 import App_IPTV_SMARTERS from './App_IPTV_SMARTERS';
 import ChannelListScreen from './src/screens/ChannelListScreen';
 import ChannelsScreen from './src/screens/ChannelsScreen';
 import ChannelPlayerScreen from './src/screens/ChannelPlayerScreen';
+import SettingsScreen from './src/screens/SettingsScreen';
 import type {Channel} from './src/types';
 
 // Types navigation simple
@@ -38,6 +40,7 @@ export type SimpleRootStackParamList = {
     playlistName: string;
     category?: string;
   };
+  Settings: undefined;
 };
 
 const Stack = createStackNavigator<SimpleRootStackParamList>();
@@ -70,11 +73,13 @@ const AppWithNavigation: React.FC = () => {
           <Stack.Screen name="ChannelList" component={ChannelListScreen} />
           <Stack.Screen name="ChannelsScreen" component={ChannelsScreen} />
           <Stack.Screen name="ChannelPlayer" component={ChannelPlayerScreen} />
+          <Stack.Screen name="Settings" component={SettingsScreen} />
         </Stack.Navigator>
         {/* Overlays globaux pour toute l'app */}
         <LoadingOverlay />
         <NotificationToast />
       </NavigationContainer>
+      <GlobalVideoPlayer />
       {/* PlaylistProvider removed - replaced by PlaylistStore Zustand */}
       {/* AppProvider removed */}
     </PaperProvider>

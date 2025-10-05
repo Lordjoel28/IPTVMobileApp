@@ -1,0 +1,7 @@
+#EXTM3U url-tvg="https://iptv-org.github.io/epg/guides/fr/programme-tv.net.epg.xml"
+#EXTINF:-1 tvg-id="TF1.fr" tvg-name="TF1" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/d/da/TF1_logo_2013.png" group-title="France",TF1
+https://raw.githubusercontent.com/iptv-org/iptv/master/streams/fr/tf1.m3u8
+#EXTINF:-1 tvg-id="France2.fr" tvg-name="France 2" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/0/0a/France_2_2018.png" group-title="France",France 2
+https://raw.githubusercontent.com/iptv-org/iptv/master/streams/fr/france2.m3u8
+#EXTINF:-1 tvg-id="M6.fr" tvg-name="M6" tvg-logo="https://upload.wikimedia.org/wikipedia/commons/1/12/M6_2009.png" group-title="France",M6
+https://raw.githubusercontent.com/iptv-org/iptv/master/streams/fr/m6.m3u8

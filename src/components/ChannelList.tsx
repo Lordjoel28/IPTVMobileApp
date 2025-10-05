@@ -12,6 +12,13 @@ import {FlashList} from '@shopify/flash-list';
 import FastImage from 'react-native-fast-image';
 import FastScrollIndicator from './FastScrollIndicator';
 import SkeletonPlaceholder from 'react-native-skeleton-placeholder';
+// 🚀 OPTIMISATION: Utiliser le store optimisé au lieu du cache local
+import {
+  usePlaylistCategories,
+  useSelectedCategory,
+  useChannelsByCategory,
+  usePlaylistActions,
+} from '../stores/PlaylistStore';
 
 // 🚀 CONSTANTES PERFORMANCE IPTV SMARTERS PRO LEVEL
 const ITEM_HEIGHT = 80; // Hauteur pour FlashList estimatedItemSize
@@ -86,62 +93,27 @@ const ChannelList: React.FC<ChannelListProps> = ({
   onToggleFavorite,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [showFastScroll, setShowFastScroll] = useState(false);
   const [currentScrollIndex, setCurrentScrollIndex] = useState(0);
   const isDarkMode = useColorScheme() === 'dark';
   const flashListRef = useRef<FlashList<Channel>>(null);
 
-  // 🚀 CACHE CATÉGORIES - Pre-compute pour éviter recalculs
+  // 🚀 OPTIMISATION: Utiliser le store au lieu de l'état local
+  const categories = usePlaylistCategories();
+  const selectedCategoryFromStore = useSelectedCategory();
+  const {selectCategory} = usePlaylistActions();
+
+  // 🚀 OPTIMISATION: Récupérer channels depuis l'index (O(1))
+  const categoryChannels = useChannelsByCategory(selectedCategoryFromStore || 'TOUS');
+
+  // 🚀 OPTIMISATION: Calcul des catégories avec compteurs (depuis store)
   const categoriesWithCounts = useMemo(() => {
-    const categoryCounts = new Map<string, number>();
-    categoryCounts.set('all', channels.length);
-    categoryCounts.set('favorites', favorites.length);
+    return categories.map(cat => [cat.name, cat.count] as [string, number]);
+  }, [categories]);
 
-    channels.forEach(channel => {
-      if (channel.category) {
-        const count = categoryCounts.get(channel.category) || 0;
-        categoryCounts.set(channel.category, count + 1);
-      }
-    });
-
-    return Array.from(categoryCounts.entries()).sort((a, b) => b[1] - a[1]);
-  }, [channels, favorites]);
-
-  // 🚀 CACHE FILTRES PAR CATÉGORIE - Pre-compute pour changement instantané
-  const channelsByCategory = useMemo(() => {
-    const cache = new Map<string, Channel[]>();
-
-    // All channels
-    cache.set('all', channels);
-
-    // Favorites
-    cache.set(
-      'favorites',
-      channels.filter(channel => favorites.includes(channel.id)),
-    );
-
-    // By category
-    const categoryGroups = new Map<string, Channel[]>();
-    channels.forEach(channel => {
-      if (channel.category) {
-        const existing = categoryGroups.get(channel.category) || [];
-        existing.push(channel);
-        categoryGroups.set(channel.category, existing);
-      }
-    });
-
-    categoryGroups.forEach((channels, category) => {
-      cache.set(category, channels);
-    });
-
-    return cache;
-  }, [channels, favorites]);
-
-  // 🚀 FILTERED CHANNELS - Ultra-rapide avec cache pre-computed
+  // 🚀 OPTIMISATION: Filtrage recherche seulement (catégorie déjà filtrée par le store)
   const filteredChannels = useMemo(() => {
-    // Get cached channels for selected category (instant!)
-    let filtered = channelsByCategory.get(selectedCategory) || [];
+    let filtered = categoryChannels;
 
     // Filter by search query only if needed
     if (searchQuery.trim()) {
@@ -154,7 +126,7 @@ const ChannelList: React.FC<ChannelListProps> = ({
     }
 
     return filtered;
-  }, [channelsByCategory, selectedCategory, searchQuery]);
+  }, [categoryChannels, searchQuery]);
 
   // 🚀 RENDER ITEM SIMPLIFIÉ - FlashList gère les skeletons nativement
   const renderChannelItem = useCallback(
@@ -162,7 +134,7 @@ const ChannelList: React.FC<ChannelListProps> = ({
       const isSelected = currentChannel?.id === item.id;
       const isFavorite = favorites.includes(item.id);
 
-    return (
+      return (
         <TouchableOpacity
           style={[
             styles.channelItem,
@@ -177,7 +149,7 @@ const ChannelList: React.FC<ChannelListProps> = ({
                 source={{
                   uri: item.logo,
                   priority: FastImage.priority.normal,
-                  cache: FastImage.cacheControl.web,
+                  cache: FastImage.cacheControl.immutable,
                 }}
                 style={styles.channelLogo}
                 resizeMode={FastImage.resizeMode.cover}
@@ -235,21 +207,21 @@ const ChannelList: React.FC<ChannelListProps> = ({
     ],
   );
 
-  // 🚀 CHANGEMENT CATÉGORIE RAPIDE
+  // 🚀 CHANGEMENT CATÉGORIE RAPIDE - Utilise le store
   const handleCategoryChange = useCallback((category: string) => {
-    setSelectedCategory(category);
+    selectCategory(category);
 
     // Reset position scroll
     flashListRef.current?.scrollToOffset({
       offset: 0,
       animated: true,
     });
-  }, []);
+  }, [selectCategory]);
 
   // 🚀 RENDER CATEGORY OPTIMISÉ - Animation instantanée
   const renderCategoryButton = useCallback(
     ([category, count]: [string, number]) => {
-      const isSelected = selectedCategory === category;
+      const isSelected = selectedCategoryFromStore === category;
       const displayName =
         category === 'all'
           ? 'Toutes'
@@ -257,7 +229,7 @@ const ChannelList: React.FC<ChannelListProps> = ({
           ? 'Favoris'
           : category;
 
-    return (
+      return (
         <TouchableOpacity
           key={category}
           style={[
@@ -278,7 +250,7 @@ const ChannelList: React.FC<ChannelListProps> = ({
         </TouchableOpacity>
       );
     },
-    [selectedCategory, isDarkMode, handleCategoryChange],
+    [selectedCategoryFromStore, isDarkMode, handleCategoryChange],
   );
 
   // 🚀 KEY EXTRACTOR optimisé
@@ -301,7 +273,7 @@ const ChannelList: React.FC<ChannelListProps> = ({
       const currentIndex = Math.floor(contentOffset.y / ITEM_HEIGHT);
       setCurrentScrollIndex(currentIndex);
 
-    // Show fast scroll indicator for large lists during scroll
+      // Show fast scroll indicator for large lists during scroll
       if (filteredChannels.length > 50) {
         setShowFastScroll(true);
         // Hide after 2 seconds of no scrolling

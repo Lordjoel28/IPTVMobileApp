@@ -17,9 +17,9 @@ export class ServiceMigration {
    * Initialise la migration - à appeler au démarrage de l'app
    */
   static initialize(): void {
-    if (this.initialized) {return;}
-
-    console.log('🔄 Starting Service Migration: Singleton → DI');
+    if (this.initialized) {
+      return;
+    }
 
     // Initialise le nouveau système DI
     ServiceRegistry.initialize();
@@ -28,7 +28,6 @@ export class ServiceMigration {
     this.setupCompatibilityWrappers();
 
     this.initialized = true;
-    console.log('✅ Service Migration completed');
   }
 
   /**
@@ -113,7 +112,6 @@ export class ServiceMigration {
   static async migrateService(serviceName: ServiceName): Promise<boolean> {
     try {
       const service = await getService(serviceName);
-      console.log(`✅ Service ${serviceName} migrated successfully`);
       return true;
     } catch (error) {
       console.error(`❌ Failed to migrate service ${serviceName}:`, error);

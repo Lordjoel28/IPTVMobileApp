@@ -241,30 +241,42 @@ export class CategoryService {
   private detectCategoryType(categoryName: string): string {
     const lower = categoryName.toLowerCase();
 
-    if (lower.includes('sport')) {return 'sport';}
-    if (lower.includes('news') || lower.includes('info')) {return 'news';}
+    if (lower.includes('sport')) {
+      return 'sport';
+    }
+    if (lower.includes('news') || lower.includes('info')) {
+      return 'news';
+    }
     if (
       lower.includes('movie') ||
       lower.includes('cinema') ||
       lower.includes('film')
-    )
-      {return 'movies';}
-    if (lower.includes('entertainment') || lower.includes('divertissement'))
-      {return 'entertainment';}
-    if (lower.includes('music') || lower.includes('radio')) {return 'music';}
+    ) {
+      return 'movies';
+    }
+    if (lower.includes('entertainment') || lower.includes('divertissement')) {
+      return 'entertainment';
+    }
+    if (lower.includes('music') || lower.includes('radio')) {
+      return 'music';
+    }
     if (
       lower.includes('kids') ||
       lower.includes('enfant') ||
       lower.includes('cartoon')
-    )
-      {return 'kids';}
-    if (lower.includes('doc')) {return 'documentary';}
+    ) {
+      return 'kids';
+    }
+    if (lower.includes('doc')) {
+      return 'documentary';
+    }
     if (
       lower.includes('lifestyle') ||
       lower.includes('cooking') ||
       lower.includes('travel')
-    )
-      {return 'lifestyle';}
+    ) {
+      return 'lifestyle';
+    }
 
     return 'general';
   }

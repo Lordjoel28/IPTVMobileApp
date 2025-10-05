@@ -6,5 +6,6 @@
 import Playlist from './Playlist';
 import Channel from './Channel';
 import Category from './Category';
+import Program from './Program';
 
-export {Playlist, Channel, Category};
+export {Playlist, Channel, Category, Program};

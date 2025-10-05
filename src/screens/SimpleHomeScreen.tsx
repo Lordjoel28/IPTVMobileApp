@@ -108,6 +108,7 @@ const SimpleHomeScreen: React.FC = () => {
         barStyle="light-content"
         backgroundColor="#000000"
         translucent
+      />
 
       {/* Header avec gradient */}
       <LinearGradient

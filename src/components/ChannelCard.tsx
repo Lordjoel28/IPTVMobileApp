@@ -7,13 +7,14 @@ import React, {useEffect, useRef} from 'react';
 import {
   View,
   Text,
-  Image,
   Pressable,
   Animated,
   StyleSheet,
   PressableStateCallbackType,
 } from 'react-native';
+import FastImage from 'react-native-fast-image';
 import LinearGradient from 'react-native-linear-gradient';
+import { useThemeColors } from '../contexts/ThemeContext';
 
 interface Channel {
   id: string;
@@ -41,6 +42,8 @@ const ChannelCard: React.FC<ChannelCardProps> = ({
   serverUrl = '',
   hideChannelNames = false,
 }) => {
+  const colors = useThemeColors();
+  const styles = createStyles(colors, width);
   // 🎬 ÉTAPE 3: Animations avec driver natif
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -121,31 +124,21 @@ const ChannelCard: React.FC<ChannelCardProps> = ({
         onPressOut={handlePressOut}
         // android_ripple supprimé pour éviter débordement
       >
-        {/* Logo principal */}
+        {/* Logo principal avec FastImage optimisé */}
         {hasLogo ? (
-          <Image
+          <FastImage
             source={{
               uri: logoUrl,
+              priority: FastImage.priority.high, // ✅ Priorité haute pour chargement instantané
+              cache: FastImage.cacheControl.immutable, // ✅ Cache permanent
               headers: {
                 'User-Agent': 'IPTV-Player/1.0',
                 Accept: 'image/*',
-                'Cache-Control': 'max-age=86400',
               },
             }}
             style={styles.channelLogoFullscreen}
-            resizeMode="contain"
-            fadeDuration={100}
-            onError={() => {
-              if (index < 5) {
-                console.log(`❌ Logo échoué: "${channel.name}" -> ${logoUrl}`);
-              }
-            }}
-            onLoad={() => {
-              if (index < 5) {
-                console.log(`✅ Logo CHARGÉ: "${channel.name}"`);
-              }
-            }}
-            progressiveRenderingEnabled={true}
+            resizeMode={FastImage.resizeMode.contain}
+            // Suppression des logs pour améliorer les performances
           />
         ) : (
           <View style={styles.channelLogoPlaceholderFullscreen}>
@@ -177,36 +170,35 @@ const ChannelCard: React.FC<ChannelCardProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any, width: number) => StyleSheet.create({
   cardContainer: {
     // Container pour animation - pas de style visuel
   },
   channelCard: {
-    backgroundColor: '#1a1a1a',
+    backgroundColor: colors.surface.primary,
     borderRadius: 16,
-    marginBottom: 8, // RÉDUIT : espacement vertical entre rangées
-    // margin: 4 SUPPRIMÉ - l'espacement est géré par columnWrapperStyle
+    marginBottom: 8,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
-    overflow: 'hidden', // CRITIQUE : Empêche débordement
+    borderColor: colors.ui.border,
+    overflow: 'hidden',
     height: 140,
     position: 'relative',
-    // Ombres subtiles améliorées pour profondeur
-    shadowColor: '#000000',
+    // Conservation des ombres avec couleur thématique
+    shadowColor: colors.ui.shadow,
     shadowOffset: {width: 0, height: 6},
     shadowOpacity: 0.2,
     shadowRadius: 16,
     elevation: 8,
   },
   channelCardPressed: {
-    // 🎯 FEEDBACK VISUEL: État pressé avec effets améliorés
-    backgroundColor: '#252525', // Changement de couleur
-    shadowOpacity: 0.35, // Ombre plus prononcée
+    // Conservation des effets visuels avec couleurs thématiques
+    backgroundColor: colors.surface.elevated,
+    shadowOpacity: 0.35,
     elevation: 12,
     shadowOffset: {width: 0, height: 8},
     shadowRadius: 20,
-    borderColor: 'rgba(0, 212, 170, 0.6)', // Bordure cyan menthe
-    borderWidth: 2, // Bordure plus épaisse pour feedback
+    borderColor: colors.accent.primary + '99', // Transparence 60%
+    borderWidth: 2,
   },
   channelLogoFullscreen: {
     position: 'absolute',
@@ -226,7 +218,7 @@ const styles = StyleSheet.create({
     left: 8,
     right: 8,
     bottom: 50,
-    backgroundColor: '#2a2a2a',
+    backgroundColor: colors.surface.secondary,
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 12,
@@ -245,25 +237,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   channelCardName: {
-    color: '#FFFFFF',
+    color: colors.text.primary,
     fontSize: 12,
     fontWeight: '500',
     lineHeight: 16,
     textAlign: 'center',
     width: '100%',
-    textShadowColor: 'rgba(0, 0, 0, 0.9)',
+    textShadowColor: colors.ui.shadow,
     textShadowOffset: {width: 1, height: 1},
     textShadowRadius: 4,
   },
   channelNameFallback: {
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: colors.text.secondary,
     fontSize: 10,
     fontWeight: '600',
     marginTop: 6,
     textAlign: 'center',
     paddingHorizontal: 4,
     lineHeight: 12,
-    textShadowColor: 'rgba(0, 0, 0, 0.8)',
+    textShadowColor: colors.ui.shadow,
     textShadowOffset: {width: 1, height: 1},
     textShadowRadius: 2,
   },

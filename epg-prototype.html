@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EPG Guide IPTV - Prototype Final</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #101010;
+            color: white;
+            overflow: hidden;
+        }
+
+        /* 📱 LAYOUT MOBILE COMME REACT NATIVE */
+        .mobile-screen {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            background: #101010;
+        }
+
+        /* 🎯 PANNEAU GAUCHE - LISTE CHAÎNES (43%) */
+        .left-panel {
+            width: 43%;
+            background: #1F1F1F;
+            border-right: 1px solid #333;
+            overflow-y: auto;
+        }
+
+        .category-header {
+            background: #1F1F1F;
+            padding: 12px;
+            border-bottom: 1px solid #333;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .category-title {
+            color: #EAEAEA;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .channels-list {
+            padding: 8px 0;
+        }
+
+        .channel-item {
+            display: flex;
+            align-items: center;
+            padding: 8px 12px;
+            margin: 1px 0;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .channel-item:hover {
+            background: #2a2a2a;
+        }
+
+        .channel-item.selected {
+            background: #333333;
+            border-radius: 12px;
+        }
+
+        .channel-logo {
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            background: #4A90E2;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: bold;
+            margin-right: 12px;
+            color: white;
+        }
+
+        .channel-name {
+            color: #EAEAEA;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        /* 🎯 PANNEAU DROIT - MINI LECTEUR + EPG (55%) */
+        .right-panel {
+            width: 55%;
+            display: flex;
+            flex-direction: column;
+            background: #101010;
+        }
+
+        /* 🎬 MINI LECTEUR */
+        .mini-player {
+            height: 180px;
+            background: linear-gradient(135deg, #1a1a1a, #2d2d2d);
+            border-radius: 12px;
+            margin: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid #333;
+            position: relative;
+        }
+
+        .mini-player::before {
+            content: "📺";
+            font-size: 48px;
+            opacity: 0.7;
+        }
+
+        .mini-player-overlay {
+            position: absolute;
+            bottom: 8px;
+            right: 8px;
+            background: rgba(0,0,0,0.8);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            color: #4A90E2;
+        }
+
+        /* 📺 ZONE EPG - STYLE TIVIMATE */
+        .epg-container {
+            flex: 1;
+            background: #1F1F1F;
+            border-radius: 12px;
+            margin: 0 8px 8px 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        /* 🎯 HEADER EPG */
+        .epg-header {
+            background: linear-gradient(135deg, #2d2d2d, #1a1a1a);
+            padding: 12px 16px;
+            border-bottom: 1px solid #333;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .epg-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: white;
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .epg-time {
+            color: #4A90E2;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        /* 🎯 TIMELINE HORIZONTALE */
+        .timeline {
+            background: #2a2a2a;
+            padding: 8px 0;
+            border-bottom: 1px solid #333;
+            display: flex;
+            align-items: center;
+            overflow-x: auto;
+        }
+
+        .timeline-hour {
+            min-width: 120px;
+            text-align: center;
+            color: #ccc;
+            font-size: 11px;
+            font-weight: 500;
+            padding: 4px 8px;
+            border-right: 1px solid #404040;
+            position: relative;
+        }
+
+        .timeline-hour.current {
+            color: #FF6B6B;
+            font-weight: 600;
+        }
+
+        .timeline-hour.current::after {
+            content: "";
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: #FF6B6B;
+        }
+
+        /* 🎯 GRILLE CHAÎNES + PROGRAMMES */
+        .epg-grid {
+            flex: 1;
+            overflow-y: auto;
+            max-height: calc(280px - 80px); /* Hauteur - header - timeline */
+        }
+
+        .epg-channel-row {
+            display: flex;
+            border-bottom: 1px solid #333;
+            min-height: 60px;
+        }
+
+        /* 🏷️ NOM CHAÎNE (Colonne fixe) */
+        .epg-channel-name {
+            width: 120px;
+            background: #2d2d2d;
+            border-right: 1px solid #404040;
+            padding: 8px 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: sticky;
+            left: 0;
+            z-index: 2;
+        }
+
+        .epg-channel-name.selected {
+            background: #4A90E2;
+        }
+
+        .channel-name-text {
+            color: #fff;
+            font-size: 10px;
+            font-weight: 500;
+            text-align: center;
+            line-height: 12px;
+        }
+
+        /* 📋 PROGRAMMES HORIZONTAUX */
+        .epg-programs {
+            flex: 1;
+            display: flex;
+            position: relative;
+            background: #1a1a1a;
+        }
+
+        .epg-program {
+            min-width: 120px;
+            padding: 8px 12px;
+            border-right: 1px solid #404040;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .epg-program:hover {
+            background: rgba(74, 144, 226, 0.1);
+        }
+
+        .epg-program.live {
+            background: linear-gradient(135deg, #FF6B6B, #FF5252);
+            border: 2px solid #FF6B6B;
+            color: white;
+        }
+
+        .epg-program.next {
+            background: linear-gradient(135deg, #4A90E2, #357ABD);
+            color: white;
+        }
+
+        .program-time {
+            font-size: 9px;
+            font-weight: 600;
+            opacity: 0.8;
+            margin-bottom: 2px;
+        }
+
+        .program-title {
+            font-size: 11px;
+            font-weight: 500;
+            line-height: 14px;
+            overflow: hidden;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+        }
+
+        .live-indicator {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 8px;
+            padding: 1px 4px;
+            font-size: 7px;
+            font-weight: bold;
+        }
+
+        /* 🎯 FOOTER EPG */
+        .epg-footer {
+            padding: 8px 16px;
+            background: #2d2d2d;
+            border-top: 1px solid #333;
+            text-align: center;
+        }
+
+        .epg-footer-text {
+            color: #666;
+            font-size: 11px;
+        }
+
+        /* 📱 RESPONSIVE MOBILE */
+        @media (max-width: 768px) {
+            .mobile-screen {
+                flex-direction: column;
+            }
+            
+            .left-panel {
+                width: 100%;
+                height: 50%;
+            }
+            
+            .right-panel {
+                width: 100%;
+                height: 50%;
+            }
+            
+            .mini-player {
+                height: 120px;
+            }
+        }
+
+        /* 🎯 ANIMATIONS */
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .live-indicator {
+            animation: pulse 2s infinite;
+        }
+
+        /* 🎨 SCROLLBARS STYLÉS */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #1a1a1a;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #404040;
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+    </style>
+</head>
+<body>
+    <div class="mobile-screen">
+        <!-- 🎯 PANNEAU GAUCHE - LISTE CHAÎNES -->
+        <div class="left-panel">
+            <div class="category-header">
+                <span class="category-title">🌍 AF | CONGO (10)</span>
+                <span style="color: #666;">▶</span>
+            </div>
+            
+            <div class="channels-list" id="channelsList">
+                <!-- Chaînes générées par JavaScript -->
+            </div>
+        </div>
+
+        <!-- 🎯 PANNEAU DROIT - MINI LECTEUR + EPG -->
+        <div class="right-panel">
+            <!-- 🎬 MINI LECTEUR -->
+            <div class="mini-player">
+                <div class="mini-player-overlay">LIVE</div>
+            </div>
+
+            <!-- 📺 GUIDE EPG STYLE TIVIMATE -->
+            <div class="epg-container">
+                <!-- Header EPG -->
+                <div class="epg-header">
+                    <div class="epg-title">
+                        <span>📅</span>
+                        <span>Guide des programmes</span>
+                    </div>
+                    <div class="epg-time" id="currentTime">02:56</div>
+                </div>
+
+                <!-- Timeline horizontale -->
+                <div class="timeline" id="timeline">
+                    <!-- Heures générées par JavaScript -->
+                </div>
+
+                <!-- Grille EPG -->
+                <div class="epg-grid" id="epgGrid">
+                    <!-- Grille générée par JavaScript -->
+                </div>
+
+                <!-- Footer -->
+                <div class="epg-footer">
+                    <div class="epg-footer-text">📺 10 chaînes • Mis à jour il y a quelques secondes</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 🎯 DONNÉES MOCK COMME VOTRE APP
+        const channels = [
+            { id: '1', name: 'CONGO| RTNC SD', logo: 'RT' },
+            { id: '2', name: 'CONGO| TELE CONGO SD', logo: 'TC' },
+            { id: '3', name: 'CONGO| TELE 50 SD', logo: 'T5' },
+            { id: '4', name: 'CONGO| B-ONE HD', logo: 'B1' },
+            { id: '5', name: 'CONGO| OBOSSO TV HD', logo: 'OB' },
+            { id: '6', name: 'CONGO| DIGITAL CONGO', logo: 'DC' },
+            { id: '7', name: 'CONGO| ANTENNE A', logo: 'AA' },
+            { id: '8', name: 'CONGO| TOP TV', logo: 'TT' }
+        ];
+
+        let selectedChannelId = '1';
+
+        // 🎯 GÉNÉRER TIMELINE
+        function generateTimeline() {
+            const timeline = document.getElementById('timeline');
+            const now = new Date();
+            
+            for (let i = -2; i <= 6; i++) {
+                const hour = new Date(now);
+                hour.setHours(now.getHours() + i);
+                
+                const hourDiv = document.createElement('div');
+                hourDiv.className = `timeline-hour ${i === 0 ? 'current' : ''}`;
+                hourDiv.textContent = hour.toLocaleTimeString('fr-FR', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                timeline.appendChild(hourDiv);
+            }
+        }
+
+        // 🎯 GÉNÉRER PROGRAMMES MOCK
+        function generatePrograms(channel, hourOffset = 0) {
+            const now = new Date();
+            const startTime = new Date(now.getTime() + (hourOffset * 60 * 60 * 1000));
+            
+            const programs = [
+                { title: 'Journal télévisé', duration: 2 },
+                { title: 'Émission culturelle', duration: 1.5 },
+                { title: 'Documentaire nature', duration: 1 },
+                { title: 'Film congolais', duration: 2 },
+                { title: 'Musique traditionnelle', duration: 1 },
+                { title: 'Débat politique', duration: 1.5 },
+                { title: 'Sport local', duration: 2 }
+            ];
+
+            return programs.map((prog, index) => ({
+                id: `${channel.id}-${hourOffset}-${index}`,
+                title: hourOffset === 0 && index === 0 ? 'Programme en cours' : prog.title,
+                startTime: new Date(startTime.getTime() + (index * prog.duration * 60 * 60 * 1000)),
+                isLive: hourOffset === 0 && index === 0,
+                isNext: hourOffset === 0 && index === 1
+            }));
+        }
+
+        // 🎯 GÉNÉRER LISTE CHAÎNES
+        function generateChannelsList() {
+            const channelsList = document.getElementById('channelsList');
+            
+            channels.forEach(channel => {
+                const channelDiv = document.createElement('div');
+                channelDiv.className = `channel-item ${channel.id === selectedChannelId ? 'selected' : ''}`;
+                channelDiv.onclick = () => selectChannel(channel.id);
+                
+                channelDiv.innerHTML = `
+                    <div class="channel-logo">${channel.logo}</div>
+                    <div class="channel-name">${channel.name}</div>
+                `;
+                
+                channelsList.appendChild(channelDiv);
+            });
+        }
+
+        // 🎯 GÉNÉRER GRILLE EPG
+        function generateEPGGrid() {
+            const epgGrid = document.getElementById('epgGrid');
+            
+            channels.slice(0, 6).forEach(channel => {
+                const rowDiv = document.createElement('div');
+                rowDiv.className = 'epg-channel-row';
+                
+                // Nom de la chaîne (colonne fixe)
+                const nameDiv = document.createElement('div');
+                nameDiv.className = `epg-channel-name ${channel.id === selectedChannelId ? 'selected' : ''}`;
+                nameDiv.innerHTML = `<div class="channel-name-text">${channel.name.replace('CONGO| ', '')}</div>`;
+                
+                // Programmes horizontaux
+                const programsDiv = document.createElement('div');
+                programsDiv.className = 'epg-programs';
+                
+                // Générer programmes pour 4 heures
+                for (let hour = 0; hour < 4; hour++) {
+                    const programs = generatePrograms(channel, hour);
+                    
+                    programs.slice(0, 2).forEach(program => {
+                        const programDiv = document.createElement('div');
+                        programDiv.className = `epg-program ${program.isLive ? 'live' : ''} ${program.isNext ? 'next' : ''}`;
+                        programDiv.onclick = () => selectProgram(program, channel);
+                        
+                        programDiv.innerHTML = `
+                            <div class="program-time">
+                                ${program.startTime.toLocaleTimeString('fr-FR', { 
+                                    hour: '2-digit', 
+                                    minute: '2-digit' 
+                                })}
+                            </div>
+                            <div class="program-title">${program.title}</div>
+                            ${program.isLive ? '<div class="live-indicator">LIVE</div>' : ''}
+                        `;
+                        
+                        programsDiv.appendChild(programDiv);
+                    });
+                }
+                
+                rowDiv.appendChild(nameDiv);
+                rowDiv.appendChild(programsDiv);
+                epgGrid.appendChild(rowDiv);
+            });
+        }
+
+        // 🎯 SÉLECTION CHAÎNE
+        function selectChannel(channelId) {
+            selectedChannelId = channelId;
+            
+            // Mettre à jour sélection dans la liste
+            document.querySelectorAll('.channel-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            event.target.closest('.channel-item').classList.add('selected');
+            
+            // Régénérer EPG avec nouvelle sélection
+            document.getElementById('epgGrid').innerHTML = '';
+            generateEPGGrid();
+            
+            console.log('🎯 Chaîne sélectionnée:', channels.find(c => c.id === channelId)?.name);
+        }
+
+        // 🎯 SÉLECTION PROGRAMME
+        function selectProgram(program, channel) {
+            console.log('🎯 Programme sélectionné:', program.title, 'sur', channel.name);
+            
+            // Animation visuelle
+            event.target.style.transform = 'scale(0.95)';
+            setTimeout(() => {
+                event.target.style.transform = 'scale(1)';
+            }, 150);
+        }
+
+        // 🎯 MISE À JOUR TEMPS
+        function updateTime() {
+            document.getElementById('currentTime').textContent = 
+                new Date().toLocaleTimeString('fr-FR', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+        }
+
+        // 🚀 INITIALISATION
+        document.addEventListener('DOMContentLoaded', function() {
+            generateTimeline();
+            generateChannelsList();
+            generateEPGGrid();
+            updateTime();
+            
+            // Mettre à jour le temps chaque minute
+            setInterval(updateTime, 60000);
+            
+            console.log('📺 EPG Guide IPTV initialisé - Style TiviMate');
+        });
+    </script>
+</body>
+</html>
