@@ -19,6 +19,7 @@ import {useAutoHideControls} from '../hooks/useAutoHideControls';
 import {useChannelSelector} from '../hooks/useChannelSelector';
 import {useVideoSettings} from '../hooks/useVideoSettings';
 import {useVideoPlayerSettings} from '../hooks/useVideoPlayerSettings';
+import {useVideoGestures} from '../hooks/useVideoGestures'; // 🎯 PHASE 3: Hook gestures
 import {useNavigation} from '@react-navigation/native';
 import {
   PanGestureHandler,
@@ -54,6 +55,7 @@ import {TiviMateControls} from './TiviMateControls';
 import {SettingsMenu} from './SettingsMenu';
 import {DockerBar} from './DockerBar';
 import {RotationBackground} from './RotationBackground';
+import {VideoFeedbackOverlay} from './VideoFeedbackOverlay'; // 🎯 PHASE 3: Feedback gestures
 import type {SubMenuType} from './SettingsMenu';
 import {IPTVService} from '../services/IPTVService';
 import WatermelonM3UService from '../services/WatermelonM3UService';
@@ -82,24 +84,12 @@ const GlobalVideoPlayer: React.FC = () => {
   const navigation = useNavigation();
 
   
-  // 🎯 PHASE 2: États pour gestures avancées (fullscreen uniquement)
+  // 🎯 États de lecture vidéo
   const [currentTime, setCurrentTime] = React.useState(0);
   const [duration, setDuration] = React.useState(0);
-  const [seekFeedback, setSeekFeedback] = React.useState<{
-    visible: boolean;
-    direction: 'forward' | 'backward';
-    seconds: number;
-  }>({visible: false, direction: 'forward', seconds: 0});
 
-  // Valeurs animées pour feedback visuel en fullscreen
-  const seekFeedbackOpacity = useSharedValue(0);
-  const seekFeedbackScale = useSharedValue(0.8);
-
-  // État et animations pour l'effet de vague (ripple)
-  const [rippleVisible, setRippleVisible] = React.useState(false);
-  const [ripplePosition, setRipplePosition] = React.useState({x: 0, y: 0});
-  const rippleScale = useSharedValue(0);
-  const rippleOpacity = useSharedValue(0);
+  // 🎯 PHASE 3: Gestures gérés par le hook useVideoGestures
+  // (seekFeedback, ripple, etc. sont maintenant dans le hook)
 
   
   
@@ -772,6 +762,32 @@ const GlobalVideoPlayer: React.FC = () => {
     isFullscreen,
   });
 
+  // 🎯 HOOK PHASE 3: Gestures vidéo avancées (fullscreen uniquement)
+  const videoGestures = useVideoGestures(
+    {
+      onSeekBackward: handleSeekBackward,
+      onSeekForward: handleSeekForward,
+      onToggleControls: toggleControls,
+      onVolumeChange: (delta: number) => {
+        // TODO: Implémenter contrôle volume avec react-native-volume-manager
+        console.log('🔊 Volume change:', delta);
+      },
+      onBrightnessChange: (delta: number) => {
+        // TODO: Implémenter contrôle luminosité avec react-native-device-brightness
+        console.log('💡 Brightness change:', delta);
+      },
+      onZoomChange: (scale: number) => {
+        // TODO: Implémenter zoom vidéo
+        console.log('🔍 Zoom change:', scale);
+      },
+    },
+    {
+      isScreenLocked: videoSettings.isScreenLocked,
+      currentTime,
+      duration,
+    }
+  );
+
   // États pour EPG réelles
   const [epgLoading, setEpgLoading] = React.useState(false);
   const [epgData, setEpgData] = React.useState<EPGData | null>(null);
@@ -1209,20 +1225,7 @@ const GlobalVideoPlayer: React.FC = () => {
   };
 
   // Fonction pour créer l'effet de vague (ripple)
-  const showRippleEffect = (x: number, y: number) => {
-    setRipplePosition({x, y});
-    setRippleVisible(true);
-
-    // Reset les valeurs
-    rippleScale.value = 0;
-    rippleOpacity.value = 0.6;
-
-    // Animation de la vague qui se propage
-    rippleScale.value = withTiming(4, {duration: 600}); // Se propage sur tout l'écran
-    rippleOpacity.value = withTiming(0, {duration: 600}, () => {
-      runOnJS(setRippleVisible)(false);
-    });
-  };
+  // 🎯 PHASE 3: showRippleEffect supprimé - géré par useVideoGestures
 
   // Fonction pour toggle resize PiP (comme IPTV Smarters Pro)
   const toggleResize = () => {
@@ -1337,6 +1340,7 @@ const GlobalVideoPlayer: React.FC = () => {
   };
 
   // 🎯 PHASE 2: Handlers pour gestures avancées (fullscreen uniquement)
+  // 🎯 PHASE 3: Handlers de seek (feedback géré par useVideoGestures)
   const handleSeekForward = () => {
     console.log(
       '📍 [DEBUG] videoRef:',
@@ -1351,7 +1355,7 @@ const GlobalVideoPlayer: React.FC = () => {
       const newTime = Math.min(currentTime + 10, duration);
       console.log('📍 [DEBUG] Seeking to:', newTime, 'seconds');
       videoRef.current.seek(newTime);
-      showSeekFeedback('forward', 10);
+      setCurrentTime(newTime);
     } else {
       console.warn(
         '⚠️ [DEBUG] Cannot seek forward - videoRef or duration issue',
@@ -1373,102 +1377,13 @@ const GlobalVideoPlayer: React.FC = () => {
       const newTime = Math.max(currentTime - 10, 0);
       console.log('📍 [DEBUG] Seeking to:', newTime, 'seconds');
       videoRef.current.seek(newTime);
-      showSeekFeedback('backward', 10);
+      setCurrentTime(newTime);
     } else {
       console.warn('⚠️ [DEBUG] Cannot seek backward - videoRef issue');
     }
   };
 
-  const showSeekFeedback = (
-    direction: 'forward' | 'backward',
-    seconds: number,
-  ) => {
-    setSeekFeedback({visible: true, direction, seconds});
-
-    // Animation style YouTube : apparition rapide avec scaling
-    seekFeedbackOpacity.value = 0;
-    seekFeedbackScale.value = 0.5;
-
-    // Animation d'entrée rapide
-    seekFeedbackOpacity.value = withTiming(1, {duration: 150});
-    seekFeedbackScale.value = withSpring(1, {
-      damping: 20,
-      stiffness: 400,
-      mass: 0.8,
-    });
-
-    // Auto-hide après 800ms comme YouTube
-    setTimeout(() => {
-      seekFeedbackOpacity.value = withTiming(0, {duration: 200});
-      seekFeedbackScale.value = withTiming(1.2, {duration: 200});
-      setTimeout(() => {
-        runOnJS(setSeekFeedback)({
-          visible: false,
-          direction: 'forward',
-          seconds: 0,
-        });
-      }, 200);
-    }, 800);
-  };
-
-  // Récupérer les dimensions d'écran une seule fois
-  const screenDims = React.useMemo(() => Dimensions.get('screen'), []);
-
-  // 🎯 PHASE 2: Configuration des gestures avancées pour fullscreen
-  const leftDoubleTap = Gesture.Tap()
-    .numberOfTaps(2)
-    .onEnd(event => {
-      // Si écran verrouillé, ne rien faire
-      if (videoSettings.isScreenLocked) {
-        return;
-      }
-
-      // Position de la vague : centre de la zone gauche
-      const rippleX = screenDims.width * 0.15; // 15% de la largeur d'écran
-      const rippleY = screenDims.height * 0.5; // Centre vertical
-
-      runOnJS(showRippleEffect)(rippleX, rippleY);
-      runOnJS(handleSeekBackward)();
-    });
-
-  const rightDoubleTap = Gesture.Tap()
-    .numberOfTaps(2)
-    .onEnd(event => {
-      // Si écran verrouillé, ne rien faire
-      if (videoSettings.isScreenLocked) {
-        return;
-      }
-
-      // Position de la vague : centre de la zone droite
-      const rippleX = screenDims.width * 0.85; // 85% de la largeur d'écran
-      const rippleY = screenDims.height * 0.5; // Centre vertical
-
-      runOnJS(showRippleEffect)(rippleX, rippleY);
-      runOnJS(handleSeekForward)();
-    });
-
-  // Geste pour zone centrale - afficher contrôles TiviMate
-  const centerTapGesture = Gesture.Tap()
-    .numberOfTaps(1)
-    .onEnd(() => {
-      console.log('🎯 [centerTapGesture] Tap détecté sur zone centrale - contrôles:', {
-        tiviMateVisible: tiviMateControls.isVisible,
-        dockerVisible: dockerControls.isVisible,
-      });
-      runOnJS(toggleControls)();
-    });
-
-  // Gestes simplifiés : seulement double-tap pour seek
-  const leftSideGesture = leftDoubleTap;
-  const rightSideGesture = rightDoubleTap;
-
-  // 🎯 STYLES ANIMÉS pour le feedback visuel
-  const seekFeedbackAnimatedStyle = useAnimatedStyle(() => {
-    return {
-      opacity: seekFeedbackOpacity.value,
-      transform: [{scale: seekFeedbackScale.value}],
-    };
-  });
+  // 🎯 PHASE 3: Gestures extraits vers useVideoGestures hook
 
   // 🎯 REFACTORED: Style animé pour le bouton play/pause central
   const playPauseButtonAnimatedStyle = useAnimatedStyle(() => {
@@ -1478,13 +1393,7 @@ const GlobalVideoPlayer: React.FC = () => {
     };
   });
 
-  // Style animé pour l'effet de vague (ripple)
-  const rippleAnimatedStyle = useAnimatedStyle(() => {
-    return {
-      opacity: rippleOpacity.value,
-      transform: [{scale: rippleScale.value}],
-    };
-  });
+  // 🎯 PHASE 3: rippleAnimatedStyle supprimé - géré par useVideoGestures
 
   // 🎯 REFACTORED: Styles animés pour les contrôles TiviMate
   const controlsAnimatedStyle = useAnimatedStyle(() => {
@@ -1929,18 +1838,18 @@ const GlobalVideoPlayer: React.FC = () => {
             {/* ⚠️ GESTES CONDITIONNELS: Actifs seulement quand les contrôles sont cachés */}
             {!(tiviMateControls.isVisible || dockerControls.isVisible) && (
               <>
-                {/* Zone gauche - Seek backward */}
-                <GestureDetector gesture={leftSideGesture}>
+                {/* 🎯 PHASE 3: Zone gauche - Double tap seek backward + Swipe brightness */}
+                <GestureDetector gesture={videoGestures.gestures.leftSide}>
                   <View style={styles.gestureZoneLeft} />
                 </GestureDetector>
 
-                {/* Zone droite - Seek forward */}
-                <GestureDetector gesture={rightSideGesture}>
+                {/* 🎯 PHASE 3: Zone droite - Double tap seek forward + Swipe volume */}
+                <GestureDetector gesture={videoGestures.gestures.rightSide}>
                   <View style={styles.gestureZoneRight} />
                 </GestureDetector>
 
-                {/* Zone centrale - Afficher contrôles */}
-                <GestureDetector gesture={centerTapGesture}>
+                {/* 🎯 PHASE 3: Zone centrale - Toggle contrôles */}
+                <GestureDetector gesture={videoGestures.gestures.center}>
                   <View style={styles.gestureZoneCenter} />
                 </GestureDetector>
               </>
@@ -2037,49 +1946,17 @@ const GlobalVideoPlayer: React.FC = () => {
               />
             </Animated.View>
 
-            {/* 🎯 EFFET DE VAGUE (RIPPLE) POUR DOUBLE-CLICS */}
-            {rippleVisible && (
-              <Animated.View
-                style={[
-                  styles.rippleEffect,
-                  rippleAnimatedStyle,
-                  {
-                    left: ripplePosition.x - 50, // Centrer le cercle
-                    top: ripplePosition.y - 50,
-                  },
-                ]}
-              />
-            )}
-
-            {/* 🎯 FEEDBACK VISUEL SEEK - Style YouTube */}
-            {seekFeedback.visible && (
-              <Animated.View
-                style={[
-                  styles.seekFeedbackContainer,
-                  seekFeedbackAnimatedStyle,
-                  {
-                    left:
-                      seekFeedback.direction === 'backward' ? '20%' : undefined,
-                    right:
-                      seekFeedback.direction === 'forward' ? '20%' : undefined,
-                  },
-                ]}>
-                <Icon
-                  name={
-                    seekFeedback.direction === 'forward'
-                      ? 'fast-forward'
-                      : 'fast-rewind'
-                  }
-                  size={32}
-                  color="white"
-                  style={{marginBottom: 8}}
-                />
-                <Text style={styles.seekFeedbackText}>
-                  {seekFeedback.direction === 'forward' ? '+' : '-'}
-                  {seekFeedback.seconds}s
-                </Text>
-              </Animated.View>
-            )}
+            {/* 🎯 PHASE 3: FEEDBACK OVERLAY - Tous les indicateurs visuels des gestures */}
+            <VideoFeedbackOverlay
+              seekFeedback={videoGestures.feedback.seek}
+              seekFeedbackStyle={videoGestures.animatedStyles.seekFeedback}
+              rippleFeedback={videoGestures.feedback.ripple}
+              rippleStyle={videoGestures.animatedStyles.ripple}
+              volumeFeedback={videoGestures.feedback.volume}
+              volumeFeedbackStyle={videoGestures.animatedStyles.volumeFeedback}
+              brightnessFeedback={videoGestures.feedback.brightness}
+              brightnessFeedbackStyle={videoGestures.animatedStyles.brightnessFeedback}
+            />
 
           </>
         ) : (
@@ -2504,21 +2381,7 @@ const styles = StyleSheet.create({
   },
 
   // 🎯 STYLES FEEDBACK VISUEL SEEK
-  seekFeedbackContainer: {
-    position: 'absolute',
-    top: '50%',
-    marginTop: -40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1000,
-    minWidth: 80,
-  },
-  seekFeedbackText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
+  // 🎯 PHASE 3: seekFeedbackContainer et seekFeedbackText supprimés - dans VideoFeedbackOverlay
 
   // Styles pour le bouton play/pause central
   playPauseButtonContainer: {
@@ -2546,14 +2409,7 @@ const styles = StyleSheet.create({
   },
 
   // Style pour l'effet de vague (ripple)
-  rippleEffect: {
-    position: 'absolute',
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    zIndex: 5, // Sous les feedbacks mais au-dessus du vidéo
-  },
+  // 🎯 PHASE 3: rippleEffect supprimé - dans VideoFeedbackOverlay
 
   // Styles pour contrôles TiviMate
   controlsOverlay: {
