@@ -488,6 +488,7 @@ class AsyncStorageCache {
     const storageUsage = Array.from(this.metadata.values()).reduce(
       (total, meta) => total + meta.size,
       0,
+    );
 
     return {
       size: storageUsage,
@@ -757,6 +758,7 @@ class SmartCacheService {
 
     console.log(
       `🧠 Predictive loading for ${baseKey}: ${relatedKeys.length} related items`,
+    );
 
     // Load related data in background with low priority
     for (const key of relatedKeys) {

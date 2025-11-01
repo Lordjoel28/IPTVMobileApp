@@ -23,9 +23,12 @@ import ThemeSettingsScreen from '../screens/ThemeSettingsScreen';
 import VideoPlayerSettingsScreen from '../screens/VideoPlayerSettingsScreen';
 import TVGuideSettingsScreen from '../screens/TVGuideSettingsScreen';
 import PlaylistDetailScreen from '../screens/PlaylistDetailScreen';
-import SearchScreen from '../screens/SearchScreen';
+import FinalSearchScreenWrapper from '../screens/FinalSearchScreenWrapper';
 import UserProfileScreen from '../screens/UserProfileScreen';
+import AccountScreen from '../screens/AccountScreen';
+import AccountInfoScreen from '../screens/AccountInfoScreen';
 import ParentalControlScreen from '../screens/ParentalControlScreen';
+import CategoriesSelectionScreen from '../screens/CategoriesSelectionScreen';
 
 // Tab Screens
 import PlaylistsScreen from '../screens/PlaylistsScreen';
@@ -70,7 +73,7 @@ const TabNavigator: React.FC = () => {
 
           return <Icon name={iconName} size={size} color={color} />;
         },
-        tabBarActiveTintColor: theme.colors.primary,
+        tabBarActiveTintColor: theme.colors.accent.primary,
         tabBarInactiveTintColor: theme.colors.onSurfaceVariant,
         tabBarStyle: {
           backgroundColor: theme.colors.surface,
@@ -122,7 +125,8 @@ const TabNavigator: React.FC = () => {
       />
       <Tab.Screen
         name="SearchTab"
-        component={SearchScreen}
+        component={FinalSearchScreenWrapper}
+        initialParams={{playlistId: null, categoryName: 'GLOBAL', categoryGroupTitle: 'GLOBAL'}}
         options={{
           title: 'Recherche',
           headerTitle: 'Rechercher',
@@ -153,7 +157,7 @@ const DrawerNavigator: React.FC = () => {
           backgroundColor: theme.colors.surface,
           width: 280,
         },
-        drawerActiveTintColor: theme.colors.primary,
+        drawerActiveTintColor: theme.colors.accent.primary,
         drawerInactiveTintColor: theme.colors.onSurfaceVariant,
         drawerLabelStyle: {
           fontSize: 16,
@@ -285,14 +289,15 @@ const AppNavigator: React.FC = () => {
         })}
       />
 
-      {/* Recherche globale */}
+      {/* Recherche optimisée FinalSearch */}
       <Stack.Screen
-        name="Search"
-        component={SearchScreen}
+        name="FinalSearch"
+        component={FinalSearchScreenWrapper}
         options={{
-          headerShown: false, // Interface custom dans SearchScreen
-          gestureEnabled: true,
-          presentation: 'modal'
+          headerShown: false, // Interface custom dans FinalSearchScreen
+          presentation: 'card', // ✅ Écran normal (pas modal)
+          gestureEnabled: false, // ❌ Désactiver gestures swipe arrière pour éviter conflits
+          gestureDirection: 'vertical', // ✅ Autoriser seulement swipe vertical si nécessaire
         }}
       />
 
@@ -302,6 +307,28 @@ const AppNavigator: React.FC = () => {
         component={SettingsScreen}
         options={{
           headerShown: false, // Interface custom dans SettingsScreen
+        }}
+      />
+
+      {/* Compte utilisateur */}
+      <Stack.Screen
+        name="Account"
+        component={AccountScreen}
+        options={{
+          title: 'Mon Compte',
+          headerShown: false, // Interface custom dans AccountScreen
+          gestureEnabled: true,
+        }}
+      />
+
+      {/* Informations du compte */}
+      <Stack.Screen
+        name="AccountInfo"
+        component={AccountInfoScreen}
+        options={{
+          title: 'Informations du compte',
+          headerShown: false, // Interface custom dans AccountInfoScreen
+          gestureEnabled: true,
         }}
       />
 
@@ -358,6 +385,16 @@ const AppNavigator: React.FC = () => {
               style={{marginRight: 15}}
             />
           ),
+        }}
+      />
+
+      {/* Sélection des catégories bloquées */}
+      <Stack.Screen
+        name="CategoriesSelection"
+        component={CategoriesSelectionScreen}
+        options={{
+          headerShown: false,
+          gestureEnabled: true,
         }}
       />
     </Stack.Navigator>

@@ -290,7 +290,6 @@ export const lightTheme: Theme = {
   borderRadius: darkTheme.borderRadius, // Même border radius
 };
 
-
 // 🎨 Thème Gris Contraste
 export const grayTheme: Theme = {
   id: 'gray',

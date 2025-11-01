@@ -140,7 +140,10 @@ const EPGManualSourcesScreen: React.FC = () => {
       return true;
     } catch {
       // Si URL() échoue, mais que les vérifications de base passent, on accepte
-      console.log('🔄 [EPGManualSources] URL acceptée malgré échec URL():', cleanUrl);
+      console.log(
+        '🔄 [EPGManualSources] URL acceptée malgré échec URL():',
+        cleanUrl,
+      );
       return true;
     }
   };
@@ -196,7 +199,9 @@ const EPGManualSourcesScreen: React.FC = () => {
       if (result.success) {
         Alert.alert(
           'Test réussi',
-          `Source EPG valide!\nChaînes détectées: ${result.channelsCount || 'Non déterminé'}`
+          `Source EPG valide!\nChaînes détectées: ${
+            result.channelsCount || 'Non déterminé'
+          }`,
         );
       } else {
         Alert.alert('Test échoué', result.error || 'URL EPG inaccessible');
@@ -228,34 +233,60 @@ const EPGManualSourcesScreen: React.FC = () => {
             : ['rgba(248, 250, 252, 0.9)', 'rgba(226, 232, 240, 0.8)']
         }
         style={styles.cardGradient}>
-
         {/* Header avec statut */}
         <View style={styles.cardHeader}>
           <View style={styles.sourceInfo}>
-            <Text style={[styles.sourceName, {color: isDarkMode ? '#e2e8f0' : '#1e293b'}]}>
+            <Text
+              style={[
+                styles.sourceName,
+                {color: isDarkMode ? '#e2e8f0' : '#1e293b'},
+              ]}>
               {source.name}
             </Text>
-            <Text style={[styles.sourceType, {color: isDarkMode ? '#94a3b8' : '#64748b'}]}>
+            <Text
+              style={[
+                styles.sourceType,
+                {color: isDarkMode ? '#94a3b8' : '#64748b'},
+              ]}>
               Source manuelle
             </Text>
           </View>
 
-          <View style={[styles.statusBadge, {backgroundColor: getStatusColor(source.status)}]}>
+          <View
+            style={[
+              styles.statusBadge,
+              {backgroundColor: getStatusColor(source.status)},
+            ]}>
             <Text style={styles.statusText}>
-              {source.status === 'active' ? 'Actif' :
-               source.status === 'error' ? 'Erreur' : 'Inactif'}
+              {source.status === 'active'
+                ? 'Actif'
+                : source.status === 'error'
+                ? 'Erreur'
+                : 'Inactif'}
             </Text>
           </View>
         </View>
 
         {/* URL et statistiques */}
-        <Text style={[styles.sourceURL, {color: isDarkMode ? '#94a3b8' : '#64748b'}]} numberOfLines={1}>
+        <Text
+          style={[
+            styles.sourceURL,
+            {color: isDarkMode ? '#94a3b8' : '#64748b'},
+          ]}
+          numberOfLines={1}>
           {source.url}
         </Text>
 
         {source.channelsCount && (
-          <Text style={[styles.sourceStats, {color: isDarkMode ? '#64748b' : '#94a3b8'}]}>
-            {source.channelsCount} chaînes • Mis à jour {source.lastUpdate ? new Date(source.lastUpdate).toLocaleDateString() : 'jamais'}
+          <Text
+            style={[
+              styles.sourceStats,
+              {color: isDarkMode ? '#64748b' : '#94a3b8'},
+            ]}>
+            {source.channelsCount} chaînes • Mis à jour{' '}
+            {source.lastUpdate
+              ? new Date(source.lastUpdate).toLocaleDateString()
+              : 'jamais'}
           </Text>
         )}
 
@@ -295,13 +326,16 @@ const EPGManualSourcesScreen: React.FC = () => {
           : ['#f8fafc', '#e2e8f0', '#cbd5e1']
       }
       style={styles.container}>
-
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}>
-          <Icon name="arrow-back" size={24} color={isDarkMode ? '#e2e8f0' : '#1e293b'} />
+          <Icon
+            name="arrow-back"
+            size={24}
+            color={isDarkMode ? '#e2e8f0' : '#1e293b'}
+          />
         </TouchableOpacity>
 
         <View style={{width: 24}} />
@@ -315,17 +349,33 @@ const EPGManualSourcesScreen: React.FC = () => {
         {loading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#3b82f6" />
-            <Text style={[styles.loadingText, {color: isDarkMode ? '#94a3b8' : '#64748b'}]}>
+            <Text
+              style={[
+                styles.loadingText,
+                {color: isDarkMode ? '#94a3b8' : '#64748b'},
+              ]}>
               Chargement des sources...
             </Text>
           </View>
         ) : sources.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <Icon name="source" size={64} color={isDarkMode ? '#475569' : '#94a3b8'} />
-            <Text style={[styles.emptyTitle, {color: isDarkMode ? '#e2e8f0' : '#1e293b'}]}>
+            <Icon
+              name="source"
+              size={64}
+              color={isDarkMode ? '#475569' : '#94a3b8'}
+            />
+            <Text
+              style={[
+                styles.emptyTitle,
+                {color: isDarkMode ? '#e2e8f0' : '#1e293b'},
+              ]}>
               Aucune source EPG manuelle
             </Text>
-            <Text style={[styles.emptyText, {color: isDarkMode ? '#94a3b8' : '#64748b'}]}>
+            <Text
+              style={[
+                styles.emptyText,
+                {color: isDarkMode ? '#94a3b8' : '#64748b'},
+              ]}>
               Ajoutez des sources EPG personnalisées pour enrichir vos guides TV
             </Text>
             <TouchableOpacity
@@ -360,56 +410,79 @@ const EPGManualSourcesScreen: React.FC = () => {
                   : ['rgba(248, 250, 252, 0.98)', 'rgba(226, 232, 240, 0.95)']
               }
               style={styles.modalContent}>
-
               {/* Header modal */}
               <View style={styles.modalHeader}>
-                <Text style={[styles.modalTitle, {color: isDarkMode ? '#e2e8f0' : '#1e293b'}]}>
-                  {editingSource ? 'Modifier la source' : 'Ajouter une source EPG'}
+                <Text
+                  style={[
+                    styles.modalTitle,
+                    {color: isDarkMode ? '#e2e8f0' : '#1e293b'},
+                  ]}>
+                  {editingSource
+                    ? 'Modifier la source'
+                    : 'Ajouter une source EPG'}
                 </Text>
                 <TouchableOpacity
                   style={styles.modalCloseButton}
                   onPress={() => setModalVisible(false)}>
-                  <Icon name="close" size={24} color={isDarkMode ? '#94a3b8' : '#64748b'} />
+                  <Icon
+                    name="close"
+                    size={24}
+                    color={isDarkMode ? '#94a3b8' : '#64748b'}
+                  />
                 </TouchableOpacity>
               </View>
 
               {/* Formulaire */}
               <View style={styles.form}>
                 <View style={styles.inputGroup}>
-                  <Text style={[styles.inputLabel, {color: isDarkMode ? '#e2e8f0' : '#1e293b'}]}>
+                  <Text
+                    style={[
+                      styles.inputLabel,
+                      {color: isDarkMode ? '#e2e8f0' : '#1e293b'},
+                    ]}>
                     Nom de la source
                   </Text>
                   <TextInput
                     style={[
                       styles.textInput,
                       {
-                        backgroundColor: isDarkMode ? 'rgba(30, 41, 59, 0.5)' : 'rgba(248, 250, 252, 0.8)',
+                        backgroundColor: isDarkMode
+                          ? 'rgba(30, 41, 59, 0.5)'
+                          : 'rgba(248, 250, 252, 0.8)',
                         borderColor: isDarkMode ? '#475569' : '#cbd5e1',
                         color: isDarkMode ? '#e2e8f0' : '#1e293b',
                       },
                     ]}
                     value={formData.name}
-                    onChangeText={(text) => setFormData({...formData, name: text})}
+                    onChangeText={text =>
+                      setFormData({...formData, name: text})
+                    }
                     placeholder="Ex: EPG France TV"
                     placeholderTextColor={isDarkMode ? '#64748b' : '#94a3b8'}
                   />
                 </View>
 
                 <View style={styles.inputGroup}>
-                  <Text style={[styles.inputLabel, {color: isDarkMode ? '#e2e8f0' : '#1e293b'}]}>
+                  <Text
+                    style={[
+                      styles.inputLabel,
+                      {color: isDarkMode ? '#e2e8f0' : '#1e293b'},
+                    ]}>
                     URL EPG (XMLTV)
                   </Text>
                   <TextInput
                     style={[
                       styles.textInput,
                       {
-                        backgroundColor: isDarkMode ? 'rgba(30, 41, 59, 0.5)' : 'rgba(248, 250, 252, 0.8)',
+                        backgroundColor: isDarkMode
+                          ? 'rgba(30, 41, 59, 0.5)'
+                          : 'rgba(248, 250, 252, 0.8)',
                         borderColor: isDarkMode ? '#475569' : '#cbd5e1',
                         color: isDarkMode ? '#e2e8f0' : '#1e293b',
                       },
                     ]}
                     value={formData.url}
-                    onChangeText={(text) => setFormData({...formData, url: text})}
+                    onChangeText={text => setFormData({...formData, url: text})}
                     placeholder="https://exemple.com/epg.xml"
                     placeholderTextColor={isDarkMode ? '#64748b' : '#94a3b8'}
                     autoCapitalize="none"

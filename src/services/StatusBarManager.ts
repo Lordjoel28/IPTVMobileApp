@@ -11,7 +11,7 @@
  * PRINCIPE : Une seule instance, un seul état, une seule décision
  */
 
-import { Platform, StatusBar } from 'react-native';
+import {Platform, StatusBar} from 'react-native';
 import ImmersiveMode from 'react-native-immersive-mode';
 import SystemNavigationBar from 'react-native-system-navigation-bar';
 
@@ -27,10 +27,10 @@ interface StatusBarConfig {
 
 // Priorités pour éviter les conflits
 const PRIORITY = {
-  PLAYER_FULLSCREEN: 100,  // Plus haute priorité
-  PLAYER_PIP: 90,          // Priorité élevée
-  SCREEN_IMMERSIVE: 50,    // Priorité moyenne
-  APP_NORMAL: 10           // Priorité basse
+  PLAYER_FULLSCREEN: 100, // Plus haute priorité
+  PLAYER_PIP: 90, // Priorité élevée
+  SCREEN_IMMERSIVE: 50, // Priorité moyenne
+  APP_NORMAL: 10, // Priorité basse
 };
 
 export class StatusBarManager {
@@ -45,7 +45,7 @@ export class StatusBarManager {
       reason: 'initialization',
       timestamp: Date.now(),
       force: false,
-      priority: PRIORITY.APP_NORMAL
+      priority: PRIORITY.APP_NORMAL,
     };
   }
 
@@ -60,19 +60,35 @@ export class StatusBarManager {
    * 🔒 MODE IMMERSIF : Masquer StatusBar + Navigation Bar
    * Utilisé pour : Fullscreen, ChannelPlayerScreen, PiP visible
    */
-  setImmersive(reason: string, force: boolean = false, priority: number = PRIORITY.SCREEN_IMMERSIVE): void {
+  setImmersive(
+    reason: string,
+    force: boolean = false,
+    priority: number = PRIORITY.SCREEN_IMMERSIVE,
+  ): void {
     // Vérifier la priorité - ne pas appliquer si priorité plus faible
-    if (!force && this.currentConfig.priority && priority < this.currentConfig.priority) {
+    if (
+      !force &&
+      this.currentConfig.priority &&
+      priority < this.currentConfig.priority
+    ) {
       if (this.debugMode) {
-        console.log(`🎯 [StatusBarManager] SKIP setImmersive - priorité trop faible (${priority} < ${this.currentConfig.priority})`);
+        console.log(
+          `🎯 [StatusBarManager] SKIP setImmersive - priorité trop faible (${priority} < ${this.currentConfig.priority})`,
+        );
       }
       return;
     }
 
     // Éviter les appels redondants sauf si forcé ou priorité différente
-    if (this.currentConfig.state === 'immersive' && !force && this.currentConfig.priority === priority) {
+    if (
+      this.currentConfig.state === 'immersive' &&
+      !force &&
+      this.currentConfig.priority === priority
+    ) {
       if (this.debugMode) {
-        console.log(`🎯 [StatusBarManager] SKIP setImmersive - déjà en mode immersif (reason: ${reason})`);
+        console.log(
+          `🎯 [StatusBarManager] SKIP setImmersive - déjà en mode immersif (reason: ${reason})`,
+        );
       }
       return;
     }
@@ -82,15 +98,15 @@ export class StatusBarManager {
       reason,
       timestamp: Date.now(),
       force,
-      priority
+      priority,
     };
 
     if (this.debugMode) {
-      console.log(`🔒 [StatusBarManager] IMMERSIVE MODE`, {
+      console.log('🔒 [StatusBarManager] IMMERSIVE MODE', {
         reason,
         force,
         previous: this.currentConfig.state,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
     }
 
@@ -108,14 +124,16 @@ export class StatusBarManager {
 
       this.currentConfig = newConfig;
       this.notifyListeners();
-
     } catch (error) {
       console.error('❌ [StatusBarManager] Erreur setImmersive:', error);
       // Fallback silencieux
       try {
         StatusBar.setHidden(true, 'fade');
       } catch (fallbackError) {
-        console.error('❌ [StatusBarManager] Fallback setImmersive failed:', fallbackError);
+        console.error(
+          '❌ [StatusBarManager] Fallback setImmersive failed:',
+          fallbackError,
+        );
       }
     }
   }
@@ -124,11 +142,21 @@ export class StatusBarManager {
    * 🔓 MODE NORMAL : Afficher StatusBar normale
    * Utilisé pour : Écrans standards, sortie de fullscreen
    */
-  setNormal(reason: string, force: boolean = false, priority: number = PRIORITY.APP_NORMAL): void {
+  setNormal(
+    reason: string,
+    force: boolean = false,
+    priority: number = PRIORITY.APP_NORMAL,
+  ): void {
     // Vérifier la priorité - ne pas appliquer si priorité plus faible
-    if (!force && this.currentConfig.priority && priority < this.currentConfig.priority) {
+    if (
+      !force &&
+      this.currentConfig.priority &&
+      priority < this.currentConfig.priority
+    ) {
       if (this.debugMode) {
-        console.log(`🎯 [StatusBarManager] SKIP setNormal - priorité trop faible (${priority} < ${this.currentConfig.priority})`);
+        console.log(
+          `🎯 [StatusBarManager] SKIP setNormal - priorité trop faible (${priority} < ${this.currentConfig.priority})`,
+        );
       }
       return;
     }
@@ -136,7 +164,9 @@ export class StatusBarManager {
     // Éviter les appels redondants sauf si forcé
     if (this.currentConfig.state === 'normal' && !force) {
       if (this.debugMode) {
-        console.log(`🎯 [StatusBarManager] SKIP setNormal - déjà en mode normal (reason: ${reason})`);
+        console.log(
+          `🎯 [StatusBarManager] SKIP setNormal - déjà en mode normal (reason: ${reason})`,
+        );
       }
       return;
     }
@@ -146,15 +176,15 @@ export class StatusBarManager {
       reason,
       timestamp: Date.now(),
       force,
-      priority
+      priority,
     };
 
     if (this.debugMode) {
-      console.log(`🔓 [StatusBarManager] NORMAL MODE`, {
+      console.log('🔓 [StatusBarManager] NORMAL MODE', {
         reason,
         force,
         previous: this.currentConfig.state,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
     }
 
@@ -175,14 +205,16 @@ export class StatusBarManager {
 
       this.currentConfig = newConfig;
       this.notifyListeners();
-
     } catch (error) {
       console.error('❌ [StatusBarManager] Erreur setNormal:', error);
       // Fallback silencieux
       try {
         StatusBar.setHidden(false, 'fade');
       } catch (fallbackError) {
-        console.error('❌ [StatusBarManager] Fallback setNormal failed:', fallbackError);
+        console.error(
+          '❌ [StatusBarManager] Fallback setNormal failed:',
+          fallbackError,
+        );
       }
     }
   }
@@ -207,7 +239,7 @@ export class StatusBarManager {
    * 📊 État actuel
    */
   getCurrentState(): StatusBarConfig {
-    return { ...this.currentConfig };
+    return {...this.currentConfig};
   }
 
   /**
@@ -251,7 +283,7 @@ export class StatusBarManager {
       currentConfig: this.currentConfig,
       listenersCount: this.listeners.size,
       debugMode: this.debugMode,
-      platform: Platform.OS
+      platform: Platform.OS,
     };
   }
 
@@ -270,4 +302,4 @@ export const statusBarManager = StatusBarManager.getInstance();
 export const STATUS_BAR_PRIORITY = PRIORITY;
 
 // Export du type pour TypeScript
-export type { StatusBarConfig, StatusBarState };
+export type {StatusBarConfig, StatusBarState};

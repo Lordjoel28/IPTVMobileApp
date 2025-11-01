@@ -52,7 +52,8 @@ const EPGPlaylistAssignmentScreen: React.FC = () => {
   const [sources, setSources] = useState<EPGSource[]>([]);
   const [assignments, setAssignments] = useState<PlaylistEPGAssignment[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
-  const [selectedPlaylist, setSelectedPlaylist] = useState<PlaylistEPGAssignment | null>(null);
+  const [selectedPlaylist, setSelectedPlaylist] =
+    useState<PlaylistEPGAssignment | null>(null);
   const isDarkMode = useColorScheme() === 'dark';
 
   const epgManager = new EPGSourceManager();
@@ -76,7 +77,6 @@ const EPGPlaylistAssignmentScreen: React.FC = () => {
 
       // Construire les assignations avec les playlists chargées
       await buildAssignments(loadedPlaylists);
-
     } catch (error) {
       console.error('Erreur chargement données:', error);
       Alert.alert('Erreur', 'Impossible de charger les données');
@@ -94,7 +94,9 @@ const EPGPlaylistAssignmentScreen: React.FC = () => {
       if (m3uData) {
         const m3uPlaylists = JSON.parse(m3uData);
         console.log('📋 M3U playlists trouvées:', m3uPlaylists.length);
-        allPlaylists.push(...m3uPlaylists.map((p: any) => ({ ...p, type: 'M3U' })));
+        allPlaylists.push(
+          ...m3uPlaylists.map((p: any) => ({...p, type: 'M3U'})),
+        );
       }
 
       // Charger Xtream playlists
@@ -102,16 +104,22 @@ const EPGPlaylistAssignmentScreen: React.FC = () => {
       if (xtreamData) {
         const xtreamPlaylists = JSON.parse(xtreamData);
         console.log('📋 Xtream playlists trouvées:', xtreamPlaylists.length);
-        allPlaylists.push(...xtreamPlaylists.map((p: any) => ({ ...p, type: 'XTREAM' })));
+        allPlaylists.push(
+          ...xtreamPlaylists.map((p: any) => ({...p, type: 'XTREAM'})),
+        );
       }
 
       // Déduplication par ID
-      const uniquePlaylists = allPlaylists.filter((playlist, index, self) =>
-        index === self.findIndex(p => p.id === playlist.id)
+      const uniquePlaylists = allPlaylists.filter(
+        (playlist, index, self) =>
+          index === self.findIndex(p => p.id === playlist.id),
       );
 
       console.log('📋 Total playlists chargées:', allPlaylists.length);
-      console.log('📋 Playlists uniques après déduplication:', uniquePlaylists.length);
+      console.log(
+        '📋 Playlists uniques après déduplication:',
+        uniquePlaylists.length,
+      );
       setPlaylists(uniquePlaylists);
       return uniquePlaylists;
     } catch (error) {
@@ -120,11 +128,17 @@ const EPGPlaylistAssignmentScreen: React.FC = () => {
     }
   };
 
-  const buildAssignments = async (playlistsToProcess: PlaylistItem[] = playlists) => {
+  const buildAssignments = async (
+    playlistsToProcess: PlaylistItem[] = playlists,
+  ) => {
     try {
       const assignmentList: PlaylistEPGAssignment[] = [];
 
-      console.log('🔧 Construction assignations pour', playlistsToProcess.length, 'playlists');
+      console.log(
+        '🔧 Construction assignations pour',
+        playlistsToProcess.length,
+        'playlists',
+      );
 
       for (const playlist of playlistsToProcess) {
         // Vérifier s'il y a une source assignée manuellement
@@ -138,7 +152,11 @@ const EPGPlaylistAssignmentScreen: React.FC = () => {
           playlistName: playlist.name,
           assignedSourceId: assignedSource?.id,
           assignedSourceName: assignedSource?.name,
-          preferredSource: assignedSource ? 'manual' : hasIntegratedEPG ? 'integrated' : 'global',
+          preferredSource: assignedSource
+            ? 'manual'
+            : hasIntegratedEPG
+            ? 'integrated'
+            : 'global',
           hasIntegratedEPG,
         });
       }
@@ -168,7 +186,9 @@ const EPGPlaylistAssignmentScreen: React.FC = () => {
   };
 
   const handleSelectSource = async (sourceId: string | null) => {
-    if (!selectedPlaylist) return;
+    if (!selectedPlaylist) {
+      return;
+    }
 
     try {
       if (sourceId) {
@@ -178,7 +198,7 @@ const EPGPlaylistAssignmentScreen: React.FC = () => {
           await epgManager.assignManualEPG(
             selectedPlaylist.playlistId,
             selectedPlaylist.playlistName,
-            source.url
+            source.url,
           );
         }
       } else {
@@ -189,10 +209,9 @@ const EPGPlaylistAssignmentScreen: React.FC = () => {
       setModalVisible(false);
       SystemNavigationBar.navigationShow(); // Restaurer les barres système
       await loadData(); // Recharger les données
-
     } catch (error) {
       console.error('Erreur assignation source:', error);
-      Alert.alert('Erreur', 'Impossible de modifier l\'assignation');
+      Alert.alert('Erreur', "Impossible de modifier l'assignation");
     }
   };
 
@@ -218,7 +237,10 @@ const EPGPlaylistAssignmentScreen: React.FC = () => {
     }
   };
 
-  const renderPlaylistCard = (assignment: PlaylistEPGAssignment, index: number) => {
+  const renderPlaylistCard = (
+    assignment: PlaylistEPGAssignment,
+    index: number,
+  ) => {
     const sourceInfo = getSourcePriorityInfo(assignment);
     const playlist = playlists.find(p => p.id === assignment.playlistId);
 
@@ -227,20 +249,30 @@ const EPGPlaylistAssignmentScreen: React.FC = () => {
         <LinearGradient
           colors={[
             isDarkMode ? '#2A2F4A' : '#F5F7FA',
-            isDarkMode ? '#1E2542' : '#E8EDF4'
+            isDarkMode ? '#1E2542' : '#E8EDF4',
           ]}
           style={styles.cardGradient}>
-
           <View style={styles.cardHeader}>
             <View style={styles.playlistInfo}>
-              <Text style={[styles.playlistName, {color: isDarkMode ? '#E2E8F0' : '#1E293B'}]}>
+              <Text
+                style={[
+                  styles.playlistName,
+                  {color: isDarkMode ? '#E2E8F0' : '#1E293B'},
+                ]}>
                 {assignment.playlistName}
               </Text>
-              <View style={[styles.sourceStatus, {backgroundColor: sourceInfo.color}]}>
+              <View
+                style={[
+                  styles.sourceStatus,
+                  {backgroundColor: sourceInfo.color},
+                ]}>
                 <Icon name={sourceInfo.icon} size={14} color="#ffffff" />
                 <Text style={styles.sourceStatusText}>
-                  {assignment.assignedSourceId ? 'Manuel' :
-                   assignment.hasIntegratedEPG ? 'Intégré' : 'Global'}
+                  {assignment.assignedSourceId
+                    ? 'Manuel'
+                    : assignment.hasIntegratedEPG
+                    ? 'Intégré'
+                    : 'Global'}
                 </Text>
               </View>
             </View>
@@ -267,7 +299,11 @@ const EPGPlaylistAssignmentScreen: React.FC = () => {
         SystemNavigationBar.navigationShow();
       }}>
       <View style={styles.modalOverlay}>
-        <StatusBar backgroundColor="rgba(0, 0, 0, 0.8)" barStyle="light-content" translucent />
+        <StatusBar
+          backgroundColor="rgba(0, 0, 0, 0.8)"
+          barStyle="light-content"
+          translucent
+        />
         <View style={styles.modalContainer}>
           <LinearGradient
             colors={
@@ -276,10 +312,13 @@ const EPGPlaylistAssignmentScreen: React.FC = () => {
                 : ['rgba(248, 250, 252, 0.98)', 'rgba(226, 232, 240, 0.95)']
             }
             style={styles.modalContent}>
-
             {/* Header */}
             <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, {color: isDarkMode ? '#e2e8f0' : '#1e293b'}]}>
+              <Text
+                style={[
+                  styles.modalTitle,
+                  {color: isDarkMode ? '#e2e8f0' : '#1e293b'},
+                ]}>
                 Assigner source EPG
               </Text>
               <TouchableOpacity
@@ -288,11 +327,19 @@ const EPGPlaylistAssignmentScreen: React.FC = () => {
                   setModalVisible(false);
                   SystemNavigationBar.navigationShow();
                 }}>
-                <Icon name="close" size={24} color={isDarkMode ? '#94a3b8' : '#64748b'} />
+                <Icon
+                  name="close"
+                  size={24}
+                  color={isDarkMode ? '#94a3b8' : '#64748b'}
+                />
               </TouchableOpacity>
             </View>
 
-            <Text style={[styles.modalSubtitle, {color: isDarkMode ? '#94a3b8' : '#64748b'}]}>
+            <Text
+              style={[
+                styles.modalSubtitle,
+                {color: isDarkMode ? '#94a3b8' : '#64748b'},
+              ]}>
               {selectedPlaylist?.playlistName}
             </Text>
 
@@ -305,10 +352,18 @@ const EPGPlaylistAssignmentScreen: React.FC = () => {
                 <View style={styles.optionContent}>
                   <Icon name="auto-awesome" size={24} color="#10b981" />
                   <View style={styles.optionText}>
-                    <Text style={[styles.optionTitle, {color: isDarkMode ? '#e2e8f0' : '#1e293b'}]}>
+                    <Text
+                      style={[
+                        styles.optionTitle,
+                        {color: isDarkMode ? '#e2e8f0' : '#1e293b'},
+                      ]}>
                       Automatique
                     </Text>
-                    <Text style={[styles.optionDesc, {color: isDarkMode ? '#94a3b8' : '#64748b'}]}>
+                    <Text
+                      style={[
+                        styles.optionDesc,
+                        {color: isDarkMode ? '#94a3b8' : '#64748b'},
+                      ]}>
                       EPG intégré ou global selon disponibilité
                     </Text>
                   </View>
@@ -316,7 +371,7 @@ const EPGPlaylistAssignmentScreen: React.FC = () => {
               </TouchableOpacity>
 
               {/* Sources manuelles */}
-              {sources.map((source) => (
+              {sources.map(source => (
                 <TouchableOpacity
                   key={source.id}
                   style={styles.optionItem}
@@ -324,10 +379,19 @@ const EPGPlaylistAssignmentScreen: React.FC = () => {
                   <View style={styles.optionContent}>
                     <Icon name="source" size={24} color="#f59e0b" />
                     <View style={styles.optionText}>
-                      <Text style={[styles.optionTitle, {color: isDarkMode ? '#e2e8f0' : '#1e293b'}]}>
+                      <Text
+                        style={[
+                          styles.optionTitle,
+                          {color: isDarkMode ? '#e2e8f0' : '#1e293b'},
+                        ]}>
                         {source.name}
                       </Text>
-                      <Text style={[styles.optionDesc, {color: isDarkMode ? '#94a3b8' : '#64748b'}]} numberOfLines={1}>
+                      <Text
+                        style={[
+                          styles.optionDesc,
+                          {color: isDarkMode ? '#94a3b8' : '#64748b'},
+                        ]}
+                        numberOfLines={1}>
                         {source.url}
                       </Text>
                     </View>
@@ -338,8 +402,16 @@ const EPGPlaylistAssignmentScreen: React.FC = () => {
               {/* Message si pas de sources */}
               {sources.length === 0 && (
                 <View style={styles.emptyOption}>
-                  <Icon name="info" size={20} color={isDarkMode ? '#64748b' : '#94a3b8'} />
-                  <Text style={[styles.emptyText, {color: isDarkMode ? '#64748b' : '#94a3b8'}]}>
+                  <Icon
+                    name="info"
+                    size={20}
+                    color={isDarkMode ? '#64748b' : '#94a3b8'}
+                  />
+                  <Text
+                    style={[
+                      styles.emptyText,
+                      {color: isDarkMode ? '#64748b' : '#94a3b8'},
+                    ]}>
                     Aucune source EPG manuelle disponible.{'\n'}
                     Ajoutez-en depuis l'écran "Sources EPG Manuelles".
                   </Text>
@@ -360,26 +432,39 @@ const EPGPlaylistAssignmentScreen: React.FC = () => {
           : ['#f8fafc', '#e2e8f0', '#cbd5e1']
       }
       style={styles.container}>
-
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}>
-          <Icon name="arrow-back" size={24} color={isDarkMode ? '#e2e8f0' : '#1e293b'} />
+          <Icon
+            name="arrow-back"
+            size={24}
+            color={isDarkMode ? '#e2e8f0' : '#1e293b'}
+          />
         </TouchableOpacity>
 
-        <Text style={[styles.headerTitle, {color: isDarkMode ? '#e2e8f0' : '#1e293b'}]}>
+        <Text
+          style={[
+            styles.headerTitle,
+            {color: isDarkMode ? '#e2e8f0' : '#1e293b'},
+          ]}>
           Assignation EPG ↔ Playlists
         </Text>
 
         <TouchableOpacity
           style={styles.helpButton}
-          onPress={() => Alert.alert(
-            'Aide',
-            'Assignez des sources EPG spécifiques à vos playlists.\n\nPriorité EPG:\n1. EPG intégré (url-tvg)\n2. Source manuelle assignée\n3. EPG global (fallback)'
-          )}>
-          <Icon name="help-outline" size={24} color={isDarkMode ? '#94a3b8' : '#64748b'} />
+          onPress={() =>
+            Alert.alert(
+              'Aide',
+              'Assignez des sources EPG spécifiques à vos playlists.\n\nPriorité EPG:\n1. EPG intégré (url-tvg)\n2. Source manuelle assignée\n3. EPG global (fallback)',
+            )
+          }>
+          <Icon
+            name="help-outline"
+            size={24}
+            color={isDarkMode ? '#94a3b8' : '#64748b'}
+          />
         </TouchableOpacity>
       </View>
 
@@ -388,17 +473,33 @@ const EPGPlaylistAssignmentScreen: React.FC = () => {
         {loading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#3b82f6" />
-            <Text style={[styles.loadingText, {color: isDarkMode ? '#94a3b8' : '#64748b'}]}>
+            <Text
+              style={[
+                styles.loadingText,
+                {color: isDarkMode ? '#94a3b8' : '#64748b'},
+              ]}>
               Chargement des assignations...
             </Text>
           </View>
         ) : assignments.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <Icon name="playlist-add" size={64} color={isDarkMode ? '#475569' : '#94a3b8'} />
-            <Text style={[styles.emptyTitle, {color: isDarkMode ? '#e2e8f0' : '#1e293b'}]}>
+            <Icon
+              name="playlist-add"
+              size={64}
+              color={isDarkMode ? '#475569' : '#94a3b8'}
+            />
+            <Text
+              style={[
+                styles.emptyTitle,
+                {color: isDarkMode ? '#e2e8f0' : '#1e293b'},
+              ]}>
               Aucune playlist trouvée
             </Text>
-            <Text style={[styles.emptyText, {color: isDarkMode ? '#94a3b8' : '#64748b'}]}>
+            <Text
+              style={[
+                styles.emptyText,
+                {color: isDarkMode ? '#94a3b8' : '#64748b'},
+              ]}>
               Importez des playlists M3U ou Xtream pour les voir ici
             </Text>
           </View>

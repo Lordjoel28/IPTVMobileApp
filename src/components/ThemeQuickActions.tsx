@@ -1,162 +1,145 @@
 /**
- * ⚡ ThemeQuickActions - Actions rapides pour les thèmes
- * Composant avec actions rapides : toggle, auto, reset
+ * ⚡ ThemeQuickActions - Actions rapides pour la gestion des thèmes.
+ * Offre des contrôles clairs et standards pour le choix manuel et automatique du thème.
  */
-
 import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Switch,
-} from 'react-native';
-import Icon from 'react-native-vector-icons/MaterialIcons';
-import { useTheme, useThemeColors, useIsDark } from '../contexts/ThemeContext';
+import {View, Text, StyleSheet, TouchableOpacity, Switch} from 'react-native';
+import {useTheme, useThemeColors, useIsDark} from '../contexts/ThemeContext';
 
 interface ThemeQuickActionsProps {
   style?: any;
 }
 
-const ThemeQuickActions: React.FC<ThemeQuickActionsProps> = ({ style }) => {
-  const { toggleTheme, resetToSystem, isSystemTheme } = useTheme();
+const ThemeQuickActions: React.FC<ThemeQuickActionsProps> = ({style}) => {
+  const {
+    setTheme,
+    currentTheme,
+    resetToSystem,
+    isSystemTheme,
+    toggleTheme,
+  } = useTheme();
   const colors = useThemeColors();
   const isDark = useIsDark();
-
-  const handleToggleTheme = async () => {
-    await toggleTheme();
-  };
 
   const handleSystemToggle = async (enabled: boolean) => {
     if (enabled) {
       await resetToSystem();
     } else {
-      // Si on désactive le thème système, on garde le thème actuel
-      // L'utilisateur peut ensuite choisir manuellement
+      // Désactive le mode auto et conserve le thème actuel (clair ou sombre)
+      await setTheme(currentTheme.id);
+    }
+  };
+
+  const handleManualToggle = (targetIsDark: boolean) => {
+    if (isDark !== targetIsDark) {
+      toggleTheme();
     }
   };
 
   return (
     <View style={[styles.container, style]}>
-      {/* Action Toggle Sombre/Clair */}
-      <TouchableOpacity
-        style={[styles.actionButton, { backgroundColor: colors.surface.primary }]}
-        onPress={handleToggleTheme}
-        activeOpacity={0.8}>
-        <View style={styles.actionIcon}>
-          <Icon
-            name={isDark ? 'light-mode' : 'dark-mode'}
-            size={24}
-            color={colors.accent.primary}
-          />
+      {/* Section 1: Sélecteur de mode manuel */}
+      <View style={styles.manualToggleContainer}>
+        <Text style={[styles.label, {color: colors.text.secondary}]}>Mode</Text>
+        <View
+          style={[
+            styles.segmentedControl,
+            {
+              backgroundColor: colors.surface.primary,
+              opacity: isSystemTheme ? 0.5 : 1,
+            },
+          ]}>
+          <TouchableOpacity
+            style={[
+              styles.segmentButton,
+              !isDark ? [styles.segmentActive, {backgroundColor: colors.accent.primary}] : {},
+            ]}
+            onPress={() => handleManualToggle(false)}
+            disabled={isSystemTheme}>
+            <Text
+              style={[
+                styles.segmentText,
+                {color: !isDark ? '#fff' : colors.text.primary},
+              ]}>
+              Clair
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.segmentButton,
+              isDark ? [styles.segmentActive, {backgroundColor: colors.accent.primary}] : {},
+            ]}
+            onPress={() => handleManualToggle(true)}
+            disabled={isSystemTheme}>
+            <Text
+              style={[
+                styles.segmentText,
+                {color: isDark ? '#fff' : colors.text.primary},
+              ]}>
+              Sombre
+            </Text>
+          </TouchableOpacity>
         </View>
-        <View style={styles.actionContent}>
-          <Text style={[styles.actionTitle, { color: colors.text.primary }]}>
-            Mode {isDark ? 'Clair' : 'Sombre'}
-          </Text>
-          <Text style={[styles.actionSubtitle, { color: colors.text.secondary }]}>
-            Basculer rapidement
-          </Text>
-        </View>
-        <Icon name="keyboard-arrow-right" size={20} color={colors.text.tertiary} />
-      </TouchableOpacity>
+      </View>
 
-      {/* Switch Thème Automatique */}
-      <View style={[styles.actionButton, { backgroundColor: colors.surface.primary }]}>
-        <View style={styles.actionIcon}>
-          <Icon
-            name="settings-system-daydream"
-            size={24}
-            color={isSystemTheme ? colors.accent.primary : colors.text.tertiary}
-          />
-        </View>
-        <View style={styles.actionContent}>
-          <Text style={[styles.actionTitle, { color: colors.text.primary }]}>
-            Thème automatique
-          </Text>
-          <Text style={[styles.actionSubtitle, { color: colors.text.secondary }]}>
-            Suit les réglages système
-          </Text>
-        </View>
+      {/* Section 2: Interrupteur pour le mode automatique */}
+      <View style={styles.autoToggleContainer}>
+        <Text style={[styles.label, {color: colors.text.primary}]}>
+          Thème automatique
+        </Text>
         <Switch
           value={isSystemTheme}
           onValueChange={handleSystemToggle}
-          trackColor={{
-            false: colors.ui.border,
-            true: colors.accent.primary + '40'
-          }}
-          thumbColor={isSystemTheme ? colors.accent.primary : colors.surface.secondary}
-          ios_backgroundColor={colors.ui.border}
+          trackColor={{false: colors.ui.border, true: colors.ui.border}}
+          thumbColor={isSystemTheme ? colors.accent.primary : colors.text.tertiary}
         />
       </View>
-
-      {/* Action Reset */}
-      <TouchableOpacity
-        style={[styles.actionButton, { backgroundColor: colors.surface.primary }]}
-        onPress={resetToSystem}
-        activeOpacity={0.8}>
-        <View style={styles.actionIcon}>
-          <Icon
-            name="restore"
-            size={24}
-            color={colors.text.tertiary}
-          />
-        </View>
-        <View style={styles.actionContent}>
-          <Text style={[styles.actionTitle, { color: colors.text.primary }]}>
-            Réinitialiser
-          </Text>
-          <Text style={[styles.actionSubtitle, { color: colors.text.secondary }]}>
-            Retour aux défauts
-          </Text>
-        </View>
-        <Icon name="keyboard-arrow-right" size={20} color={colors.text.tertiary} />
-      </TouchableOpacity>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    gap: 12,
+    // Le conteneur principal n'a plus besoin de gérer la direction
   },
-
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-
-  actionIcon: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    marginRight: 12,
-  },
-
-  actionContent: {
-    flex: 1,
-  },
-
-  actionTitle: {
+  label: {
     fontSize: 16,
     fontWeight: '600',
-    marginBottom: 2,
+    marginBottom: 8,
   },
-
-  actionSubtitle: {
-    fontSize: 12,
-    lineHeight: 16,
+  manualToggleContainer: {
+    marginBottom: 24,
+    backgroundColor: 'transparent',
+    padding: 16,
+    borderRadius: 16,
+  },
+  segmentedControl: {
+    flexDirection: 'row',
+    borderRadius: 12,
+    height: 44,
+    padding: 4,
+  },
+  segmentButton: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 9,
+  },
+  segmentActive: {
+    // La couleur de fond est appliquée dynamiquement
+  },
+  segmentText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  autoToggleContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 16,
   },
 });
 
 export default ThemeQuickActions;
+

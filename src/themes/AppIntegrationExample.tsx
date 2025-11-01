@@ -4,9 +4,9 @@
  */
 
 import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
-import { StatusBar } from 'react-native';
-import { ThemeProvider, useIsDark } from '../contexts/ThemeContext';
+import {NavigationContainer} from '@react-navigation/native';
+import {StatusBar} from 'react-native';
+import {ThemeProvider, useIsDark} from '../contexts/ThemeContext';
 
 // Vos navigateurs existants
 // import MainNavigator from '../navigation/MainNavigator';
@@ -37,9 +37,9 @@ const App: React.FC = () => {
     <ThemeProvider>
       {/* Si vous utilisez react-native-gesture-handler */}
       {/* <GestureHandlerRootView style={{ flex: 1 }}> */}
-        <NavigationContainer>
-          <AppContent />
-        </NavigationContainer>
+      <NavigationContainer>
+        <AppContent />
+      </NavigationContainer>
       {/* </GestureHandlerRootView> */}
     </ThemeProvider>
   );

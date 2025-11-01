@@ -33,15 +33,22 @@ class EPGInstantManagerClass {
    * Retourne immédiatement des données (< 100ms) puis met à jour en arrière-plan
    */
   async getInstantEPG(channelId: string): Promise<EPGData> {
-    console.log(`⚡ [EPGInstant DEBUG] Demande EPG instantané pour: ${channelId}`);
+    console.log(
+      `⚡ [EPGInstant DEBUG] Demande EPG instantané pour: ${channelId}`,
+    );
 
     // 1. Vérifier cache instantané (< 1ms)
     const cached = this.instantCache.get(channelId);
     if (cached && this.isCacheValid(cached)) {
-      console.log(`✅ [EPGInstant DEBUG] Cache hit instantané pour: ${channelId}`);
+      console.log(
+        `✅ [EPGInstant DEBUG] Cache hit instantané pour: ${channelId}`,
+      );
 
       // Déclencher background fetch si données anciennes (> 5min)
-      if (!cached.isRealData || (Date.now() - (cached.lastUpdated || 0)) > 5 * 60 * 1000) {
+      if (
+        !cached.isRealData ||
+        Date.now() - (cached.lastUpdated || 0) > 5 * 60 * 1000
+      ) {
         this.triggerBackgroundFetch(channelId);
       }
 
@@ -53,12 +60,15 @@ class EPGInstantManagerClass {
     const instantData = this.generateSmartInstantData(channelId);
     this.instantCache.set(channelId, instantData);
 
-    console.log(`🔥 [EPGInstant DEBUG] Données instantanées générées pour: ${channelId}`, {
-      currentProgram: !!instantData.currentProgram,
-      nextProgram: !!instantData.nextProgram,
-      currentTitle: instantData.currentProgram?.title,
-      isRealData: instantData.isRealData
-    });
+    console.log(
+      `🔥 [EPGInstant DEBUG] Données instantanées générées pour: ${channelId}`,
+      {
+        currentProgram: !!instantData.currentProgram,
+        nextProgram: !!instantData.nextProgram,
+        currentTitle: instantData.currentProgram?.title,
+        isRealData: instantData.isRealData,
+      },
+    );
 
     // 3. Déclencher fetch real EPG en arrière-plan (non-bloquant)
     this.triggerBackgroundFetch(channelId);
@@ -71,7 +81,9 @@ class EPGInstantManagerClass {
    */
   async updateWithRealEPG(channelId: string): Promise<EPGData | null> {
     if (this.backgroundFetchQueue.has(channelId)) {
-      console.log(`⏳ [EPGInstant] Background fetch déjà en cours pour: ${channelId}`);
+      console.log(
+        `⏳ [EPGInstant] Background fetch déjà en cours pour: ${channelId}`,
+      );
       return null;
     }
 
@@ -93,7 +105,9 @@ class EPGInstantManagerClass {
         // Mettre à jour cache instantané
         this.instantCache.set(channelId, enhancedData);
 
-        console.log(`✅ [EPGInstant] Vraies données EPG récupérées pour: ${channelId}`);
+        console.log(
+          `✅ [EPGInstant] Vraies données EPG récupérées pour: ${channelId}`,
+        );
 
         // Notifier les listeners (UI update)
         this.notifyListeners(channelId, enhancedData);
@@ -103,7 +117,10 @@ class EPGInstantManagerClass {
 
       return null;
     } catch (error) {
-      console.warn(`⚠️ [EPGInstant] Échec background fetch pour ${channelId}:`, error);
+      console.warn(
+        `⚠️ [EPGInstant] Échec background fetch pour ${channelId}:`,
+        error,
+      );
       return null;
     } finally {
       this.backgroundFetchQueue.delete(channelId);
@@ -155,8 +172,14 @@ class EPGInstantManagerClass {
     const totalDuration = endTime.getTime() - startTime.getTime();
     const elapsed = currentTime - startTime.getTime();
 
-    const progressPercentage = Math.max(0, Math.min(100, (elapsed / totalDuration) * 100));
-    const remainingMinutes = Math.max(0, Math.ceil((endTime.getTime() - currentTime) / (1000 * 60)));
+    const progressPercentage = Math.max(
+      0,
+      Math.min(100, (elapsed / totalDuration) * 100),
+    );
+    const remainingMinutes = Math.max(
+      0,
+      Math.ceil((endTime.getTime() - currentTime) / (1000 * 60)),
+    );
 
     // Formats d'heure cohérents
     const programStartTime = startTime.toLocaleTimeString('fr-FR', {
@@ -170,7 +193,11 @@ class EPGInstantManagerClass {
 
     // Génération des titres de programmes intelligents
     const currentTitle = this.getSmartProgramTitle(channelId, startHour, now);
-    const nextTitle = this.getSmartProgramTitle(channelId, nextStartTime.getHours(), now);
+    const nextTitle = this.getSmartProgramTitle(
+      channelId,
+      nextStartTime.getHours(),
+      now,
+    );
 
     return {
       currentProgram: {
@@ -207,58 +234,120 @@ class EPGInstantManagerClass {
   /**
    * 📺 Obtient titre de programme intelligent selon chaîne, heure et jour
    */
-  private getSmartProgramTitle(channelId: string, hour: number, date: Date): string {
+  private getSmartProgramTitle(
+    channelId: string,
+    hour: number,
+    date: Date,
+  ): string {
     const isWeekend = date.getDay() === 0 || date.getDay() === 6;
 
     // Base de données programme par chaîne (pattern réaliste français)
     const programsDB = {
       // Chaînes généralistes
-      'tf1': {
+      tf1: {
         weekday: {
-          6: 'Bonjour !', 8: 'Télé-achat', 10: 'Coup de pouce pour la planète',
-          12: "Les Feux de l'amour", 13: 'Le Journal de 13h', 14: "Les Feux de l'amour",
-          17: 'Quatre mariages pour une lune de miel', 18: 'Bienvenue chez nous',
-          19: 'Demain nous appartient', 20: 'Le Journal de 20h', 21: 'Koh-Lanta', 23: 'Esprits criminels'
+          6: 'Bonjour !',
+          8: 'Télé-achat',
+          10: 'Coup de pouce pour la planète',
+          12: "Les Feux de l'amour",
+          13: 'Le Journal de 13h',
+          14: "Les Feux de l'amour",
+          17: 'Quatre mariages pour une lune de miel',
+          18: 'Bienvenue chez nous',
+          19: 'Demain nous appartient',
+          20: 'Le Journal de 20h',
+          21: 'Koh-Lanta',
+          23: 'Esprits criminels',
         },
         weekend: {
-          8: 'TFou', 10: 'Automoto', 12: 'Reportages', 13: 'Le Journal de 13h',
-          16: 'Les docs du dimanche', 18: 'Sept à huit Life', 20: 'Le Journal de 20h',
-          21: 'The Voice', 23: 'Esprits criminels'
-        }
+          8: 'TFou',
+          10: 'Automoto',
+          12: 'Reportages',
+          13: 'Le Journal de 13h',
+          16: 'Les docs du dimanche',
+          18: 'Sept à huit Life',
+          20: 'Le Journal de 20h',
+          21: 'The Voice',
+          23: 'Esprits criminels',
+        },
       },
-      'france2': {
+      france2: {
         weekday: {
-          6: 'Télématin', 9: 'Amour, gloire et beauté', 10: "C'est au programme",
-          12: 'Tout le monde veut prendre sa place', 13: 'Journal de 13h', 14: 'Un si grand soleil',
-          17: 'Affaire conclue', 19: "N'oubliez pas les paroles", 20: 'Journal de 20h',
-          21: 'Envoyé spécial', 23: "Complément d'enquête"
+          6: 'Télématin',
+          9: 'Amour, gloire et beauté',
+          10: "C'est au programme",
+          12: 'Tout le monde veut prendre sa place',
+          13: 'Journal de 13h',
+          14: 'Un si grand soleil',
+          17: 'Affaire conclue',
+          19: "N'oubliez pas les paroles",
+          20: 'Journal de 20h',
+          21: 'Envoyé spécial',
+          23: "Complément d'enquête",
         },
         weekend: {
-          8: 'Sagesses bouddhistes', 10: 'Tout compte fait', 12: 'Journal de 13h',
-          14: 'Vivement dimanche', 17: 'Stade 2', 19: "N'oubliez pas les paroles",
-          20: 'Journal de 20h', 21: 'Les enquêtes de Vera', 23: 'Un soir à la Tour Eiffel'
-        }
+          8: 'Sagesses bouddhistes',
+          10: 'Tout compte fait',
+          12: 'Journal de 13h',
+          14: 'Vivement dimanche',
+          17: 'Stade 2',
+          19: "N'oubliez pas les paroles",
+          20: 'Journal de 20h',
+          21: 'Les enquêtes de Vera',
+          23: 'Un soir à la Tour Eiffel',
+        },
       },
       // Chaînes info
-      'bfmtv': {
-        weekday: { 6: 'BFM Matin', 9: 'BFM Story', 12: 'BFM Midi', 14: 'BFM Afternoon', 17: 'BFM Soir', 20: 'BFM Story' },
-        weekend: { 8: 'BFM Weekend', 12: 'BFM Midi Weekend', 17: 'BFM Soir Weekend', 20: 'BFM Story' }
+      bfmtv: {
+        weekday: {
+          6: 'BFM Matin',
+          9: 'BFM Story',
+          12: 'BFM Midi',
+          14: 'BFM Afternoon',
+          17: 'BFM Soir',
+          20: 'BFM Story',
+        },
+        weekend: {
+          8: 'BFM Weekend',
+          12: 'BFM Midi Weekend',
+          17: 'BFM Soir Weekend',
+          20: 'BFM Story',
+        },
       },
       // Chaînes sport
-      'lequipe': {
-        weekday: { 6: "L'Équipe du matin", 10: "L'Équipe d'Estelle", 14: "L'Équipe TYPE", 18: "L'Équipe du soir", 21: 'Ligue 1' },
-        weekend: { 10: "L'Équipe Weekend", 14: 'Ligue 1', 17: 'Premier League', 21: 'NBA' }
-      }
+      lequipe: {
+        weekday: {
+          6: "L'Équipe du matin",
+          10: "L'Équipe d'Estelle",
+          14: "L'Équipe TYPE",
+          18: "L'Équipe du soir",
+          21: 'Ligue 1',
+        },
+        weekend: {
+          10: "L'Équipe Weekend",
+          14: 'Ligue 1',
+          17: 'Premier League',
+          21: 'NBA',
+        },
+      },
     };
 
     // Détection intelligente du type de chaîne par l'ID
     let channelType = 'default';
     const lowerChannelId = channelId.toLowerCase();
 
-    if (lowerChannelId.includes('tf1')) channelType = 'tf1';
-    else if (lowerChannelId.includes('france2') || lowerChannelId.includes('f2')) channelType = 'france2';
-    else if (lowerChannelId.includes('bfm')) channelType = 'bfmtv';
-    else if (lowerChannelId.includes('equipe')) channelType = 'lequipe';
+    if (lowerChannelId.includes('tf1')) {
+      channelType = 'tf1';
+    } else if (
+      lowerChannelId.includes('france2') ||
+      lowerChannelId.includes('f2')
+    ) {
+      channelType = 'france2';
+    } else if (lowerChannelId.includes('bfm')) {
+      channelType = 'bfmtv';
+    } else if (lowerChannelId.includes('equipe')) {
+      channelType = 'lequipe';
+    }
 
     const scheduleType = isWeekend ? 'weekend' : 'weekday';
     const channelPrograms = programsDB[channelType]?.[scheduleType];
@@ -266,11 +355,15 @@ class EPGInstantManagerClass {
     if (channelPrograms) {
       // Chercher programme exact ou le plus proche
       const exactProgram = channelPrograms[hour];
-      if (exactProgram) return exactProgram;
+      if (exactProgram) {
+        return exactProgram;
+      }
 
-      const availableHours = Object.keys(channelPrograms).map(Number).sort((a, b) => a - b);
+      const availableHours = Object.keys(channelPrograms)
+        .map(Number)
+        .sort((a, b) => a - b);
       const closestHour = availableHours.reduce((prev, curr) =>
-        Math.abs(curr - hour) < Math.abs(prev - hour) ? curr : prev
+        Math.abs(curr - hour) < Math.abs(prev - hour) ? curr : prev,
       );
 
       return channelPrograms[closestHour] || this.getGenericProgramTitle(hour);
@@ -283,13 +376,27 @@ class EPGInstantManagerClass {
    * 📝 Génère titre générique intelligent selon l'heure
    */
   private getGenericProgramTitle(hour: number): string {
-    if (hour >= 6 && hour < 9) return 'Émission matinale';
-    if (hour >= 9 && hour < 12) return 'Magazine matinal';
-    if (hour >= 12 && hour < 14) return 'Journal et magazine midi';
-    if (hour >= 14 && hour < 17) return 'Émission de l\'après-midi';
-    if (hour >= 17 && hour < 20) return 'Magazine de fin d\'après-midi';
-    if (hour >= 20 && hour < 22) return 'Programme de soirée';
-    if (hour >= 22 && hour < 2) return 'Émission de fin de soirée';
+    if (hour >= 6 && hour < 9) {
+      return 'Émission matinale';
+    }
+    if (hour >= 9 && hour < 12) {
+      return 'Magazine matinal';
+    }
+    if (hour >= 12 && hour < 14) {
+      return 'Journal et magazine midi';
+    }
+    if (hour >= 14 && hour < 17) {
+      return "Émission de l'après-midi";
+    }
+    if (hour >= 17 && hour < 20) {
+      return "Magazine de fin d'après-midi";
+    }
+    if (hour >= 20 && hour < 22) {
+      return 'Programme de soirée';
+    }
+    if (hour >= 22 && hour < 2) {
+      return 'Émission de fin de soirée';
+    }
     return 'Programme de nuit';
   }
 
@@ -322,7 +429,11 @@ class EPGInstantManagerClass {
     if (lowerChannelId.includes('sport') || lowerChannelId.includes('equipe')) {
       return 'Sport';
     }
-    if (lowerChannelId.includes('news') || lowerChannelId.includes('bfm') || lowerChannelId.includes('cnews')) {
+    if (
+      lowerChannelId.includes('news') ||
+      lowerChannelId.includes('bfm') ||
+      lowerChannelId.includes('cnews')
+    ) {
       return 'Information';
     }
     if (lowerChannelId.includes('kids') || lowerChannelId.includes('toon')) {
@@ -330,9 +441,15 @@ class EPGInstantManagerClass {
     }
 
     // Catégorie selon l'heure
-    if (hour >= 20 && hour < 23) return 'Prime Time';
-    if (hour >= 13 && hour < 14) return 'Information';
-    if (hour >= 6 && hour < 9) return 'Matinale';
+    if (hour >= 20 && hour < 23) {
+      return 'Prime Time';
+    }
+    if (hour >= 13 && hour < 14) {
+      return 'Information';
+    }
+    if (hour >= 6 && hour < 9) {
+      return 'Matinale';
+    }
 
     return 'Général';
   }
@@ -340,8 +457,10 @@ class EPGInstantManagerClass {
   // Méthodes utilitaires
 
   private isCacheValid(data: EPGData): boolean {
-    if (!data.lastUpdated) return false;
-    return (Date.now() - data.lastUpdated) < this.instantCacheTTL;
+    if (!data.lastUpdated) {
+      return false;
+    }
+    return Date.now() - data.lastUpdated < this.instantCacheTTL;
   }
 
   private triggerBackgroundFetch(channelId: string) {
@@ -358,7 +477,7 @@ class EPGInstantManagerClass {
         try {
           callback(data);
         } catch (error) {
-          console.warn(`⚠️ [EPGInstant] Erreur callback listener:`, error);
+          console.warn('⚠️ [EPGInstant] Erreur callback listener:', error);
         }
       });
     }
@@ -374,7 +493,9 @@ class EPGInstantManagerClass {
         this.instantCache.delete(channelId);
       }
     }
-    console.log(`🧹 [EPGInstant] Cache cleanup: ${this.instantCache.size} entrées restantes`);
+    console.log(
+      `🧹 [EPGInstant] Cache cleanup: ${this.instantCache.size} entrées restantes`,
+    );
   }
 
   /**
@@ -384,7 +505,10 @@ class EPGInstantManagerClass {
     return {
       cacheSize: this.instantCache.size,
       backgroundFetchActive: this.backgroundFetchQueue.size,
-      listeners: Array.from(this.updateListeners.entries()).reduce((acc, [id, listeners]) => acc + listeners.length, 0),
+      listeners: Array.from(this.updateListeners.entries()).reduce(
+        (acc, [id, listeners]) => acc + listeners.length,
+        0,
+      ),
     };
   }
 }

@@ -20,14 +20,18 @@ if (typeof global.atob === 'undefined') {
     return Buffer.from(str, 'base64').toString('utf8');
   };
 }
-console.log('🔧 Buffer & Base64 polyfills loaded:', typeof global.Buffer, typeof global.btoa);
+console.log(
+  '🔧 Buffer & Base64 polyfills loaded:',
+  typeof global.Buffer,
+  typeof global.btoa,
+);
 
-// Supprimer warning NativeEventEmitter pour react-native-voice
-// TODO: À supprimer quand react-native-voice sera mis à jour
-import { LogBox } from 'react-native';
+// Supprimer warning NativeEventEmitter pour react-native-voice et react-native-google-cast
+// TODO: À supprimer quand les librairies seront mises à jour
+import {LogBox} from 'react-native';
 LogBox.ignoreLogs([
-  'new NativeEventEmitter()', // Warning lié à react-native-voice
-  'removeListeners', // Warning lié à NativeEventEmitter
+  '`new NativeEventEmitter()` was called with a non-null argument without the required `addListener` method.',
+  '`new NativeEventEmitter()` was called with a non-null argument without the required `removeListeners` method.',
 ]);
 
 // Activer react-native-screens pour React Navigation

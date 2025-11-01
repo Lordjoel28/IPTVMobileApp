@@ -174,6 +174,7 @@ const PlaylistsScreen: React.FC = () => {
       if (selectedPlaylist) {
         console.log(
           `✅ Playlist "${selectedPlaylist.name}" sélectionnée avec succès`,
+        );
 
         // Aussi mettre à jour l'AppManager pour cohérence
         await appManager.selectPlaylist(playlist.id);

@@ -15,7 +15,9 @@ class SimpleEventEmitter {
   }
 
   off(event: string, listener: Function): void {
-    if (!this.listeners.has(event)) return;
+    if (!this.listeners.has(event)) {
+      return;
+    }
     const eventListeners = this.listeners.get(event)!;
     const index = eventListeners.indexOf(listener);
     if (index > -1) {
@@ -24,7 +26,9 @@ class SimpleEventEmitter {
   }
 
   emit(event: string, ...args: any[]): void {
-    if (!this.listeners.has(event)) return;
+    if (!this.listeners.has(event)) {
+      return;
+    }
     const eventListeners = this.listeners.get(event)!;
     eventListeners.forEach(listener => listener(...args));
   }
@@ -200,11 +204,14 @@ class EPGInstantCache extends SimpleEventEmitter {
     const startTime = Date.now();
     const preloadChannels = channelIds.slice(0, this.config.preloadSize);
 
-    console.log('🔄 [EPGInstantCache] Démarrage pré-chargement chaînes populaires', {
-      requestedChannels: channelIds.length,
-      preloadingChannels: preloadChannels.length,
-      maxPreload: this.config.preloadSize,
-    });
+    console.log(
+      '🔄 [EPGInstantCache] Démarrage pré-chargement chaînes populaires',
+      {
+        requestedChannels: channelIds.length,
+        preloadingChannels: preloadChannels.length,
+        maxPreload: this.config.preloadSize,
+      },
+    );
 
     let successful = 0;
     let errors = 0;
@@ -225,7 +232,11 @@ class EPGInstantCache extends SimpleEventEmitter {
           console.log('⚡ [EPGInstantCache] Déjà en cache:', channelId);
         }
       } catch (error) {
-        console.warn('⚠️ [EPGInstantCache] Erreur pré-chargement', channelId, error);
+        console.warn(
+          '⚠️ [EPGInstantCache] Erreur pré-chargement',
+          channelId,
+          error,
+        );
         errors++;
       }
 
@@ -267,7 +278,8 @@ class EPGInstantCache extends SimpleEventEmitter {
 
     this.cache.forEach((entry, channelId) => {
       const age = now - entry.data.lastUpdate;
-      const shouldRemove = force ||
+      const shouldRemove =
+        force ||
         age > this.config.ttl || // TTL expiré
         (entry.data.hitCount === 0 && age > 30000); // Jamais utilisé depuis 30s
 
@@ -322,7 +334,8 @@ class EPGInstantCache extends SimpleEventEmitter {
     });
 
     const totalRequests = this.stats.hits + this.stats.misses;
-    const hitRate = totalRequests > 0 ? (this.stats.hits / totalRequests) * 100 : 0;
+    const hitRate =
+      totalRequests > 0 ? (this.stats.hits / totalRequests) * 100 : 0;
     const avgAccessTime = 0.5; // Estimation basée sur les perfs observées
 
     const stats: CacheStats = {
@@ -371,10 +384,12 @@ class EPGInstantCache extends SimpleEventEmitter {
 
   private estimateSize(epgData: EPGData): number {
     // Estimation approximative de la taille en mémoire
-    const currentProgramSize = epgData.currentProgram ?
-      JSON.stringify(epgData.currentProgram).length : 0;
-    const nextProgramSize = epgData.nextProgram ?
-      JSON.stringify(epgData.nextProgram).length : 0;
+    const currentProgramSize = epgData.currentProgram
+      ? JSON.stringify(epgData.currentProgram).length
+      : 0;
+    const nextProgramSize = epgData.nextProgram
+      ? JSON.stringify(epgData.nextProgram).length
+      : 0;
 
     return (currentProgramSize + nextProgramSize + 200) * 2; // x2 pour overhead
   }
@@ -383,7 +398,7 @@ class EPGInstantCache extends SimpleEventEmitter {
     // Si on dépasse la taille max, faire du nettoyage LRU
     while (
       (this.stats.totalSize + requiredSize > this.config.maxSize ||
-       this.cache.size >= this.config.maxEntries) &&
+        this.cache.size >= this.config.maxEntries) &&
       this.cache.size > 0
     ) {
       // Trouver l'entrée la moins récemment utilisée
@@ -420,7 +435,10 @@ class EPGInstantCache extends SimpleEventEmitter {
       const stats = this.getStats();
 
       // Déclencher nettoyage si nécessaire
-      if (stats.expiredEntries > 10 || stats.totalEntries > this.config.maxEntries * 0.8) {
+      if (
+        stats.expiredEntries > 10 ||
+        stats.totalEntries > this.config.maxEntries * 0.8
+      ) {
         this.cleanup();
       }
     }, this.config.cleanupInterval);

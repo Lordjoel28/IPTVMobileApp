@@ -1,5 +1,6 @@
 /**
- * = SearchBar - Composant de recherche simple pour les chaînes
+ * =
+ SearchBar - Composant de recherche simple pour les chaï¿½nes
  */
 
 import React, {useState, useRef, useEffect} from 'react';
@@ -28,7 +29,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
   onClose,
   channels,
   onChannelSelect,
-  placeholder = 'Rechercher une chaîne...',
+  placeholder = 'Rechercher une chaï¿½ne...',
 }) => {
   const [query, setQuery] = useState('');
   const [filteredChannels, setFilteredChannels] = useState<Channel[]>([]);
@@ -52,32 +53,35 @@ const SearchBar: React.FC<SearchBarProps> = ({
         duration: 200,
         useNativeDriver: true,
       }).start();
-      // Reset query quand fermé
+      // Reset query quand fermï¿½
       setQuery('');
       setFilteredChannels([]);
     }
   }, [visible]);
 
-  // Recherche simple en temps réel
+  // Recherche simple en temps rï¿½el
   useEffect(() => {
     if (!query.trim()) {
       setFilteredChannels([]);
       return;
     }
 
-    const filtered = channels.filter(channel =>
-      channel.name.toLowerCase().includes(query.toLowerCase()) ||
-      (channel.group && channel.group.toLowerCase().includes(query.toLowerCase())) ||
-      (channel.category && channel.category.toLowerCase().includes(query.toLowerCase()))
+    const filtered = channels.filter(
+      channel =>
+        channel.name.toLowerCase().includes(query.toLowerCase()) ||
+        (channel.group &&
+          channel.group.toLowerCase().includes(query.toLowerCase())) ||
+        (channel.category &&
+          channel.category.toLowerCase().includes(query.toLowerCase())),
     );
 
-    // Limiter à 20 résultats pour performance
+    // Limiter ï¿½ 20 rï¿½sultats pour performance
     setFilteredChannels(filtered.slice(0, 20));
   }, [query, channels]);
 
   const handleChannelPress = (channel: Channel) => {
     onChannelSelect(channel);
-    onClose(); // Fermer après sélection
+    onClose(); // Fermer aprï¿½s sï¿½lection
   };
 
   const clearSearch = () => {
@@ -122,15 +126,16 @@ const SearchBar: React.FC<SearchBarProps> = ({
         </TouchableOpacity>
       </View>
 
-      {/* Résultats de recherche */}
+      {/* Rï¿½sultats de recherche */}
       {filteredChannels.length > 0 && (
         <View style={styles.resultsContainer}>
           <Text style={styles.resultsHeader}>
-            {filteredChannels.length} résultat{filteredChannels.length > 1 ? 's' : ''}
+            {filteredChannels.length} rï¿½sultat
+            {filteredChannels.length > 1 ? 's' : ''}
           </Text>
           <FlatList
             data={filteredChannels}
-            keyExtractor={(item) => `search-${item.id}`}
+            keyExtractor={item => `search-${item.id}`}
             renderItem={({item}) => (
               <TouchableOpacity
                 style={styles.resultItem}
@@ -154,12 +159,12 @@ const SearchBar: React.FC<SearchBarProps> = ({
         </View>
       )}
 
-      {/* Message si pas de résultats */}
+      {/* Message si pas de rï¿½sultats */}
       {query.length > 0 && filteredChannels.length === 0 && (
         <View style={styles.noResultsContainer}>
           <Icon name="search-off" size={32} color="#666" />
           <Text style={styles.noResultsText}>
-            Aucune chaîne trouvée pour "{query}"
+            Aucune chaï¿½ne trouvï¿½e pour "{query}"
           </Text>
         </View>
       )}

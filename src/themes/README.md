@@ -317,4 +317,4 @@ const MyComponent = () => {
 
 ## 🎯 Exemple Complet
 
-Voir `SearchScreen.tsx` pour un exemple complet d'intégration du système de thèmes dans un composant complexe avec toutes les fonctionnalités (gradients, couleurs dynamiques, icons, etc.).
+Voir `FinalSearchScreenWrapper.tsx` pour un exemple complet d'intégration du système de thèmes dans un composant complexe avec toutes les fonctionnalités (gradients, couleurs dynamiques, icons, etc.).

@@ -32,7 +32,7 @@ http://stream2.example.com/live.m3u8`,
 http://stream1.example.com/live.m3u8
 url-tvg="https://example.com/middle-epg.xml"
 #EXTINF:-1 tvg-id="canal2" group-title="Sport",Canal Test 2
-http://stream2.example.com/live.m3u8`
+http://stream2.example.com/live.m3u8`,
 };
 
 /**
@@ -49,21 +49,34 @@ export async function runEPGDetectionTests(): Promise<void> {
   const test1 = await playlistManager.testEPGDetection(M3U_SAMPLES.withEPG);
   console.log('Result:', test1);
   console.assert(test1.hasEPG === true, 'Should detect EPG');
-  console.assert(test1.epgUrl === 'https://example.com/epg.xml', 'Should extract correct URL');
+  console.assert(
+    test1.epgUrl === 'https://example.com/epg.xml',
+    'Should extract correct URL',
+  );
 
   // Test 2: M3U avec EPG entre guillemets simples
   console.log('\n📋 Test 2: M3U avec url-tvg entre guillemets simples');
-  const test2 = await playlistManager.testEPGDetection(M3U_SAMPLES.withEPGQuotes);
+  const test2 = await playlistManager.testEPGDetection(
+    M3U_SAMPLES.withEPGQuotes,
+  );
   console.log('Result:', test2);
   console.assert(test2.hasEPG === true, 'Should detect EPG');
-  console.assert(test2.epgUrl === 'https://example.com/guide.xml', 'Should extract correct URL');
+  console.assert(
+    test2.epgUrl === 'https://example.com/guide.xml',
+    'Should extract correct URL',
+  );
 
   // Test 3: M3U avec EPG sans guillemets
   console.log('\n📋 Test 3: M3U avec url-tvg sans guillemets');
-  const test3 = await playlistManager.testEPGDetection(M3U_SAMPLES.withEPGNoQuotes);
+  const test3 = await playlistManager.testEPGDetection(
+    M3U_SAMPLES.withEPGNoQuotes,
+  );
   console.log('Result:', test3);
   console.assert(test3.hasEPG === true, 'Should detect EPG');
-  console.assert(test3.epgUrl === 'https://example.com/xmltv.xml', 'Should extract correct URL');
+  console.assert(
+    test3.epgUrl === 'https://example.com/xmltv.xml',
+    'Should extract correct URL',
+  );
 
   // Test 4: M3U sans EPG
   console.log('\n📋 Test 4: M3U sans url-tvg');
@@ -74,10 +87,15 @@ export async function runEPGDetectionTests(): Promise<void> {
 
   // Test 5: M3U avec EPG au milieu du contenu
   console.log('\n📋 Test 5: M3U avec url-tvg au milieu');
-  const test5 = await playlistManager.testEPGDetection(M3U_SAMPLES.withEPGInMiddle);
+  const test5 = await playlistManager.testEPGDetection(
+    M3U_SAMPLES.withEPGInMiddle,
+  );
   console.log('Result:', test5);
   console.assert(test5.hasEPG === true, 'Should detect EPG even in middle');
-  console.assert(test5.epgUrl === 'https://example.com/middle-epg.xml', 'Should extract correct URL');
+  console.assert(
+    test5.epgUrl === 'https://example.com/middle-epg.xml',
+    'Should extract correct URL',
+  );
 
   console.log('\n✅ All EPG Detection Tests Completed!');
 
@@ -104,11 +122,12 @@ export async function runIntegrationTest(): Promise<void> {
     console.log('EPG Detection Result:', result);
 
     if (result.hasEPG) {
-      console.log('✅ Integration test successful - EPG would be configured automatically');
+      console.log(
+        '✅ Integration test successful - EPG would be configured automatically',
+      );
     } else {
       console.error('❌ Integration test failed - EPG not detected');
     }
-
   } catch (error) {
     console.error('❌ Integration test failed:', error);
   }
@@ -117,4 +136,4 @@ export async function runIntegrationTest(): Promise<void> {
 }
 
 // Export pour utilisation dans d'autres fichiers
-export { M3U_SAMPLES };
+export {M3U_SAMPLES};

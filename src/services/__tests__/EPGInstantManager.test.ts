@@ -25,7 +25,7 @@ describe('EPGInstantManager', () => {
     expect(duration).toBeLessThan(200); // Performance < 200ms
   });
 
-  test('doit générer des programmes réalistes selon l\'heure', async () => {
+  test("doit générer des programmes réalistes selon l'heure", async () => {
     const result = await EPGInstantManager.getInstantEPG('tf1');
 
     expect(result?.currentProgram?.title).toBeDefined();
@@ -52,7 +52,10 @@ describe('EPGInstantManager', () => {
     const mockCallback = jest.fn();
 
     // S'abonner aux mises à jour
-    const unsubscribe = EPGInstantManager.subscribe('test-channel', mockCallback);
+    const unsubscribe = EPGInstantManager.subscribe(
+      'test-channel',
+      mockCallback,
+    );
 
     // Obtenir EPG instantané (doit déclencher background fetch)
     await EPGInstantManager.getInstantEPG('test-channel');

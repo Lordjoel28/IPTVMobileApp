@@ -266,6 +266,7 @@ class CacheIntegrationService {
         console.log(
           `🔗 Cache miss for ${cacheKey} (${accessTime.toFixed(2)}ms)`,
         );
+      }
 
       return data;
     } catch (error) {
@@ -569,6 +570,7 @@ class CacheIntegrationService {
       recommendations.push(
         'Consider increasing L1 cache size or implement more aggressive eviction',
       );
+    }
 
     // Hit rate recommendations
     if (cacheStats.overall.hitRate < 0.6) {
@@ -582,12 +584,14 @@ class CacheIntegrationService {
       recommendations.push(
         `${usageStats.hotKeys.length} hot keys detected - consider prioritizing these for L1`,
       );
+    }
 
     // Access time recommendations
     if (cacheStats.overall.avgAccessTime > 50) {
       recommendations.push(
         'Average access time is high - consider optimizing cache key structure',
       );
+    }
 
     return recommendations;
   }

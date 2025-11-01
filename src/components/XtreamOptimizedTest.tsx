@@ -60,7 +60,7 @@ export const XtreamOptimizedTest: React.FC = () => {
       url: 'http://example3.com:8080',
       username: 'mega',
       password: 'mega',
-    }
+    },
   ];
 
   const addLog = (message: string) => {
@@ -112,12 +112,10 @@ export const XtreamOptimizedTest: React.FC = () => {
           `${result.channelCount} channels imported in ${duration}ms\n\nPerformance: ${channelsPerSecond} channels/second`,
           [{text: 'OK', style: 'default'}],
         );
-
       } else {
         addLog(`❌ Import failed: ${result.error}`);
         Alert.alert('Import Failed', result.error);
       }
-
     } catch (error) {
       const endTime = performance.now();
       const duration = Math.round(endTime - startTime);
@@ -236,7 +234,7 @@ export const XtreamOptimizedTest: React.FC = () => {
   // Test Smart Cache System
   const testSmartCache = async () => {
     addLog('🧠 Testing Smart Cache L1/L2/L3 System...');
-    
+
     try {
       // Test data
       const testData = {
@@ -337,7 +335,6 @@ export const XtreamOptimizedTest: React.FC = () => {
       addLog('✅ Cache cleanup completed');
 
       addLog('🎉 Smart Cache System test completed successfully!');
-
     } catch (error) {
       addLog(`❌ Smart Cache test failed: ${error}`);
     }

@@ -9,8 +9,12 @@
  * ✅ Compatible avec UltraOptimizedM3UParser
  */
 
-import { UltraOptimizedM3UParser, Channel, ParseResult } from './UltraOptimizedM3UParser';
-import { PlaylistMetadata } from '../playlist/PlaylistManager';
+import {
+  UltraOptimizedM3UParser,
+  Channel,
+  ParseResult,
+} from './UltraOptimizedM3UParser';
+import {PlaylistMetadata} from '../playlist/PlaylistManager';
 
 export interface ExtendedParseResult extends ParseResult {
   metadata: PlaylistMetadata;
@@ -24,11 +28,13 @@ export interface EPGDetectionResult {
 }
 
 export class M3UParserWithEPG extends UltraOptimizedM3UParser {
-
   /**
    * Parse M3U avec détection automatique url-tvg
    */
-  async parseWithEPGDetection(content: string, chunkSize = 1000): Promise<ExtendedParseResult> {
+  async parseWithEPGDetection(
+    content: string,
+    chunkSize = 1000,
+  ): Promise<ExtendedParseResult> {
     console.log('🔍 Début parsing M3U avec détection EPG...');
 
     // 1. Détecter EPG avant parsing principal
@@ -44,7 +50,7 @@ export class M3UParserWithEPG extends UltraOptimizedM3UParser {
     console.log('✅ Parsing M3U + EPG terminé');
     return {
       ...parseResult,
-      metadata
+      metadata,
     };
   }
 
@@ -65,7 +71,7 @@ export class M3UParserWithEPG extends UltraOptimizedM3UParser {
           hasIntegratedEPG: true,
           epgUrl,
           epgType: 'integrated',
-          detectionMethod: 'url-tvg header'
+          detectionMethod: 'url-tvg header',
         };
       }
     }
@@ -78,14 +84,14 @@ export class M3UParserWithEPG extends UltraOptimizedM3UParser {
         hasIntegratedEPG: true,
         epgUrl: fallbackEpgUrl,
         epgType: 'integrated',
-        detectionMethod: 'content scan'
+        detectionMethod: 'content scan',
       };
     }
 
     console.log('❌ Aucun EPG intégré détecté');
     return {
       hasIntegratedEPG: false,
-      epgType: 'none'
+      epgType: 'none',
     };
   }
 
@@ -129,17 +135,19 @@ export class M3UParserWithEPG extends UltraOptimizedM3UParser {
     const patterns = [
       /url-tvg\s*=\s*"([^"]+)"/gi,
       /url-tvg\s*=\s*'([^']+)'/gi,
-      /url-tvg\s*=\s*([^\s]+)/gi
+      /url-tvg\s*=\s*([^\s]+)/gi,
     ];
 
     for (const pattern of patterns) {
       const match = content.match(pattern);
       if (match) {
         for (const fullMatch of match) {
-          const urlMatch = fullMatch.match(/=\s*["']?([^"'\s]+)["']?/);
+          const urlMatch = fullMatch.match(/[=]\s*["']?([^"'\s]+)["']?/);
           if (urlMatch) {
             const epgUrl = this.validateAndCleanEpgUrl(urlMatch[1]);
-            if (epgUrl) return epgUrl;
+            if (epgUrl) {
+              return epgUrl;
+            }
           }
         }
       }
@@ -152,7 +160,9 @@ export class M3UParserWithEPG extends UltraOptimizedM3UParser {
    * Valide et nettoie une URL EPG (compatible React Native)
    */
   private validateAndCleanEpgUrl(url: string): string | null {
-    if (!url || url.length < 10) return null;
+    if (!url || url.length < 10) {
+      return null;
+    }
 
     // Nettoyer l'URL
     const cleanUrl = url.trim().replace(/['"]/g, '');
@@ -168,7 +178,10 @@ export class M3UParserWithEPG extends UltraOptimizedM3UParser {
       }
 
       // Vérifier protocole manuellement
-      if (!cleanUrl.toLowerCase().startsWith('http://') && !cleanUrl.toLowerCase().startsWith('https://')) {
+      if (
+        !cleanUrl.toLowerCase().startsWith('http://') &&
+        !cleanUrl.toLowerCase().startsWith('https://')
+      ) {
         console.warn(`⚠️ Protocole EPG non supporté: ${cleanUrl}`);
         return null;
       }
@@ -187,7 +200,6 @@ export class M3UParserWithEPG extends UltraOptimizedM3UParser {
 
       console.log(`✅ URL EPG validée: ${cleanUrl}`);
       return cleanUrl;
-
     } catch (error) {
       console.warn(`⚠️ URL EPG invalide: ${cleanUrl}`, error);
       return null;
@@ -197,11 +209,14 @@ export class M3UParserWithEPG extends UltraOptimizedM3UParser {
   /**
    * Extrait les métadonnées de la playlist incluant EPG
    */
-  private extractPlaylistMetadata(content: string, epgDetection: EPGDetectionResult): PlaylistMetadata {
+  private extractPlaylistMetadata(
+    content: string,
+    epgDetection: EPGDetectionResult,
+  ): PlaylistMetadata {
     const lines = content.split('\n').slice(0, 10); // Analyser les premières lignes
 
     const metadata: PlaylistMetadata = {
-      epgType: epgDetection.epgType
+      epgType: epgDetection.epgType,
     };
 
     // Ajouter URL EPG si détectée
@@ -214,7 +229,10 @@ export class M3UParserWithEPG extends UltraOptimizedM3UParser {
       const cleanLine = line.trim();
 
       // Extraire titre si présent
-      if (cleanLine.startsWith('#PLAYLIST:') || cleanLine.startsWith('#EXTM3U')) {
+      if (
+        cleanLine.startsWith('#PLAYLIST:') ||
+        cleanLine.startsWith('#EXTM3U')
+      ) {
         const titleMatch = cleanLine.match(/title\s*=\s*["']?([^"'\s]+)["']?/i);
         if (titleMatch) {
           metadata.title = titleMatch[1];

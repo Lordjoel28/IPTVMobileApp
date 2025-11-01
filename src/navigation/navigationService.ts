@@ -1,4 +1,7 @@
-import { createNavigationContainerRef, StackActions } from '@react-navigation/native';
+import {
+  createNavigationContainerRef,
+  StackActions,
+} from '@react-navigation/native';
 
 // Crée une référence au conteneur de navigation
 export const navigationRef = createNavigationContainerRef();
@@ -21,10 +24,10 @@ export function navigate(name: string, params?: object) {
  * @param params Les paramètres à passer à l'écran.
  */
 export function replace(name: string, params?: object) {
-    if (navigationRef.isReady()) {
-        navigationRef.dispatch(
-            // @ts-ignore
-            StackActions.replace(name, params)
-        );
-    }
+  if (navigationRef.isReady()) {
+    navigationRef.dispatch(
+      // @ts-ignore
+      StackActions.replace(name, params),
+    );
+  }
 }

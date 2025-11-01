@@ -76,7 +76,9 @@ export const usePlaylistStore = create<PlaylistStoreState>()((set, get) => ({
   // Action pour définir la playlist active
   selectPlaylist: (playlistId: string | null) => {
     set({selectedPlaylistId: playlistId});
-    console.log(`🏪 PlaylistStore - Playlist active définie sur : ${playlistId}`);
+    console.log(
+      `🏪 PlaylistStore - Playlist active définie sur : ${playlistId}`,
+    );
   },
 
   // Action loadPlaylist - FLUX STRICT : reçoit les données déjà parsées
@@ -155,10 +157,7 @@ export const usePlaylistStore = create<PlaylistStoreState>()((set, get) => ({
 
   // Action selectCategory - avec filtrage complet des chaînes
   selectCategory: (category: string) => {
-    console.log(
-      '🏪 PLAYLIST STORE - selectCategory appelée avec:',
-      category,
-    );
+    console.log('🏪 PLAYLIST STORE - selectCategory appelée avec:', category);
     const currentState = get();
 
     // Si pas de channels, pas de filtrage possible
@@ -176,8 +175,7 @@ export const usePlaylistStore = create<PlaylistStoreState>()((set, get) => ({
     } else {
       // Filtrer par catégorie
       filteredChannels = currentState.channels.filter(
-        channel =>
-          channel.category === category || channel.group === category,
+        channel => channel.category === category || channel.group === category,
       );
     }
 
@@ -195,9 +193,7 @@ export const usePlaylistStore = create<PlaylistStoreState>()((set, get) => ({
 
   // Action clearAll - version sans persist
   clearAll: async () => {
-    console.log(
-      '🧹 CLEAR ALL - Effacement complet cache et données (STORE)',
-    );
+    console.log('🧹 CLEAR ALL - Effacement complet cache et données (STORE)');
 
     // Vider le state + index
     set({
@@ -248,7 +244,9 @@ export const usePlaylistStore = create<PlaylistStoreState>()((set, get) => ({
     }
 
     // Fallback si index pas encore créé (ne devrait pas arriver)
-    console.warn(`⚠️ Index manquant pour catégorie: ${category}, fallback filter`);
+    console.warn(
+      `⚠️ Index manquant pour catégorie: ${category}, fallback filter`,
+    );
     return state.channels.filter(
       channel => channel.category === category || channel.group === category,
     );
@@ -289,7 +287,9 @@ export const usePlaylistStore = create<PlaylistStoreState>()((set, get) => ({
     const visible = categoryChannels.slice(start, end);
 
     console.log(
-      `📄 PAGINATION - Page ${state.currentPage + 1}: ${visible.length} channels (${start}-${end})`,
+      `📄 PAGINATION - Page ${state.currentPage + 1}: ${
+        visible.length
+      } channels (${start}-${end})`,
     );
 
     return visible;
@@ -377,4 +377,6 @@ export const usePaginationInfo = () =>
     hasPrev: state.currentPage > 0,
   }));
 
-console.log('🏪 PlaylistStore initialized - Version sans persist pour éviter les erreurs AsyncStorage');
+console.log(
+  '🏪 PlaylistStore initialized - Version sans persist pour éviter les erreurs AsyncStorage',
+);

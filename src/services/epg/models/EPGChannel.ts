@@ -3,8 +3,8 @@
  * Modèle SQLite pour les chaînes EPG
  */
 
-import { Model } from '@nozbe/watermelondb';
-import { field, readonly, date } from '@nozbe/watermelondb/decorators';
+import {Model} from '@nozbe/watermelondb';
+import {field, readonly, date} from '@nozbe/watermelondb/decorators';
 
 export default class EPGChannel extends Model {
   static table = 'epg_channels';

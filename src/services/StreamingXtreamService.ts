@@ -381,6 +381,7 @@ class StreamingXtreamService {
     try {
       console.log(
         '🚀 Starting Phase 3 optimized import with Smart Cache L1/L2/L3...',
+      );
 
       // Start all services including cache
       BackgroundWorkerService.start();
@@ -404,6 +405,7 @@ class StreamingXtreamService {
         onProgress?.(
           25,
           `🧠 Found ${cachedChannels.length} cached channels - fast track enabled`,
+        );
 
         // Fast track with cached data
         const playlistId = await this.importFromCache(
@@ -475,6 +477,7 @@ class StreamingXtreamService {
       onProgress?.(
         100,
         '✅ Advanced import completed with background processing!',
+      );
 
       // Keep services running for ongoing optimization
       setTimeout(() => {
@@ -502,6 +505,7 @@ class StreamingXtreamService {
   ): Promise<string> {
     console.log(
       `⚡ Fast track import for ${cachedChannels.length} cached channels`,
+    );
 
     onProgress?.(30, '🧠 Using cached data - warming up search index...');
 
@@ -509,6 +513,7 @@ class StreamingXtreamService {
     await CacheIntegrationService.warmUpCache(
       'cached_playlist',
       cachedChannels.slice(0, 1000),
+    );
 
     onProgress?.(50, '🏗️ Creating playlist from cached data...');
 
@@ -526,6 +531,7 @@ class StreamingXtreamService {
     onProgress?.(
       100,
       `✅ Fast import completed! ${cachedChannels.length} channels from cache`,
+    );
 
     // Background cache optimization for next time
     setTimeout(async () => {
@@ -596,6 +602,7 @@ class StreamingXtreamService {
               record.playlist.set(playlist);
             }),
           ),
+        );
 
         const progress = 40 + Math.round((i / categories.length) * 20);
         onProgress?.(
@@ -604,6 +611,7 @@ class StreamingXtreamService {
             categories.length
           } categories`,
         );
+      }
 
       onProgress?.(60, `Creating ${channels.length} channels from cache...`);
 
@@ -621,6 +629,7 @@ class StreamingXtreamService {
               record.playlist.set(playlist);
             }),
           ),
+        );
 
         const progress = 60 + Math.round((i / channels.length) * 40);
         onProgress?.(
@@ -650,6 +659,7 @@ class StreamingXtreamService {
   }> {
     console.log(
       `🔄 Starting background processing of ${channels.length} channels...`,
+    );
 
     let normalizedChannels: XtreamChannel[] = [];
     let categories: any[] = [];
@@ -773,10 +783,12 @@ class StreamingXtreamService {
             'Creating categories...',
           );
         },
+      );
 
       onProgress?.(
         40,
         `📺 Importing ${normalizedChannels.length} channels with progressive UI...`,
+      );
 
       // 3. Create channels with progressive UI updates
       await this.createChannelsWithProgressiveUI(
@@ -1012,6 +1024,7 @@ class StreamingXtreamService {
       onProgress?.(
         progress,
         `📺 Batch ${i + 1}/${batches.length} - ${batch.length} channels`,
+      );
 
       const channelRecords = batch.map(channel =>
         database.get<Channel>('channels').prepareCreate(ch => {

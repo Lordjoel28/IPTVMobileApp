@@ -42,30 +42,43 @@ export class PlaylistService {
       console.log('📋 Clés AsyncStorage disponibles:', allKeys);
 
       // Chercher les différents patterns de clés de playlist
-      const playlistKeys = allKeys.filter(key =>
-        key.startsWith('playlist_') &&
-        !key.includes('index') &&
-        !key.includes('meta') &&
-        !key.includes('url_') &&
-        key !== 'current_active_playlist_id'
+      const playlistKeys = allKeys.filter(
+        key =>
+          key.startsWith('playlist_') &&
+          !key.includes('index') &&
+          !key.includes('meta') &&
+          !key.includes('url_') &&
+          key !== 'current_active_playlist_id',
       );
 
-      console.log(`📦 ${playlistKeys.length} playlists trouvées dans storage:`, playlistKeys);
+      console.log(
+        `📦 ${playlistKeys.length} playlists trouvées dans storage:`,
+        playlistKeys,
+      );
 
       // 🚀 NOUVELLE LOGIQUE : Essayer aussi saved_m3u_playlists
       if (allKeys.includes('saved_m3u_playlists')) {
         console.log('🔍 Tentative chargement depuis saved_m3u_playlists...');
         try {
-          const savedPlaylists = await AsyncStorage.getItem('saved_m3u_playlists');
+          const savedPlaylists = await AsyncStorage.getItem(
+            'saved_m3u_playlists',
+          );
           if (savedPlaylists) {
             const playlistsArray = JSON.parse(savedPlaylists);
-            console.log('📋 Playlists dans saved_m3u_playlists:', playlistsArray.length);
+            console.log(
+              '📋 Playlists dans saved_m3u_playlists:',
+              playlistsArray.length,
+            );
 
             for (let i = 0; i < playlistsArray.length; i++) {
               try {
                 const playlist = playlistsArray[i] as Playlist;
                 this.playlists.set(playlist.id, playlist);
-                console.log(`✅ Playlist chargée: ${playlist.name} (${playlist.channels?.length || 0} chaînes)`);
+                console.log(
+                  `✅ Playlist chargée: ${playlist.name} (${
+                    playlist.channels?.length || 0
+                  } chaînes)`,
+                );
               } catch (error) {
                 console.error(`❌ Erreur chargement playlist ${i}:`, error);
               }
@@ -83,14 +96,20 @@ export class PlaylistService {
           if (playlistData) {
             const playlist = JSON.parse(playlistData) as Playlist;
             this.playlists.set(playlist.id, playlist);
-            console.log(`✅ Playlist chargée: ${playlist.name} (${playlist.channels?.length || 0} chaînes)`);
+            console.log(
+              `✅ Playlist chargée: ${playlist.name} (${
+                playlist.channels?.length || 0
+              } chaînes)`,
+            );
           }
         } catch (error) {
           console.error(`❌ Erreur chargement playlist ${key}:`, error);
         }
       }
 
-      console.log(`✅ PlaylistService initialisé avec ${this.playlists.size} playlists`);
+      console.log(
+        `✅ PlaylistService initialisé avec ${this.playlists.size} playlists`,
+      );
     } catch (error) {
       console.error('❌ Erreur initialisation PlaylistService:', error);
     }
@@ -140,15 +159,25 @@ export class PlaylistService {
         throw new Error(`Playlist ${playlistId} non trouvée dans AsyncStorage`);
       }
 
-      console.log(`📋 Playlist chargée: ${playlist.name} (${playlist.channels?.length || 0} chaînes)`);
-      onProgress?.(15, `Préparation migration ${playlist.channels?.length || 0} chaînes...`);
+      console.log(
+        `📋 Playlist chargée: ${playlist.name} (${
+          playlist.channels?.length || 0
+        } chaînes)`,
+      );
+      onProgress?.(
+        15,
+        `Préparation migration ${playlist.channels?.length || 0} chaînes...`,
+      );
 
       // 2. Convertir en format M3U pour import
       const m3uContent = this.convertPlaylistToM3U(playlist);
-      console.log(`✅ Conversion M3U terminée: ${m3uContent.length} caractères`);
+      console.log(
+        `✅ Conversion M3U terminée: ${m3uContent.length} caractères`,
+      );
 
       // 3. Importer dans WatermelonDB via WatermelonM3UService
-      const WatermelonM3UService = (await import('./WatermelonM3UService')).default;
+      const WatermelonM3UService = (await import('./WatermelonM3UService'))
+        .default;
 
       const newPlaylistId = await WatermelonM3UService.importM3UPlaylist(
         m3uContent,
@@ -170,12 +199,21 @@ export class PlaylistService {
 
       // Supprimer aussi de saved_m3u_playlists si présente
       try {
-        const savedPlaylists = await AsyncStorage.getItem('saved_m3u_playlists');
+        const savedPlaylists = await AsyncStorage.getItem(
+          'saved_m3u_playlists',
+        );
         if (savedPlaylists) {
           const playlistsArray = JSON.parse(savedPlaylists);
-          const filtered = playlistsArray.filter((p: Playlist) => p.id !== playlistId);
-          await AsyncStorage.setItem('saved_m3u_playlists', JSON.stringify(filtered));
-          console.log(`✅ Playlist ${playlistId} supprimée de saved_m3u_playlists`);
+          const filtered = playlistsArray.filter(
+            (p: Playlist) => p.id !== playlistId,
+          );
+          await AsyncStorage.setItem(
+            'saved_m3u_playlists',
+            JSON.stringify(filtered),
+          );
+          console.log(
+            `✅ Playlist ${playlistId} supprimée de saved_m3u_playlists`,
+          );
         }
       } catch (e) {
         console.log('⚠️ saved_m3u_playlists non trouvée ou vide');
@@ -184,7 +222,11 @@ export class PlaylistService {
       // 5. Mettre à jour la référence en mémoire
       this.playlists.delete(playlistId);
 
-      const result = await WatermelonM3UService.getPlaylistWithChannels(newPlaylistId, 100, 0);
+      const result = await WatermelonM3UService.getPlaylistWithChannels(
+        newPlaylistId,
+        100,
+        0,
+      );
       this.playlists.set(newPlaylistId, {
         id: newPlaylistId,
         name: result.playlist.name,
@@ -222,7 +264,9 @@ export class PlaylistService {
         channel.logo ? `tvg-logo="${channel.logo}"` : '',
         channel.groupTitle ? `group-title="${channel.groupTitle}"` : '',
         channel.name || 'Sans nom',
-      ].filter(Boolean).join(' ');
+      ]
+        .filter(Boolean)
+        .join(' ');
 
       lines.push(extinf);
       lines.push(channel.url);
@@ -247,9 +291,8 @@ export class PlaylistService {
       onProgress?.(5, 'Démarrage import...');
 
       // 🚀 Utiliser WatermelonM3UService pour import SQLite
-      const WatermelonM3UService = (
-        await import('./WatermelonM3UService')
-      ).default;
+      const WatermelonM3UService = (await import('./WatermelonM3UService'))
+        .default;
 
       // Import avec progress callback
       const playlistId = await WatermelonM3UService.importM3UPlaylist(
@@ -311,12 +354,19 @@ export class PlaylistService {
 
       // 🚀 FALLBACK : Si playlist pas en mémoire, essayer WatermelonDB d'abord
       if (!playlist) {
-        console.log(`⚠️ Playlist ${playlistId} pas en mémoire, tentative chargement WatermelonDB...`);
+        console.log(
+          `⚠️ Playlist ${playlistId} pas en mémoire, tentative chargement WatermelonDB...`,
+        );
 
         try {
           // Essayer de charger depuis WatermelonDB
-          const WatermelonM3UService = (await import('./WatermelonM3UService')).default;
-          const result = await WatermelonM3UService.getPlaylistWithChannels(playlistId, 100, 0);
+          const WatermelonM3UService = (await import('./WatermelonM3UService'))
+            .default;
+          const result = await WatermelonM3UService.getPlaylistWithChannels(
+            playlistId,
+            100,
+            0,
+          );
 
           if (result && result.playlist) {
             // Créer objet Playlist depuis WatermelonDB
@@ -334,7 +384,9 @@ export class PlaylistService {
             };
 
             this.playlists.set(playlistId, playlist);
-            console.log(`✅ Playlist ${playlistId} chargée depuis WatermelonDB`);
+            console.log(
+              `✅ Playlist ${playlistId} chargée depuis WatermelonDB`,
+            );
           }
         } catch (watermelonError) {
           console.log('⚠️ Pas dans WatermelonDB, essai cache AsyncStorage...');
@@ -343,7 +395,9 @@ export class PlaylistService {
 
           if (playlist) {
             this.playlists.set(playlistId, playlist);
-            console.log(`✅ Playlist ${playlistId} chargée depuis cache AsyncStorage`);
+            console.log(
+              `✅ Playlist ${playlistId} chargée depuis cache AsyncStorage`,
+            );
           }
         }
       }
@@ -360,18 +414,16 @@ export class PlaylistService {
       // Les données sont déjà en SQLite
       if (playlist.channels && playlist.channels.length > 0) {
         // Legacy: synchroniser avec PlaylistStore
-        const { usePlaylistStore } = await import('../stores/PlaylistStore');
-        const { loadPlaylist } = usePlaylistStore.getState();
+        const {usePlaylistStore} = await import('../stores/PlaylistStore');
+        const {loadPlaylist} = usePlaylistStore.getState();
 
         console.log('🔄 Synchronisation PlaylistStore (Legacy)...');
-        loadPlaylist(
-          playlist.source,
-          playlist.channels,
-          playlist.name
-        );
+        loadPlaylist(playlist.source, playlist.channels, playlist.name);
         console.log('✅ PlaylistStore synchronisé');
       } else {
-        console.log('✅ Playlist WatermelonDB - Pas de sync PlaylistStore nécessaire');
+        console.log(
+          '✅ Playlist WatermelonDB - Pas de sync PlaylistStore nécessaire',
+        );
       }
 
       return playlist;
@@ -396,14 +448,21 @@ export class PlaylistService {
    */
   async getAllPlaylists(): Promise<Playlist[]> {
     try {
-      console.log('📋 Chargement de toutes les playlists depuis WatermelonDB...');
+      console.log(
+        '📋 Chargement de toutes les playlists depuis WatermelonDB...',
+      );
 
       const database = (await import('../database')).default;
       const {Playlist: PlaylistModel} = await import('../database/models');
 
-      const watermelonPlaylists = await database.get<typeof PlaylistModel>('playlists').query().fetch();
+      const watermelonPlaylists = await database
+        .get<typeof PlaylistModel>('playlists')
+        .query()
+        .fetch();
 
-      console.log(`📋 ${watermelonPlaylists.length} playlists trouvées dans WatermelonDB`);
+      console.log(
+        `📋 ${watermelonPlaylists.length} playlists trouvées dans WatermelonDB`,
+      );
 
       return watermelonPlaylists.map(p => ({
         id: p.id,
@@ -565,22 +624,30 @@ export class PlaylistService {
       }
 
       // 🚀 FALLBACK CRITIQUE : Essayer AsyncStorage directement
-      console.log(`📦 Tentative chargement direct AsyncStorage pour: ${playlistId}`);
+      console.log(
+        `📦 Tentative chargement direct AsyncStorage pour: ${playlistId}`,
+      );
       const playlistData = await AsyncStorage.getItem(cacheKey);
 
       if (playlistData) {
         const parsedPlaylist = JSON.parse(playlistData) as Playlist;
-        console.log(`✅ Playlist ${playlistId} chargée depuis AsyncStorage direct:`, {
-          name: parsedPlaylist.name,
-          channels: parsedPlaylist.channels?.length || 0
-        });
+        console.log(
+          `✅ Playlist ${playlistId} chargée depuis AsyncStorage direct:`,
+          {
+            name: parsedPlaylist.name,
+            channels: parsedPlaylist.channels?.length || 0,
+          },
+        );
         return parsedPlaylist;
       }
 
       console.log(`❌ Playlist ${playlistId} introuvable dans tous les caches`);
       return null;
     } catch (error) {
-      console.error(`❌ Erreur chargement cache playlist ${playlistId}:`, error);
+      console.error(
+        `❌ Erreur chargement cache playlist ${playlistId}:`,
+        error,
+      );
       return null;
     }
   }

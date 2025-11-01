@@ -143,18 +143,21 @@ export class SearchService {
       let hasPartialMatch = false;
 
       const searchFields = [
-        channel.name,
-        channel.group || '',
-        channel.category || '',
-        channel.language || '',
-        channel.country || '',
+        channel.name,        // 🔥 UNIQUEMENT le nom de la chaîne
+        // channel.group || '', // ❌ Désactivé - cause du problème !
+        // channel.category || '', // Désactivé - trop large
+        // channel.language || '', // Désactivé - perturbant
+        // channel.country || '', // Désactivé - perturbant
       ];
 
       // Vérifier correspondance exacte d'abord
       searchFields.forEach(field => {
-        if (field) {
+        if (field && typeof field === 'string') {
           const fieldLower = field.toLowerCase();
-          if (fieldLower === lowerQuery || fieldLower.startsWith(lowerQuery + ' ')) {
+          if (
+            fieldLower === lowerQuery ||
+            fieldLower.startsWith(lowerQuery + ' ')
+          ) {
             isExactMatch = true;
           }
         }
@@ -163,14 +166,14 @@ export class SearchService {
       // Si pas de correspondance exacte, vérifier correspondance partielle
       if (!isExactMatch) {
         searchFields.forEach(field => {
-          if (field && field.toLowerCase().includes(lowerQuery)) {
+          if (field && typeof field === 'string' && field.toLowerCase().includes(lowerQuery)) {
             hasPartialMatch = true;
           }
         });
       }
 
       if (isExactMatch) {
-        exactMatches.push({ ...channel, isHighlighted: true });
+        exactMatches.push({...channel, isHighlighted: true});
       } else if (hasPartialMatch) {
         partialMatches.push(channel);
       }
@@ -190,25 +193,29 @@ export class SearchService {
     tolerance: number = 2,
   ): Channel[] {
     const lowerQuery = query.toLowerCase().trim();
-    const results: {channel: Channel; score: number; isExactMatch: boolean}[] = [];
+    const results: {channel: Channel; score: number; isExactMatch: boolean}[] =
+      [];
 
     channels.forEach(channel => {
       let bestScore = Infinity;
       let isExactMatch = false;
       const searchFields = [
-        channel.name,
-        channel.group || '',
-        channel.category || '',
-        channel.language || '',
-        channel.country || '',
+        channel.name,        // 🔥 UNIQUEMENT le nom de la chaîne
+        // channel.group || '', // ❌ Désactivé - cause du problème !
+        // channel.category || '', // Désactivé - trop large
+        // channel.language || '', // Désactivé - perturbant
+        // channel.country || '', // Désactivé - perturbant
       ];
 
       searchFields.forEach(field => {
-        if (field) {
+        if (field && typeof field === 'string') {
           const fieldLower = field.toLowerCase();
 
           // 🎯 Détecter correspondance exacte ou début exact
-          if (fieldLower === lowerQuery || fieldLower.startsWith(lowerQuery + ' ')) {
+          if (
+            fieldLower === lowerQuery ||
+            fieldLower.startsWith(lowerQuery + ' ')
+          ) {
             bestScore = -1; // Score spécial pour correspondance exacte
             isExactMatch = true;
             return;
@@ -231,9 +238,13 @@ export class SearchService {
       if (bestScore <= tolerance) {
         const channelWithHighlight = {
           ...channel,
-          isHighlighted: isExactMatch
+          isHighlighted: isExactMatch,
         };
-        results.push({channel: channelWithHighlight, score: bestScore, isExactMatch});
+        results.push({
+          channel: channelWithHighlight,
+          score: bestScore,
+          isExactMatch,
+        });
       }
     });
 
@@ -241,8 +252,12 @@ export class SearchService {
     return results
       .sort((a, b) => {
         // Correspondances exactes en premier
-        if (a.isExactMatch && !b.isExactMatch) return -1;
-        if (!a.isExactMatch && b.isExactMatch) return 1;
+        if (a.isExactMatch && !b.isExactMatch) {
+          return -1;
+        }
+        if (!a.isExactMatch && b.isExactMatch) {
+          return 1;
+        }
         // Sinon trier par score
         return a.score - b.score;
       })
@@ -443,12 +458,14 @@ export class SearchService {
 
   private getSearchableText(channel: Channel): string {
     return [
-      channel.name,
-      channel.group || '',
-      channel.category || '',
-      channel.language || '',
-      channel.country || '',
-    ].join(' ');
+      channel.name || '',        // 🔥 UNIQUEMENT le nom de la chaîne
+      // channel.group || '',       // ❌ Désactivé - cause du problème !
+      // channel.category || '', // Désactivé - trop large
+      // channel.language || '', // Désactivé - perturbant
+      // channel.country || '', // Désactivé - perturbant
+    ]
+    .filter(field => typeof field === 'string')
+    .join(' ');
   }
 
   private levenshteinDistance(a: string, b: string): number {

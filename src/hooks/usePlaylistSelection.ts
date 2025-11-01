@@ -30,7 +30,6 @@ export const usePlaylistSelection = () => {
           playlistName,
         );
 
-
         // 🚀 ANIMATION IMMÉDIATE - Aucun délai !
         showLoading(
           playlistName
@@ -40,14 +39,13 @@ export const usePlaylistSelection = () => {
           0,
         );
 
-
-      // S'assurer que les callbacks sont configurés
+        // S'assurer que les callbacks sont configurés
         initializePlaylistService();
 
         // Appeler la méthode du service qui gère l'animation
         const playlist = await playlistService.selectPlaylist(playlistId);
 
-      return playlist;
+        return playlist;
       } catch (error) {
         console.error(
           '❌ Hook: Erreur dans selectPlaylistWithAnimation:',

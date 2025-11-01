@@ -19,6 +19,9 @@ import ChannelListScreen from './src/screens/ChannelListScreen';
 import ChannelsScreen from './src/screens/ChannelsScreen';
 import ChannelPlayerScreen from './src/screens/ChannelPlayerScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
+import ParentalControlScreen from './src/screens/ParentalControlScreen';
+import CategoriesSelectionScreen from './src/screens/CategoriesSelectionScreen';
+import TimeRestrictionsScreen from './src/screens/TimeRestrictionsScreen';
 import type {Channel} from './src/types';
 
 // Types navigation simple
@@ -41,6 +44,9 @@ export type SimpleRootStackParamList = {
     category?: string;
   };
   Settings: undefined;
+  ParentalControl: undefined;
+  CategoriesSelection: {profileId: string};
+  TimeRestrictions: {profileId: string};
 };
 
 const Stack = createStackNavigator<SimpleRootStackParamList>();
@@ -74,12 +80,15 @@ const AppWithNavigation: React.FC = () => {
           <Stack.Screen name="ChannelsScreen" component={ChannelsScreen} />
           <Stack.Screen name="ChannelPlayer" component={ChannelPlayerScreen} />
           <Stack.Screen name="Settings" component={SettingsScreen} />
+          <Stack.Screen name="ParentalControl" component={ParentalControlScreen} />
+          <Stack.Screen name="CategoriesSelection" component={CategoriesSelectionScreen} />
+          <Stack.Screen name="TimeRestrictions" component={TimeRestrictionsScreen} />
         </Stack.Navigator>
         {/* Overlays globaux pour toute l'app */}
         <LoadingOverlay />
         <NotificationToast />
       </NavigationContainer>
-      <GlobalVideoPlayer />
+      {/* GlobalVideoPlayer géré par App.tsx (instance principale) */}
       {/* PlaylistProvider removed - replaced by PlaylistStore Zustand */}
       {/* AppProvider removed */}
     </PaperProvider>

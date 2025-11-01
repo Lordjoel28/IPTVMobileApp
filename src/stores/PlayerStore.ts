@@ -15,6 +15,7 @@ interface NavigationData {
   initialChannels: Channel[];
   playlistName: string;
   useWatermelonDB: boolean;
+  playlistType?: 'M3U' | 'XTREAM';
 }
 
 export interface PlayerState {
@@ -88,42 +89,38 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       if (currentState.playlistId) {
         setTimeout(async () => {
           try {
-            const AsyncStorage = (
-              await import('@react-native-async-storage/async-storage')
+            // 👤 Récupérer le profil actif
+            const ProfileService = (
+              await import('../services/ProfileService')
             ).default;
-            const recentKey = `recent_channels_${currentState.playlistId}`;
+            const activeProfile = await ProfileService.getActiveProfile();
 
-            // Récupérer l'historique actuel
-            const existingData = await AsyncStorage.getItem(recentKey);
-            let recentChannels: Channel[] = existingData
-              ? JSON.parse(existingData)
-              : [];
-
-            // Retirer la chaîne si elle existe déjà (éviter doublons)
-            recentChannels = recentChannels.filter(c => c.id !== channel.id);
-
-            // Ajouter la chaîne en première position
-            recentChannels.unshift(channel);
-
-            // Limiter à 20 chaînes récentes maximum
-            if (recentChannels.length > 20) {
-              recentChannels = recentChannels.slice(0, 20);
+            if (!activeProfile) {
+              console.log('⚠️ [PlayerStore] Aucun profil actif, impossible d\'ajouter aux récents');
+              return;
             }
 
-            // Sauvegarder l'historique mis à jour
-            await AsyncStorage.setItem(
-              recentKey,
-              JSON.stringify(recentChannels),
-            );
-            console.log(
-              `✅ [PlayerStore Récents] Chaîne "${channel.name}" ajoutée aux récents (${recentChannels.length} total)`,
+            // 🆕 Utiliser le nouveau RecentChannelsService
+            const RecentChannelsService = (
+              await import('../services/RecentChannelsService')
+            ).default;
+
+            await RecentChannelsService.addRecent(
+              channel,
+              currentState.playlistId,
+              activeProfile.id,
             );
 
             // Mettre à jour le store partagé pour synchronisation
+            const updatedRecents = await RecentChannelsService.getRecentsByProfile(
+              activeProfile.id,
+              currentState.playlistId,
+            );
+
             const {setRecentChannels} = (
               await import('./RecentChannelsStore')
             ).useRecentChannelsStore.getState();
-            setRecentChannels(recentChannels);
+            setRecentChannels(updatedRecents, activeProfile.id);
           } catch (error) {
             console.error(
               '❌ [PlayerStore Récents] Erreur ajout aux récents:',
@@ -144,7 +141,9 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
         error: null,
       }));
 
-      console.log(`✅ [PlayerStore] Channel state updated - isPaused: false, isVisible: true`);
+      console.log(
+        '✅ [PlayerStore] Channel state updated - isPaused: false, isVisible: true',
+      );
     },
 
     // Alias pour compatibilité avec les appels existants
@@ -165,11 +164,39 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
 
     // Gérer le mode plein écran
     setFullscreen: (fullscreen: boolean) => {
-      console.log(`🖥️ [PlayerStore] Setting fullscreen to: ${fullscreen}`);
-      // Ne pas masquer le lecteur si on passe en mini-lecteur
-      if (get().isVisible) {
-        set(state => ({...state, isFullscreen: fullscreen}));
+      const currentState = get();
+
+      console.log(`🖥️ [PlayerStore] Changement fullscreen demandé: ${fullscreen}`);
+      console.log('  État actuel:', {
+        isFullscreen: currentState.isFullscreen,
+        isVisible: currentState.isVisible,
+        channelName: currentState.channel?.name,
+        isPaused: currentState.isPaused,
+        isInChannelPlayerScreen: currentState.isInChannelPlayerScreen
+      });
+
+      // Guard: éviter les changements inutiles
+      if (currentState.isFullscreen === fullscreen) {
+        console.log('⏭️ [PlayerStore] Changement fullscreen ignoré - déjà dans cet état');
+        return;
       }
+
+      // Guard: préserver isVisible sauf si explicitement demandé autrement
+      if (!currentState.isVisible) {
+        console.log('⚠️ [PlayerStore] Changement fullscreen - player non visible, autorisé');
+      }
+
+      set(state => ({
+        ...state,
+        isFullscreen: fullscreen,
+        // Préserver isVisible sauf si explicitement demandé autrement
+        isVisible: fullscreen ? currentState.isVisible : currentState.isVisible,
+      }));
+
+      console.log('✅ [PlayerStore] Changement fullscreen effectué:', {
+        newFullscreen: fullscreen,
+        isVisible: get().isVisible
+      });
     },
 
     // Gérer Play/Pause
@@ -189,7 +216,30 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
 
     // Arrêter et masquer le lecteur
     stop: () => {
-      console.log('⏹️ [PlayerStore] Stopping and hiding player');
+      console.log('⏹️ [PlayerStore] Demande d\'arrêt - vérification des conditions');
+
+      const currentState = get();
+
+      // Guard: Ne pas arrêter si on est en plein écran et que c'est un clic accidentel
+      if (currentState.isFullscreen && currentState.isVisible && currentState.channel) {
+        console.log('⚠️ [PlayerStore] Arrêt bloqué - fullscreen actif et visible');
+        console.log('   État actuel:', {
+          isFullscreen: currentState.isFullscreen,
+          isVisible: currentState.isVisible,
+          channelName: currentState.channel?.name,
+          isPaused: currentState.isPaused
+        });
+        return;
+      }
+
+  
+      console.log('✅ [PlayerStore] Arrêt autorisé - État avant arrêt:', {
+        isFullscreen: currentState.isFullscreen,
+        isVisible: currentState.isVisible,
+        channelName: currentState.channel?.name,
+        isPaused: currentState.isPaused
+      });
+
       set(() => ({...initialState}));
     },
 
@@ -275,7 +325,9 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     },
 
     setSearchScreenOpen: (isOpen: boolean) => {
-      console.log(`[PlayerStore] Search screen ${isOpen ? 'opened' : 'closed'}`);
+      console.log(
+        `[PlayerStore] Search screen ${isOpen ? 'opened' : 'closed'}`,
+      );
       set(state => ({...state, isSearchScreenOpen: isOpen}));
     },
 

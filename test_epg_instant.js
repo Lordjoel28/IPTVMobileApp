@@ -27,12 +27,17 @@ function testEPGInstant() {
   endTime.setHours(startTime.getHours() + 2);
 
   console.log(`⏰ Heure courante: ${now.toLocaleTimeString()}`);
-  console.log(`📅 Programme actuel: ${startTime.toLocaleTimeString()} - ${endTime.toLocaleTimeString()}`);
+  console.log(
+    `📅 Programme actuel: ${startTime.toLocaleTimeString()} - ${endTime.toLocaleTimeString()}`,
+  );
 
   const currentTime = now.getTime();
   const totalDuration = endTime.getTime() - startTime.getTime();
   const elapsed = currentTime - startTime.getTime();
-  const progressPercentage = Math.max(0, Math.min(100, (elapsed / totalDuration) * 100));
+  const progressPercentage = Math.max(
+    0,
+    Math.min(100, (elapsed / totalDuration) * 100),
+  );
 
   console.log(`📊 Progression: ${progressPercentage.toFixed(1)}%`);
 

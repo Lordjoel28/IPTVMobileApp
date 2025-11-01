@@ -23,7 +23,9 @@ export const useEPGProgressNotifications = () => {
   const {showNotification} = useUIStore();
 
   useEffect(() => {
-    console.log('📢 [useEPGProgressNotifications] Démarrage écoute événements EPG');
+    console.log(
+      '📢 [useEPGProgressNotifications] Démarrage écoute événements EPG',
+    );
 
     // Gestionnaires d'événements EPG
     const handleEPGSyncStarted = (event: EPGProgressEvent) => {
@@ -50,9 +52,15 @@ export const useEPGProgressNotifications = () => {
       });
 
       // Afficher notifications aux étapes importantes
-      if (progress.progress === 25 || progress.progress === 50 || progress.progress === 75) {
+      if (
+        progress.progress === 25 ||
+        progress.progress === 50 ||
+        progress.progress === 75
+      ) {
         const timeRemaining = progress.estimatedTimeRemaining
-          ? ` (${Math.round(progress.estimatedTimeRemaining / 1000)}s restantes)`
+          ? ` (${Math.round(
+              progress.estimatedTimeRemaining / 1000,
+            )}s restantes)`
           : '';
 
         showNotification(
@@ -77,7 +85,9 @@ export const useEPGProgressNotifications = () => {
       console.log('❌ [EPG Notifications] Erreur EPG sync', event);
 
       showNotification(
-        `⚠️ Erreur EPG: ${event.progress.error || 'Impossible de charger le guide'}`,
+        `⚠️ Erreur EPG: ${
+          event.progress.error || 'Impossible de charger le guide'
+        }`,
         'error',
         5000,
       );

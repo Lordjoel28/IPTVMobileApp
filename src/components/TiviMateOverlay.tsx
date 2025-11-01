@@ -108,19 +108,19 @@ const TiviMateOverlay: React.FC<TiviMateOverlayProps> = ({
               <Text style={styles.programTitle}>Programme actuel</Text>
               <View style={styles.programDetails}>
                 <Text style={styles.programTime}>
-                  {Math.floor(currentTime / 60)
+                  {Math.floor((currentTime || 0) / 60)
                     .toString()
                     .padStart(2, '0')}
                   :
-                  {Math.floor(currentTime % 60)
+                  {Math.floor((currentTime || 0) % 60)
                     .toString()
                     .padStart(2, '0')}{' '}
                   —
-                  {Math.floor(duration / 60)
+                  {Math.floor((duration || 0) / 60)
                     .toString()
                     .padStart(2, '0')}
                   :
-                  {Math.floor(duration % 60)
+                  {Math.floor((duration || 0) % 60)
                     .toString()
                     .padStart(2, '0')}
                 </Text>

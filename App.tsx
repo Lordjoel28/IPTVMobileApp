@@ -5,6 +5,7 @@
 
 import React from 'react';
 import {useFastImageCache} from './src/hooks/useFastImageCache';
+import {useDatabaseInitialization} from './src/hooks/useDatabaseInitialization';
 
 // ✅ Masquer le warning WatermelonDB spécifique (trop verbeux pour l'utilisateur)
 const originalWarn = console.warn;
@@ -12,8 +13,11 @@ console.warn = (...args) => {
   const message = args[0]?.toString?.() || '';
 
   // Masquer spécifiquement le warning batch de WatermelonDB
-  if (message.includes('Database.batch was called with') && message.includes('arguments') ||
-      message.includes('🍉')) {
+  if (
+    (message.includes('Database.batch was called with') &&
+      message.includes('arguments')) ||
+    message.includes('🍉')
+  ) {
     return; // Ne pas afficher ce warning spécifique
   }
 
@@ -31,28 +35,50 @@ import {GestureHandlerRootView} from 'react-native-gesture-handler';
 // Force l'initialisation du PlaylistStore pour déclencher le log de persistance
 import './src/stores/PlaylistStore';
 
+// Force l'initialisation du CastManager pour demander les permissions dès le démarrage
+import {castManager} from './src/services/CastManager';
+// Le simple import du singleton déclenche son initialisation
+console.log('📺 [App] CastManager initialized:', !!castManager);
+
+// Initialisation des index de performance pour la recherche
+import {databaseIndexService} from './src/services/DatabaseIndexService';
+// L'indexation se fera au premier accès, sans bloquer le démarrage
+console.log('🗃️ [App] Database index service initialized:', !!databaseIndexService);
+
+// NOTE: Les index SQL sont créés automatiquement par les migrations WatermelonDB (schema v4)
+// Il est impossible de vérifier leur existence via SQL car sqlite_master n'est pas dans le schéma
+// Les performances se vérifieront lors de l'utilisation réelle de l'app
+
 // Components globaux
 import LoadingOverlay from './src/components/LoadingOverlay';
 import NotificationToast from './src/components/NotificationToast';
 import GlobalVideoPlayer from './src/components/GlobalVideoPlayer';
 import SplashScreen from './src/screens/SplashScreen';
-import { ThemeProvider } from './src/contexts/ThemeContext';
+import {ThemeProvider} from './src/contexts/ThemeContext';
+import {AlertProvider} from './src/contexts/AlertContext';
 
 // Screens
 import App_IPTV_SMARTERS from './App_IPTV_SMARTERS';
 import ChannelListScreen from './src/screens/ChannelListScreen';
 import ChannelsScreen from './src/screens/ChannelsScreen';
 import ChannelPlayerScreen from './src/screens/ChannelPlayerScreen';
-import SearchScreen from './src/screens/SearchScreen';
+import FinalSearchScreenWrapper from './src/screens/FinalSearchScreenWrapper';
 import SettingsScreen from './src/screens/SettingsScreen';
 import VideoPlayerSettingsScreen from './src/screens/VideoPlayerSettingsScreen';
 import TVGuideSettingsScreen from './src/screens/TVGuideSettingsScreen';
 import ThemeSettingsScreen from './src/screens/ThemeSettingsScreen';
+import AccountScreen from './src/screens/AccountScreen';
+import AccountInfoScreen from './src/screens/AccountInfoScreen';
+import ParentalControlScreen from './src/screens/ParentalControlScreen';
+import CategoriesSelectionScreen from './src/screens/CategoriesSelectionScreen';
+import TimeRestrictionsScreen from './src/screens/TimeRestrictionsScreen';
 import EPGManualSourcesScreen from './src/screens/EPGManualSourcesScreen';
 import EPGPlaylistAssignmentScreen from './src/screens/EPGPlaylistAssignmentScreen';
+import AddProfileScreen from './src/screens/AddProfileScreen';
+import UserProfileScreen from './src/screens/UserProfileScreen';
 
 // Types navigation
-import type {Channel} from './src/types';
+import type {Channel, Profile} from './src/types';
 
 // Types navigation unifiés
 export type RootStackParamList = {
@@ -73,15 +99,25 @@ export type RootStackParamList = {
     playlistName: string;
     category?: string;
   };
-  Search: {
-    allChannels: Channel[];
+  FinalSearch: {
     playlistId: string;
-    playlistName: string;
+    initialCategory?: string;
+    categoryName?: string;
+    categoryGroupTitle?: string;
+    playlistName?: string;
+    playlistType?: string;
   };
   Settings: undefined;
   VideoPlayerSettings: undefined;
   TVGuideSettings: undefined;
   ThemeSettings: undefined;
+  Account: undefined;
+  AccountInfo: undefined;
+    AddProfile: undefined;
+  UserProfile: { profile: Profile };
+  ParentalControl: undefined;
+  CategoriesSelection: {profileId: string};
+  TimeRestrictions: {profileId: string};
   EPGManualSources: undefined;
   EPGPlaylistAssignment: undefined;
 };
@@ -102,14 +138,18 @@ const App: React.FC = () => {
   // Configuration cache FastImage au démarrage
   useFastImageCache();
 
+  // Initialisation des index de base de données en arrière-plan
+  useDatabaseInitialization();
+
   // La persistance est maintenant gérée automatiquement par le store Zustand.
   // L'état (y compris la playlist active) est restauré au démarrage de l'application.
 
   return (
     <GestureHandlerRootView style={{flex: 1}}>
       <ThemeProvider>
-        <PaperProvider>
-        {/*
+        <AlertProvider>
+          <PaperProvider>
+            {/*
         Architecture moderne IPTV Mobile v2.2.0+ :
         ✅ Pas de Context Providers (remplacés par Zustand)
         ✅ Architecture DI pure avec services modulaires
@@ -117,67 +157,127 @@ const App: React.FC = () => {
         ✅ Navigation React Navigation 6.x
         ✅ Overlays globaux pour UX fluide
       */}
-        <NavigationContainer>
-          <Stack.Navigator
-            initialRouteName="IPTVSmarters"
-            screenOptions={{
-              headerShown: false,
-              gestureEnabled: true,
-              cardStyleInterpolator: ({current, layouts}) => ({
-                cardStyle: {
-                  transform: [
-                    {
-                      translateX: current.progress.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [layouts?.screen?.width || 375, 0],
-                      }),
+            <NavigationContainer>
+              <Stack.Navigator
+                initialRouteName="IPTVSmarters"
+                screenOptions={{
+                  headerShown: false,
+                  gestureEnabled: true,
+                  gestureDirection: 'horizontal-inverted', // Swipe vers la gauche pour revenir
+                  cardStyleInterpolator: ({current, layouts}) => ({
+                    cardStyle: {
+                      transform: [
+                        {
+                          translateX: current.progress.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [layouts?.screen?.width || 375, 0],
+                          }),
+                        },
+                      ],
                     },
-                  ],
-                },
-              }),
-            }}>
-            <Stack.Screen name="IPTVSmarters" component={App_IPTV_SMARTERS} />
-            <Stack.Screen name="ChannelList" component={ChannelListScreen} />
-            <Stack.Screen name="ChannelsScreen" component={ChannelsScreen} />
-            <Stack.Screen
-              name="ChannelPlayer"
-              component={ChannelPlayerScreen}
-            />
-            <Stack.Screen
-              name="Search"
-              component={SearchScreen}
-              options={{
-                presentation: 'modal',
-                cardStyleInterpolator: ({current, layouts}) => ({
-                  cardStyle: {
-                    transform: [
-                      {
-                        translateY: current.progress.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [layouts?.screen?.height || 844, 0],
-                        }),
+                  }),
+                }}>
+                <Stack.Screen
+                  name="IPTVSmarters"
+                  component={App_IPTV_SMARTERS}
+                />
+                <Stack.Screen
+                  name="ChannelList"
+                  component={ChannelListScreen}
+                />
+                <Stack.Screen
+                  name="ChannelsScreen"
+                  component={ChannelsScreen}
+                />
+                <Stack.Screen
+                  name="ChannelPlayer"
+                  component={ChannelPlayerScreen}
+                />
+                                  <Stack.Screen
+                  name="FinalSearch"
+                  component={FinalSearchScreenWrapper}
+                  options={{
+                    presentation: 'modal',
+                    headerShown: false,
+                    gestureEnabled: false, // 🔥 Désactiver les gestes pour éviter conflit avec ScrollView horizontal
+                    cardStyleInterpolator: ({current, layouts}) => ({
+                      cardStyle: {
+                        transform: [
+                          {
+                            translateY: current.progress.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: [layouts?.screen?.height || 844, 0],
+                            }),
+                          },
+                        ],
                       },
-                    ],
-                  },
-                }),
-              }}
-            />
-            <Stack.Screen name="Settings" component={SettingsScreen} />
-            <Stack.Screen name="VideoPlayerSettings" component={VideoPlayerSettingsScreen} />
-            <Stack.Screen name="TVGuideSettings" component={TVGuideSettingsScreen} />
-            <Stack.Screen name="ThemeSettings" component={ThemeSettingsScreen} />
-            <Stack.Screen name="EPGManualSources" component={EPGManualSourcesScreen} />
-            <Stack.Screen name="EPGPlaylistAssignment" component={EPGPlaylistAssignmentScreen} />
-          </Stack.Navigator>
+                    }),
+                  }}
+                />
+                <Stack.Screen name="Settings" component={SettingsScreen} />
+                <Stack.Screen
+                  name="VideoPlayerSettings"
+                  component={VideoPlayerSettingsScreen}
+                />
+                <Stack.Screen
+                  name="TVGuideSettings"
+                  component={TVGuideSettingsScreen}
+                />
+                <Stack.Screen
+                  name="ThemeSettings"
+                  component={ThemeSettingsScreen}
+                />
+                <Stack.Screen
+                  name="Account"
+                  component={AccountScreen}
+                />
+                <Stack.Screen
+                  name="AccountInfo"
+                  component={AccountInfoScreen}
+                />
+                  <Stack.Screen
+                  name="AddProfile"
+                  component={AddProfileScreen}
+                  options={{
+                    presentation: 'modal',
+                    headerShown: false,
+                  }}
+                />
+                <Stack.Screen
+                  name="UserProfile"
+                  component={UserProfileScreen}
+                />
+                <Stack.Screen
+                  name="ParentalControl"
+                  component={ParentalControlScreen}
+                />
+                <Stack.Screen
+                  name="CategoriesSelection"
+                  component={CategoriesSelectionScreen}
+                />
+                <Stack.Screen
+                  name="TimeRestrictions"
+                  component={TimeRestrictionsScreen}
+                />
+                <Stack.Screen
+                  name="EPGManualSources"
+                  component={EPGManualSourcesScreen}
+                />
+                <Stack.Screen
+                  name="EPGPlaylistAssignment"
+                  component={EPGPlaylistAssignmentScreen}
+                />
+              </Stack.Navigator>
 
-          {/* Overlays globaux pour toute l'app */}
-          <LoadingOverlay />
-          <NotificationToast />
+              {/* Overlays globaux pour toute l'app */}
+              <LoadingOverlay />
+              <NotificationToast />
 
-          {/* 🎯 GLOBAL VIDEO PLAYER SINGLETON */}
-          <GlobalVideoPlayer />
-        </NavigationContainer>
-        </PaperProvider>
+              {/* 🎯 GLOBAL VIDEO PLAYER SINGLETON */}
+              <GlobalVideoPlayer />
+            </NavigationContainer>
+          </PaperProvider>
+        </AlertProvider>
       </ThemeProvider>
     </GestureHandlerRootView>
   );

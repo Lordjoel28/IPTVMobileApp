@@ -6,6 +6,7 @@
 // Navigation Types
 export type RootStackParamList = {
   Home: undefined;
+  AddProfile: undefined;
   ChannelList: {
     playlistId?: string;
     playlistName?: string;
@@ -27,6 +28,8 @@ export type RootStackParamList = {
   TVGuideSettings: undefined;
   PlaylistDetail: {playlist: Playlist};
   Search: undefined;
+  Account: undefined;
+  AccountInfo: undefined;
   UserProfile: undefined;
   ParentalControl: undefined;
   EPGCategoriesScreen: {
@@ -46,6 +49,7 @@ export type RootStackParamList = {
     playlistId: string;
     playlistName: string;
   };
+  CategoriesSelection: {profileId: string};
 };
 
 export type BottomTabParamList = {
@@ -97,6 +101,40 @@ export interface Playlist {
   categories?: string[];
   provider?: string;
   type?: 'M3U' | 'Xtream' | 'Local';
+  chunked?: boolean; // Playlist divisée en chunks pour optimisation
+  chunkCount?: number; // Nombre de chunks
+}
+
+// Profile Types (Multi-user support)
+export interface Profile {
+  id: string;
+  name: string;
+  avatar: string; // emoji or color
+  theme?: ThemeType; // Thème préféré du profil
+  createdAt: string;
+  lastUsed?: string;
+  isDefault?: boolean; // Profil par défaut pour chargement automatique
+
+  // ========== Type de profil ==========
+  isKids?: boolean; // Mode enfant - filtre le contenu sensible
+
+  // ========== Protection PIN anti-switch (optionnel, configurable par profil) ==========
+  requiresPinToAccess?: boolean; // PIN requis pour switcher DEPUIS ce profil (bloquer switch enfant)
+  profilePin?: string; // PIN spécifique hashed (optionnel, non utilisé actuellement - PIN global suffit)
+
+  // ========== Restrictions par catégorie ==========
+  blockedCategories?: string[]; // Catégories bloquées pour ce profil (ex: ['Adulte', 'News'])
+  visibleGroups?: string[]; // Groupes visibles uniquement (si vide = tous visibles)
+
+  // ========== Déverrouillage temporaire ==========
+  temporaryUnlock?: TemporaryUnlock; // Déverrouillage temporaire actif
+}
+
+// Déverrouillage temporaire
+export interface TemporaryUnlock {
+  expiresAt: number; // Timestamp d'expiration
+  unlockedCategories: string[]; // Catégories déverrouillées
+  grantedAt: number; // Timestamp d'octroi
 }
 
 // User Types
@@ -334,8 +372,13 @@ export interface Favorite {
   channelId: string;
   playlistId: string;
   userId: string;
+  profileId: string; // Link to profile
   dateAdded: string;
   category?: string;
+  // 🆕 Stocker la chaîne complète (même logique que RecentChannelsService)
+  streamUrl?: string;
+  channelName?: string;
+  channelData: Channel; // ✅ Données complètes de la chaîne (pas de requête WatermelonDB)
 }
 
 // Recent Channels Types

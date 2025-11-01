@@ -5,20 +5,24 @@
  * Migration depuis AsyncStorage vers SQLite pour performance et volume
  */
 
-import { FullEPGData, EPGChannel } from '../XtreamEPGService';
-import { SQLiteEPG } from './SQLiteEPGStorage';
+import {FullEPGData, EPGChannel} from '../XtreamEPGService';
+import {SQLiteEPG} from './SQLiteEPGStorage';
 import epgDatabase from './database';
-import { Q } from '@nozbe/watermelondb';
+import {Q} from '@nozbe/watermelondb';
 
 /**
  * Parse une date au format XMLTV vers un objet Date JavaScript
  * Format XMLTV: "20250920103300 +0000" -> Date object
  */
 function parseEPGDate(dateString: string): Date | null {
-  if (!dateString) return null;
+  if (!dateString) {
+    return null;
+  }
 
   // Regex pour matcher le format XMLTV: YYYYMMDDHHMMSS +HHHMM
-  const match = dateString.match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})\s*(.*)$/);
+  const match = dateString.match(
+    /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})\s*(.*)$/,
+  );
 
   if (match) {
     const [, year, month, day, hour, minute, second] = match;
@@ -32,7 +36,10 @@ function parseEPGDate(dateString: string): Date | null {
     }
   }
 
-  console.warn('⚠️ [EPGCacheManager] Format de date XMLTV invalide:', dateString);
+  console.warn(
+    '⚠️ [EPGCacheManager] Format de date XMLTV invalide:',
+    dateString,
+  );
   return null;
 }
 
@@ -69,7 +76,9 @@ export const EPGCacheManager = {
    * 🚀 TiviMate Style : Initialisation minimale sans chargement automatique
    */
   async initialize(): Promise<void> {
-    if (this.isInitialized) return;
+    if (this.isInitialized) {
+      return;
+    }
 
     try {
       console.log('🔄 [EPGCacheManager] Initialisation minimale...');
@@ -79,9 +88,13 @@ export const EPGCacheManager = {
       // 🎯 TiviMate Style : Charger le flag de session depuis storage
       this.isFirstSessionAfterDownload = await this.loadFirstSessionFlag();
       if (this.isFirstSessionAfterDownload) {
-        console.log('🎯 [EPGCacheManager] Première session après téléchargement détectée - pas de chargement progressif');
+        console.log(
+          '🎯 [EPGCacheManager] Première session après téléchargement détectée - pas de chargement progressif',
+        );
       } else {
-        console.log('🎯 [EPGCacheManager] Redémarrage normal - chargement progressif TiviMate autorisé');
+        console.log(
+          '🎯 [EPGCacheManager] Redémarrage normal - chargement progressif TiviMate autorisé',
+        );
       }
 
       console.log('✅ [EPGCacheManager] Prêt pour chargement à la demande');
@@ -97,7 +110,10 @@ export const EPGCacheManager = {
   isCacheValid(): boolean {
     const now = Date.now();
     const cacheValidityPeriod = 30 * 60 * 1000; // 30 minutes
-    return this.fullEPG !== null && (now - this.lastFullEPGUpdate) < cacheValidityPeriod;
+    return (
+      this.fullEPG !== null &&
+      now - this.lastFullEPGUpdate < cacheValidityPeriod
+    );
   },
 
   /**
@@ -127,7 +143,11 @@ export const EPGCacheManager = {
    */
   async updateCache(epgData: FullEPGData): Promise<void> {
     try {
-      console.log('🔄 [EPGCacheManager] Traitement des données EPG...', epgData.programmes.length, 'programmes bruts');
+      console.log(
+        '🔄 [EPGCacheManager] Traitement des données EPG...',
+        epgData.programmes.length,
+        'programmes bruts',
+      );
 
       // S'assurer que SQLite est initialisé
       if (!this.isInitialized) {
@@ -153,7 +173,7 @@ export const EPGCacheManager = {
       // Mettre à jour avec les programmes filtrés
       const filteredEPGData = {
         ...epgData,
-        programmes: validProgrammes
+        programmes: validProgrammes,
       };
 
       // Sauvegarder en SQLite d'abord (persistant)
@@ -168,13 +188,19 @@ export const EPGCacheManager = {
       this.isFirstSessionAfterDownload = true;
       // Persister le flag pour survivre au redémarrage
       await this.saveFirstSessionFlag(true);
-      console.log('🎯 [EPGCacheManager] Marqué comme première session après téléchargement EPG');
+      console.log(
+        '🎯 [EPGCacheManager] Marqué comme première session après téléchargement EPG',
+      );
 
-      console.log('✅ [EPGCacheManager] Cache hybride mis à jour:',
-        epgData.channels.length, 'chaînes,',
-        validProgrammes.length, 'programmes valides sur', epgData.programmes.length,
-        '(SQLite + mémoire)');
-
+      console.log(
+        '✅ [EPGCacheManager] Cache hybride mis à jour:',
+        epgData.channels.length,
+        'chaînes,',
+        validProgrammes.length,
+        'programmes valides sur',
+        epgData.programmes.length,
+        '(SQLite + mémoire)',
+      );
     } catch (error) {
       console.error('❌ [EPGCacheManager] Erreur mise à jour cache:', error);
 
@@ -185,7 +211,7 @@ export const EPGCacheManager = {
           const startDate = parseEPGDate(programme.start);
           const stopDate = parseEPGDate(programme.stop);
           return startDate && stopDate;
-        })
+        }),
       };
 
       this.fullEPG = filteredEPGData;
@@ -199,7 +225,9 @@ export const EPGCacheManager = {
   /**
    * 🚀 TiviMate Style : Chargement progressif des données existantes
    */
-  async loadExistingDataChunked(progressCallback?: (progress: number) => void): Promise<boolean> {
+  async loadExistingDataChunked(
+    progressCallback?: (progress: number) => void,
+  ): Promise<boolean> {
     if (this.isLoadingChunked) {
       console.log('⚠️ [EPGCacheManager] Chargement déjà en cours...');
       return false;
@@ -217,23 +245,31 @@ export const EPGCacheManager = {
         hasData: stats.hasData,
         channelsCount: stats.channelsCount,
         programmesCount: stats.programmesCount,
-        threshold: 1000
+        threshold: 1000,
       });
 
       if (!stats.hasData || stats.channelsCount < 1000) {
-        console.log('📭 [EPGCacheManager] Aucune donnée EPG valide trouvée - 1er démarrage TiviMate');
+        console.log(
+          '📭 [EPGCacheManager] Aucune donnée EPG valide trouvée - 1er démarrage TiviMate',
+        );
         return false;
       }
 
       // 🎯 TiviMate Style : Vérifier si c'est la première session après téléchargement
       if (this.isFirstSessionAfterDownload) {
-        console.log('🎯 [EPGCacheManager] Première session après téléchargement - pas de chargement progressif TiviMate');
-        console.log('📭 [EPGCacheManager] Style TiviMate : chargement progressif au prochain redémarrage uniquement');
+        console.log(
+          '🎯 [EPGCacheManager] Première session après téléchargement - pas de chargement progressif TiviMate',
+        );
+        console.log(
+          '📭 [EPGCacheManager] Style TiviMate : chargement progressif au prochain redémarrage uniquement',
+        );
 
         // Réinitialiser le flag pour permettre le chargement au prochain redémarrage
         this.isFirstSessionAfterDownload = false;
         await this.saveFirstSessionFlag(false);
-        console.log('🎯 [EPGCacheManager] Flag réinitialisé - chargement progressif activé pour le prochain redémarrage');
+        console.log(
+          '🎯 [EPGCacheManager] Flag réinitialisé - chargement progressif activé pour le prochain redémarrage',
+        );
 
         return false;
       }
@@ -242,8 +278,12 @@ export const EPGCacheManager = {
       this.loadingProgress = 0;
       this.onProgressCallback = progressCallback || null;
 
-      console.log('🚀 [EPGCacheManager] Chargement progressif TiviMate style démarré...');
-      console.log(`📊 Données trouvées: ${stats.channelsCount} chaînes, ${stats.programmesCount} programmes`);
+      console.log(
+        '🚀 [EPGCacheManager] Chargement progressif TiviMate style démarré...',
+      );
+      console.log(
+        `📊 Données trouvées: ${stats.channelsCount} chaînes, ${stats.programmesCount} programmes`,
+      );
 
       // 1. Charger les chaînes d'abord (rapide)
       console.log('📺 [EPGCacheManager] Chargement des chaînes...');
@@ -253,7 +293,7 @@ export const EPGCacheManager = {
       this.fullEPG = {
         channels,
         programmes: [], // Sera rempli progressivement
-        source: 'SQLite chunked loading'
+        source: 'SQLite chunked loading',
       };
 
       this.updateProgress(10); // 10% pour les chaînes
@@ -264,7 +304,9 @@ export const EPGCacheManager = {
       const CHUNK_SIZE = 1500; // Taille optimale TiviMate
       const allPrograms: any[] = [];
 
-      console.log(`📋 [EPGCacheManager] Chargement de ${totalPrograms} programmes par chunks de ${CHUNK_SIZE}...`);
+      console.log(
+        `📋 [EPGCacheManager] Chargement de ${totalPrograms} programmes par chunks de ${CHUNK_SIZE}...`,
+      );
 
       for (let offset = 0; offset < totalPrograms; offset += CHUNK_SIZE) {
         // Charger chunk
@@ -275,7 +317,11 @@ export const EPGCacheManager = {
         const programProgress = Math.round((offset / totalPrograms) * 90);
         this.updateProgress(10 + programProgress);
 
-        console.log(`📈 [EPGCacheManager] Progression: ${this.loadingProgress}% (${offset + chunk.length}/${totalPrograms})`);
+        console.log(
+          `📈 [EPGCacheManager] Progression: ${this.loadingProgress}% (${
+            offset + chunk.length
+          }/${totalPrograms})`,
+        );
 
         // 🎯 PAUSE CRITIQUE : Laisser respirer l'UI (TiviMate style)
         await new Promise(resolve => setTimeout(resolve, 50));
@@ -290,16 +336,20 @@ export const EPGCacheManager = {
       this.updateProgress(100);
 
       console.log('✅ [EPGCacheManager] Chargement progressif terminé');
-      console.log(`📊 Cache final: ${channels.length} chaînes, ${allPrograms.length} programmes`);
+      console.log(
+        `📊 Cache final: ${channels.length} chaînes, ${allPrograms.length} programmes`,
+      );
 
       // 🎯 TiviMate Style : Reconstruire l'index après chargement pour optimiser les recherches
       this.buildChannelIndex(channels);
 
       this.isLoadingChunked = false;
       return true;
-
     } catch (error) {
-      console.error('❌ [EPGCacheManager] Erreur chargement progressif:', error);
+      console.error(
+        '❌ [EPGCacheManager] Erreur chargement progressif:',
+        error,
+      );
       this.isLoadingChunked = false;
       this.updateProgress(0);
       return false;
@@ -339,7 +389,10 @@ export const EPGCacheManager = {
         channelsCount: this.fullEPG?.channels.length || 0,
         programmesCount: this.fullEPG?.programmes.length || 0,
         isLoading: this.isLoadingFullEPG,
-        lastUpdate: this.lastFullEPGUpdate > 0 ? new Date(this.lastFullEPGUpdate).toLocaleString('fr-FR') : 'Jamais',
+        lastUpdate:
+          this.lastFullEPGUpdate > 0
+            ? new Date(this.lastFullEPGUpdate).toLocaleString('fr-FR')
+            : 'Jamais',
       };
 
       // Stats du cache SQLite
@@ -347,7 +400,7 @@ export const EPGCacheManager = {
         hasData: false,
         channelsCount: 0,
         programmesCount: 0,
-        lastUpdate: 'Non initialisé'
+        lastUpdate: 'Non initialisé',
       };
 
       if (this.isInitialized) {
@@ -356,9 +409,8 @@ export const EPGCacheManager = {
 
       return {
         ...memoryStats,
-        sqliteStats
+        sqliteStats,
       };
-
     } catch (error) {
       console.error('❌ [EPGCacheManager] Erreur stats cache:', error);
       return {
@@ -371,8 +423,8 @@ export const EPGCacheManager = {
           hasData: false,
           channelsCount: 0,
           programmesCount: 0,
-          lastUpdate: 'Erreur'
-        }
+          lastUpdate: 'Erreur',
+        },
       };
     }
   },
@@ -381,13 +433,21 @@ export const EPGCacheManager = {
    * Récupère les programmes d'une chaîne directement depuis SQLite
    * Performance optimisée pour éviter de charger tout l'EPG en mémoire
    */
-  async getProgramsForChannel(channelId: string, startTime?: number, endTime?: number): Promise<CompactProgram[]> {
+  async getProgramsForChannel(
+    channelId: string,
+    startTime?: number,
+    endTime?: number,
+  ): Promise<CompactProgram[]> {
     try {
       if (!this.isInitialized) {
         await this.initialize();
       }
 
-      const programmes = await SQLiteEPG.getProgrammesForChannel(channelId, startTime, endTime);
+      const programmes = await SQLiteEPG.getProgrammesForChannel(
+        channelId,
+        startTime,
+        endTime,
+      );
 
       // Convertir vers le format CompactProgram
       const compactPrograms: CompactProgram[] = programmes.map(prog => ({
@@ -399,13 +459,15 @@ export const EPGCacheManager = {
         isLive: this.isProgramLive(prog.start_time, prog.end_time),
         progress: this.calculateProgress(prog.start_time, prog.end_time),
         duration: prog.duration,
-        category: prog.category
+        category: prog.category,
       }));
 
       return compactPrograms;
-
     } catch (error) {
-      console.error('❌ [EPGCacheManager] Erreur récupération programmes SQLite:', error);
+      console.error(
+        '❌ [EPGCacheManager] Erreur récupération programmes SQLite:',
+        error,
+      );
       return [];
     }
   },
@@ -443,10 +505,14 @@ export const EPGCacheManager = {
       if (stats.hasData) {
         // 🧪 Vérifier si ce sont des données de test à supprimer
         const channels = await this.getChannelsFromSQLite();
-        const isTestData = channels.some(ch => ch.id && ch.id.startsWith('test_channel_'));
+        const isTestData = channels.some(
+          ch => ch.id && ch.id.startsWith('test_channel_'),
+        );
 
         if (isTestData) {
-          console.log('🧪 [EPGCacheManager] Données de test détectées - nettoyage en cours...');
+          console.log(
+            '🧪 [EPGCacheManager] Données de test détectées - nettoyage en cours...',
+          );
           await SQLiteEPG.clearCache();
           console.log('🗑️ [EPGCacheManager] Données de test supprimées');
           return;
@@ -454,41 +520,58 @@ export const EPGCacheManager = {
 
         // Vérifier si les données sont assez récentes (moins de 24h)
         if (stats.channelsCount < 1000) {
-          console.log(`⚠️ [EPGCacheManager] Données trop anciennes ou incomplètes (${stats.channelsCount} chaînes) - ignorer la restauration`);
+          console.log(
+            `⚠️ [EPGCacheManager] Données trop anciennes ou incomplètes (${stats.channelsCount} chaînes) - ignorer la restauration`,
+          );
           return;
         }
 
-        console.log(`🔄 [EPGCacheManager] Restauration depuis SQLite: ${stats.channelsCount} chaînes, ${stats.programmesCount} programmes`);
+        console.log(
+          `🔄 [EPGCacheManager] Restauration depuis SQLite: ${stats.channelsCount} chaînes, ${stats.programmesCount} programmes`,
+        );
 
         // 🚀 OPTIMISATION : Restauration progressive pour éviter le blocage UI
-        console.log('🚀 [EPGCacheManager] Restauration progressive démarrée...');
+        console.log(
+          '🚀 [EPGCacheManager] Restauration progressive démarrée...',
+        );
 
         // Créer un cache basique d'abord (rapide)
         this.fullEPG = {
           channels,
           programmes: [], // Vide au début, sera rempli progressivement
-          source: 'SQLite restore (progressive)'
+          source: 'SQLite restore (progressive)',
         };
 
         this.lastFullEPGUpdate = Date.now();
-        console.log('⚡ [EPGCacheManager] Cache de base restauré (UI non-bloquée)');
+        console.log(
+          '⚡ [EPGCacheManager] Cache de base restauré (UI non-bloquée)',
+        );
 
         // Charger les programmes progressivement en arrière-plan
         setTimeout(async () => {
           try {
-            console.log('🔄 [EPGCacheManager] Chargement programmes en arrière-plan...');
+            console.log(
+              '🔄 [EPGCacheManager] Chargement programmes en arrière-plan...',
+            );
             const programmes = await this.getProgrammesFromSQLite();
 
             if (this.fullEPG) {
               this.fullEPG.programmes = programmes;
-              console.log('✅ [EPGCacheManager] Programmes chargés en arrière-plan');
+              console.log(
+                '✅ [EPGCacheManager] Programmes chargés en arrière-plan',
+              );
             }
           } catch (error) {
-            console.error('❌ [EPGCacheManager] Erreur chargement programmes:', error);
+            console.error(
+              '❌ [EPGCacheManager] Erreur chargement programmes:',
+              error,
+            );
           }
         }, 2000); // Délai pour ne pas bloquer l'UI
 
-        console.log('✅ [EPGCacheManager] Cache mémoire restauré depuis persistance SQLite');
+        console.log(
+          '✅ [EPGCacheManager] Cache mémoire restauré depuis persistance SQLite',
+        );
       } else {
         console.log('📭 [EPGCacheManager] Aucune donnée persistante trouvée');
       }
@@ -507,10 +590,13 @@ export const EPGCacheManager = {
       return channels.map((ch: any) => ({
         id: ch.channelId,
         displayName: ch.displayName,
-        icon: ch.iconUrl
+        icon: ch.iconUrl,
       }));
     } catch (error) {
-      console.error('❌ [EPGCacheManager] Erreur récupération chaînes SQLite:', error);
+      console.error(
+        '❌ [EPGCacheManager] Erreur récupération chaînes SQLite:',
+        error,
+      );
       return [];
     }
   },
@@ -521,16 +607,30 @@ export const EPGCacheManager = {
   async getProgrammesFromSQLite(): Promise<any[]> {
     try {
       // Utiliser l'API SQLiteEPG existante
-      const programmes = await epgDatabase.get('epg_programmes').query().fetch();
+      const programmes = await epgDatabase
+        .get('epg_programmes')
+        .query()
+        .fetch();
       return programmes.map((prog: any) => ({
         channel: prog.channelId,
         title: prog.title,
         desc: prog.description,
-        start: new Date(prog.startTime).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '') + ' +0000',
-        stop: new Date(prog.endTime).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '') + ' +0000'
+        start:
+          new Date(prog.startTime)
+            .toISOString()
+            .replace(/[-:]/g, '')
+            .replace(/\.\d{3}/, '') + ' +0000',
+        stop:
+          new Date(prog.endTime)
+            .toISOString()
+            .replace(/[-:]/g, '')
+            .replace(/\.\d{3}/, '') + ' +0000',
       }));
     } catch (error) {
-      console.error('❌ [EPGCacheManager] Erreur récupération programmes SQLite:', error);
+      console.error(
+        '❌ [EPGCacheManager] Erreur récupération programmes SQLite:',
+        error,
+      );
       return [];
     }
   },
@@ -540,10 +640,17 @@ export const EPGCacheManager = {
    */
   async saveFirstSessionFlag(isFirstSession: boolean): Promise<void> {
     try {
-      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-      await AsyncStorage.setItem('epg_first_session_after_download', JSON.stringify(isFirstSession));
+      const AsyncStorage =
+        require('@react-native-async-storage/async-storage').default;
+      await AsyncStorage.setItem(
+        'epg_first_session_after_download',
+        JSON.stringify(isFirstSession),
+      );
     } catch (error) {
-      console.error('❌ [EPGCacheManager] Erreur sauvegarde flag session:', error);
+      console.error(
+        '❌ [EPGCacheManager] Erreur sauvegarde flag session:',
+        error,
+      );
     }
   },
 
@@ -552,11 +659,17 @@ export const EPGCacheManager = {
    */
   async loadFirstSessionFlag(): Promise<boolean> {
     try {
-      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-      const value = await AsyncStorage.getItem('epg_first_session_after_download');
+      const AsyncStorage =
+        require('@react-native-async-storage/async-storage').default;
+      const value = await AsyncStorage.getItem(
+        'epg_first_session_after_download',
+      );
       return value ? JSON.parse(value) : false;
     } catch (error) {
-      console.error('❌ [EPGCacheManager] Erreur chargement flag session:', error);
+      console.error(
+        '❌ [EPGCacheManager] Erreur chargement flag session:',
+        error,
+      );
       return false;
     }
   },
@@ -572,7 +685,8 @@ export const EPGCacheManager = {
       }
 
       // Rechercher directement dans SQLite
-      const programmes = await epgDatabase.get('epg_programmes')
+      const programmes = await epgDatabase
+        .get('epg_programmes')
         .query(Q.where('channel_id', channelId))
         .fetch();
 
@@ -581,11 +695,22 @@ export const EPGCacheManager = {
         channel: prog.channelId,
         title: prog.title,
         desc: prog.description,
-        start: new Date(prog.startTime).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '') + ' +0000',
-        stop: new Date(prog.endTime).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '') + ' +0000'
+        start:
+          new Date(prog.startTime)
+            .toISOString()
+            .replace(/[-:]/g, '')
+            .replace(/\.\d{3}/, '') + ' +0000',
+        stop:
+          new Date(prog.endTime)
+            .toISOString()
+            .replace(/[-:]/g, '')
+            .replace(/\.\d{3}/, '') + ' +0000',
       }));
     } catch (error) {
-      console.error('❌ [EPGCacheManager] Erreur recherche programmes SQLite:', error);
+      console.error(
+        '❌ [EPGCacheManager] Erreur recherche programmes SQLite:',
+        error,
+      );
       return [];
     }
   },
@@ -595,7 +720,8 @@ export const EPGCacheManager = {
    */
   buildChannelIndex(channels: EPGChannel[]) {
     this.channelIndex.clear();
-    const normalizeName = (name: string): string => name.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const normalizeName = (name: string): string =>
+      name.toLowerCase().replace(/[^a-z0-9]/g, '');
 
     channels.forEach(channel => {
       const normalizedName = normalizeName(channel.displayName);
@@ -616,8 +742,12 @@ export const EPGCacheManager = {
       });
     });
 
-    console.log('🔍 [EPGCacheManager] Index de chaînes reconstruit:', this.channelIndex.size, 'entrées');
-  }
+    console.log(
+      '🔍 [EPGCacheManager] Index de chaînes reconstruit:',
+      this.channelIndex.size,
+      'entrées',
+    );
+  },
 };
 
 export default EPGCacheManager;

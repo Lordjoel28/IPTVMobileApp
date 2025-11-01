@@ -6,7 +6,7 @@
 import {appSchema, tableSchema} from '@nozbe/watermelondb';
 
 export default appSchema({
-  version: 3, // OPTIMISÉ: Suppression champs redondants pour 100K+ chaînes
+  version: 6, // Migration v6: Ajout champs account_created_date et connection_info
   tables: [
     // Table des playlists
     tableSchema({
@@ -20,6 +20,8 @@ export default appSchema({
         {name: 'password', type: 'string', isOptional: true},
         {name: 'date_added', type: 'number'},
         {name: 'expiration_date', type: 'string', isOptional: true},
+        {name: 'account_created_date', type: 'string', isOptional: true}, // Date de création du compte Xtream
+        {name: 'connection_info', type: 'string', isOptional: true}, // Infos connexions (JSON string)
         {name: 'channels_count', type: 'number'},
         {name: 'status', type: 'string'}, // 'active' | 'expiring' | 'expired'
         {name: 'is_active', type: 'boolean'},
@@ -47,7 +49,12 @@ export default appSchema({
       name: 'channels',
       columns: [
         {name: 'playlist_id', type: 'string', isIndexed: true},
-        {name: 'category_id', type: 'string', isOptional: true, isIndexed: true},
+        {
+          name: 'category_id',
+          type: 'string',
+          isOptional: true,
+          isIndexed: true,
+        },
         {name: 'name', type: 'string', isIndexed: true},
         {name: 'stream_url', type: 'string'},
         {name: 'logo_url', type: 'string', isOptional: true},

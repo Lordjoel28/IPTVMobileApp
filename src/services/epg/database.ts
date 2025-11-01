@@ -3,12 +3,12 @@
  * Configuration de la base de données SQLite pour EPG
  */
 
-import { Database } from '@nozbe/watermelondb';
+import {Database} from '@nozbe/watermelondb';
 import SQLiteAdapter from '@nozbe/watermelondb/adapters/sqlite';
-import { epgSchema } from './models/schema';
+import {epgSchema} from './models/schema';
 import EPGChannel from './models/EPGChannel';
 import EPGProgramme from './models/EPGProgramme';
-import { Platform } from 'react-native';
+import {Platform} from 'react-native';
 
 // Configuration de l'adaptateur SQLite avec persistance explicite
 const adapter = new SQLiteAdapter({
@@ -21,7 +21,7 @@ const adapter = new SQLiteAdapter({
     console.error('❌ [WatermelonDB] Error details:', {
       message: error.message,
       stack: error.stack,
-      name: error.name
+      name: error.name,
     });
   },
   // Configuration de performance pour gros volumes
@@ -34,7 +34,10 @@ const adapter = new SQLiteAdapter({
 const modelClasses = [EPGChannel, EPGProgramme];
 
 // Vérification que les models sont correctement définis
-console.log('🔍 [WatermelonDB] Models enregistrés:', modelClasses.map(Model => Model.table));
+console.log(
+  '🔍 [WatermelonDB] Models enregistrés:',
+  modelClasses.map(Model => Model.table),
+);
 
 export const epgDatabase = new Database({
   adapter,

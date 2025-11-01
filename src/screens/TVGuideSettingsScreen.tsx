@@ -16,10 +16,10 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import {useNavigation} from '@react-navigation/native';
 import type {StackNavigationProp} from '@react-navigation/stack';
 import type {RootStackParamList} from '../../App';
-import { EPGSourceManager } from '../services/epg/EPGSourceManager';
-import { XtreamEPG, FullEPGData, EPGChannel } from '../services/XtreamEPGService';
-import { EPGCacheManager } from '../services/epg/EPGCacheManager';
-import { ModernDialog } from '../components/ModernDialog';
+import {EPGSourceManager} from '../services/epg/EPGSourceManager';
+import {XtreamEPG, FullEPGData, EPGChannel} from '../services/XtreamEPGService';
+import {EPGCacheManager} from '../services/epg/EPGCacheManager';
+import {ModernDialog} from '../components/ModernDialog';
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -33,13 +33,16 @@ const xtreamCredentials = {
   password: 'B58Y9VGJ',
 };
 
-
 const TVGuideSettingsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const [epgGlobalStatus, setEpgGlobalStatus] = useState('Non téléchargé');
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
-  const [epgStats, setEpgStats] = useState({ totalSources: 0, manualCount: 0, globalAvailable: false });
+  const [epgStats, setEpgStats] = useState({
+    totalSources: 0,
+    manualCount: 0,
+    globalAvailable: false,
+  });
   const isDarkMode = useColorScheme() === 'dark';
 
   // États pour les dialogues modernes
@@ -62,7 +65,6 @@ const TVGuideSettingsScreen: React.FC = () => {
   useEffect(() => {
     loadEPGStats();
   }, []);
-
 
   // ✅ Fonction simplifiée pour vérifier statut EPG (sans boucles)
   const checkEPGStatus = () => {
@@ -92,7 +94,7 @@ const TVGuideSettingsScreen: React.FC = () => {
             duration: 800,
             useNativeDriver: true,
           }),
-        ])
+        ]),
       );
       pulseAnimation.start();
 
@@ -120,7 +122,11 @@ const TVGuideSettingsScreen: React.FC = () => {
       const cacheStats = epgCache.getCacheStats();
       if (cacheStats.hasData) {
         setEpgGlobalStatus('Téléchargé');
-        console.log('✅ [TVGuideSettings] EPG global détecté en cache:', cacheStats.channelsCount, 'chaînes');
+        console.log(
+          '✅ [TVGuideSettings] EPG global détecté en cache:',
+          cacheStats.channelsCount,
+          'chaînes',
+        );
       } else {
         setEpgGlobalStatus('Non téléchargé');
       }
@@ -131,7 +137,10 @@ const TVGuideSettingsScreen: React.FC = () => {
 
   const handleDownloadGlobalEPG = async () => {
     if (isDownloading) {
-      Alert.alert('Information', 'Un téléchargement EPG est déjà en cours. Veuillez patienter.');
+      Alert.alert(
+        'Information',
+        'Un téléchargement EPG est déjà en cours. Veuillez patienter.',
+      );
       return;
     }
 
@@ -173,7 +182,9 @@ const TVGuideSettingsScreen: React.FC = () => {
       setDownloadProgress(30);
       setEpgGlobalStatus('Téléchargement programmes TV...');
 
-      console.log('🔄 [TVGuideSettings] Démarrage téléchargement EPG Xtream...');
+      console.log(
+        '🔄 [TVGuideSettings] Démarrage téléchargement EPG Xtream...',
+      );
       console.log('🔗 [TVGuideSettings] Serveur:', xtreamCredentials.server);
 
       const epgData = await XtreamEPG.getFullEPG(xtreamCredentials);
@@ -195,7 +206,7 @@ const TVGuideSettingsScreen: React.FC = () => {
         epgData.channels.length,
         'chaînes,',
         epgData.programmes.length,
-        'programmes'
+        'programmes',
       );
 
       // Étape 4: Construction de l'index et sauvegarde en cache
@@ -228,24 +239,31 @@ const TVGuideSettingsScreen: React.FC = () => {
 
       // ✅ Succès silencieux - Le statut "À jour" avec icône verte suffit
 
-      console.log('✅ [TVGuideSettings] EPG Global téléchargé avec succès!',
-        epgData.channels.length, 'chaînes,',
-        epgData.programmes.length, 'programmes');
-
+      console.log(
+        '✅ [TVGuideSettings] EPG Global téléchargé avec succès!',
+        epgData.channels.length,
+        'chaînes,',
+        epgData.programmes.length,
+        'programmes',
+      );
     } catch (error) {
       console.error('❌ [TVGuideSettings] Erreur téléchargement EPG:', error);
       setIsDownloading(false);
       epgCache.isLoadingFullEPG = false;
       setEpgGlobalStatus('Erreur de téléchargement');
 
-      let errorMessage = 'Échec du téléchargement EPG. Vérifiez votre connexion internet.';
+      let errorMessage =
+        'Échec du téléchargement EPG. Vérifiez votre connexion internet.';
       if (error instanceof Error) {
         if (error.name === 'AbortError' || error.message.includes('timeout')) {
-          errorMessage = 'Timeout de connexion (15s). Le serveur EPG met trop de temps à répondre. Réessayez plus tard.';
+          errorMessage =
+            'Timeout de connexion (15s). Le serveur EPG met trop de temps à répondre. Réessayez plus tard.';
         } else if (error.message.includes('Network')) {
-          errorMessage = 'Erreur de connexion réseau. Vérifiez votre connexion internet.';
+          errorMessage =
+            'Erreur de connexion réseau. Vérifiez votre connexion internet.';
         } else if (error.message.includes('Aucune donnée')) {
-          errorMessage = 'Le serveur EPG n\'a retourné aucune donnée. Réessayez plus tard.';
+          errorMessage =
+            "Le serveur EPG n'a retourné aucune donnée. Réessayez plus tard.";
         }
       }
 
@@ -274,7 +292,11 @@ const TVGuideSettingsScreen: React.FC = () => {
         }
       });
     });
-    console.log('🔍 [TVGuideSettings] Index de chaînes construit:', epgCache.channelIndex.size, 'entrées');
+    console.log(
+      '🔍 [TVGuideSettings] Index de chaînes construit:',
+      epgCache.channelIndex.size,
+      'entrées',
+    );
   };
 
   // Fonction de normalisation (copiée depuis EPGCompact)
@@ -295,7 +317,7 @@ const TVGuideSettingsScreen: React.FC = () => {
     console.log('📋 Gestion sources EPG');
     Alert.alert(
       'Sources EPG Manuelles',
-      'Cette fonctionnalité permettra d\'assigner des sources EPG spécifiques à vos playlists.',
+      "Cette fonctionnalité permettra d'assigner des sources EPG spécifiques à vos playlists.",
       [{text: 'OK'}],
     );
   };
@@ -315,12 +337,14 @@ const TVGuideSettingsScreen: React.FC = () => {
 
       // Redémarrer le téléchargement EPG
       await startEPGDownload();
-
     } catch (error) {
       console.error('❌ Erreur actualisation EPG:', error);
       setIsDownloading(false);
-      setEpgGlobalStatus('Erreur d\'actualisation');
-      Alert.alert('❌ Erreur', 'Erreur lors de l\'actualisation EPG. Vérifiez votre connexion.');
+      setEpgGlobalStatus("Erreur d'actualisation");
+      Alert.alert(
+        '❌ Erreur',
+        "Erreur lors de l'actualisation EPG. Vérifiez votre connexion.",
+      );
     }
   };
 
@@ -355,12 +379,13 @@ const TVGuideSettingsScreen: React.FC = () => {
       setIsClearingCache(false);
       setClearProgress(0);
 
-      setSuccessMessage('Cache EPG supprimé avec succès !\n\nToutes les données EPG en cache ont été effacées. Vous pouvez maintenant télécharger de nouvelles données.');
+      setSuccessMessage(
+        'Cache EPG supprimé avec succès !\n\nToutes les données EPG en cache ont été effacées. Vous pouvez maintenant télécharger de nouvelles données.',
+      );
       setShowSuccessDialog(true);
 
       console.log('✅ [TVGuideSettings] Cache EPG supprimé avec succès !');
       loadEPGStats(); // Recharger les stats
-
     } catch (error) {
       console.error('❌ [TVGuideSettings] Erreur suppression cache:', error);
       setIsClearingCache(false);
@@ -401,7 +426,9 @@ const TVGuideSettingsScreen: React.FC = () => {
                 style={styles.sectionIcon}>
                 <Icon name="file-download" size={16} color="#FFFFFF" />
               </LinearGradient>
-              <Text style={styles.modernSectionTitle}>EPG Automatique (Global)</Text>
+              <Text style={styles.modernSectionTitle}>
+                EPG Automatique (Global)
+              </Text>
             </View>
           </View>
 
@@ -418,23 +445,66 @@ const TVGuideSettingsScreen: React.FC = () => {
                 <View style={styles.statusWithIcon}>
                   {isDownloading ? (
                     <>
-                      <ActivityIndicator size="small" color="#FF9800" style={styles.statusIcon} />
-                      <Text style={[styles.statusDescription, styles.statusInProgress]}>En cours...</Text>
+                      <ActivityIndicator
+                        size="small"
+                        color="#FF9800"
+                        style={styles.statusIcon}
+                      />
+                      <Text
+                        style={[
+                          styles.statusDescription,
+                          styles.statusInProgress,
+                        ]}>
+                        En cours...
+                      </Text>
                     </>
                   ) : epgGlobalStatus === 'Téléchargé' ? (
                     <>
-                      <Icon name="check-circle" size={16} color="#4CAF50" style={styles.statusIcon} />
-                      <Text style={[styles.statusDescription, styles.statusSuccessText]}>À jour</Text>
+                      <Icon
+                        name="check-circle"
+                        size={16}
+                        color="#4CAF50"
+                        style={styles.statusIcon}
+                      />
+                      <Text
+                        style={[
+                          styles.statusDescription,
+                          styles.statusSuccessText,
+                        ]}>
+                        À jour
+                      </Text>
                     </>
                   ) : epgGlobalStatus.includes('Erreur') ? (
                     <>
-                      <Icon name="error" size={16} color="#F44336" style={styles.statusIcon} />
-                      <Text style={[styles.statusDescription, styles.statusErrorText]}>Erreur</Text>
+                      <Icon
+                        name="error"
+                        size={16}
+                        color="#F44336"
+                        style={styles.statusIcon}
+                      />
+                      <Text
+                        style={[
+                          styles.statusDescription,
+                          styles.statusErrorText,
+                        ]}>
+                        Erreur
+                      </Text>
                     </>
                   ) : (
                     <>
-                      <Icon name="cloud-download" size={16} color="#9E9E9E" style={styles.statusIcon} />
-                      <Text style={[styles.statusDescription, styles.statusInactive]}>Non téléchargé</Text>
+                      <Icon
+                        name="cloud-download"
+                        size={16}
+                        color="#9E9E9E"
+                        style={styles.statusIcon}
+                      />
+                      <Text
+                        style={[
+                          styles.statusDescription,
+                          styles.statusInactive,
+                        ]}>
+                        Non téléchargé
+                      </Text>
                     </>
                   )}
                 </View>
@@ -458,7 +528,9 @@ const TVGuideSettingsScreen: React.FC = () => {
                     ]}
                   />
                 </View>
-                <Text style={styles.modernProgressText}>{Math.round(downloadProgress)}%</Text>
+                <Text style={styles.modernProgressText}>
+                  {Math.round(downloadProgress)}%
+                </Text>
               </View>
             )}
           </LinearGradient>
@@ -468,13 +540,15 @@ const TVGuideSettingsScreen: React.FC = () => {
             style={[
               styles.modernActionButton,
               styles.primaryActionButton,
-              isDownloading && styles.disabledActionButton
+              isDownloading && styles.disabledActionButton,
             ]}
             onPress={handleDownloadGlobalEPG}
             disabled={isDownloading}
             activeOpacity={0.8}>
             <LinearGradient
-              colors={isDownloading ? ['#6B7FBB', '#5A6FA8'] : ['#4A90E2', '#357ABD']}
+              colors={
+                isDownloading ? ['#6B7FBB', '#5A6FA8'] : ['#4A90E2', '#357ABD']
+              }
               style={styles.actionButtonGradient}
               start={{x: 0, y: 0}}
               end={{x: 1, y: 1}}>
@@ -483,7 +557,11 @@ const TVGuideSettingsScreen: React.FC = () => {
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
                   <Icon
-                    name={epgGlobalStatus === 'Téléchargé' ? 'refresh' : 'file-download'}
+                    name={
+                      epgGlobalStatus === 'Téléchargé'
+                        ? 'refresh'
+                        : 'file-download'
+                    }
                     size={14}
                     color="#FFFFFF"
                   />
@@ -500,9 +578,10 @@ const TVGuideSettingsScreen: React.FC = () => {
           </TouchableOpacity>
 
           <Text style={styles.modernHelpText}>
-            📡 Solution de secours automatique : Téléchargez un guide TV global qui s'applique
-            automatiquement à toutes vos playlists qui n'ont pas d'EPG intégré.
-            Idéal quand vos playlists ne fournissent pas de guide TV.
+            📡 Solution de secours automatique : Téléchargez un guide TV global
+            qui s'applique automatiquement à toutes vos playlists qui n'ont pas
+            d'EPG intégré. Idéal quand vos playlists ne fournissent pas de guide
+            TV.
           </Text>
         </LinearGradient>
 
@@ -520,7 +599,9 @@ const TVGuideSettingsScreen: React.FC = () => {
                 style={styles.sectionIcon}>
                 <Icon name="tune" size={16} color="#FFFFFF" />
               </LinearGradient>
-              <Text style={styles.modernSectionTitle}>Sources EPG Manuelles</Text>
+              <Text style={styles.modernSectionTitle}>
+                Sources EPG Manuelles
+              </Text>
             </View>
           </View>
 
@@ -536,9 +617,13 @@ const TVGuideSettingsScreen: React.FC = () => {
                 <Text style={styles.statLabel}>Sources assignées</Text>
                 <View style={styles.ratioContainer}>
                   <Text style={styles.ratioValue}>
-                    <Text style={styles.ratioActive}>{epgStats.manualCount}</Text>
+                    <Text style={styles.ratioActive}>
+                      {epgStats.manualCount}
+                    </Text>
                     <Text style={styles.ratioSeparator}> / </Text>
-                    <Text style={styles.ratioTotal}>{epgStats.totalSources}</Text>
+                    <Text style={styles.ratioTotal}>
+                      {epgStats.totalSources}
+                    </Text>
                   </Text>
                 </View>
               </View>
@@ -547,7 +632,11 @@ const TVGuideSettingsScreen: React.FC = () => {
                   {epgStats.manualCount > 0 ? (
                     <Icon name="check-circle" size={16} color="#4CAF50" />
                   ) : (
-                    <Icon name="radio-button-unchecked" size={16} color="#9E9E9E" />
+                    <Icon
+                      name="radio-button-unchecked"
+                      size={16}
+                      color="#9E9E9E"
+                    />
                   )}
                 </View>
               </View>
@@ -567,7 +656,9 @@ const TVGuideSettingsScreen: React.FC = () => {
                 end={{x: 1, y: 1}}>
                 <View style={styles.actionButtonContent}>
                   <Icon name="tune" size={14} color="#FFFFFF" />
-                  <Text style={styles.modernActionButtonText}>Gérer les Sources</Text>
+                  <Text style={styles.modernActionButtonText}>
+                    Gérer les Sources
+                  </Text>
                 </View>
               </LinearGradient>
             </TouchableOpacity>
@@ -583,14 +674,17 @@ const TVGuideSettingsScreen: React.FC = () => {
                 end={{x: 1, y: 1}}>
                 <View style={styles.actionButtonContent}>
                   <Icon name="playlist-add" size={14} color="#FFFFFF" />
-                  <Text style={styles.modernActionButtonText}>Assigner aux Playlists</Text>
+                  <Text style={styles.modernActionButtonText}>
+                    Assigner aux Playlists
+                  </Text>
                 </View>
               </LinearGradient>
             </TouchableOpacity>
           </View>
 
           <Text style={styles.modernHelpText}>
-            Gérez vos sources EPG manuelles et assignez-les à des playlists spécifiques pour optimiser la précision du guide TV.
+            Gérez vos sources EPG manuelles et assignez-les à des playlists
+            spécifiques pour optimiser la précision du guide TV.
           </Text>
         </LinearGradient>
 
@@ -617,10 +711,17 @@ const TVGuideSettingsScreen: React.FC = () => {
             <View style={styles.clearProgressContainer}>
               <View style={styles.progressHeader}>
                 <ActivityIndicator size="small" color="#F44336" />
-                <Text style={styles.progressTitle}>Suppression du cache EPG...</Text>
+                <Text style={styles.progressTitle}>
+                  Suppression du cache EPG...
+                </Text>
               </View>
               <View style={styles.modernProgressBar}>
-                <View style={[styles.modernProgressFill, { width: `${clearProgress}%` }]} />
+                <View
+                  style={[
+                    styles.modernProgressFill,
+                    {width: `${clearProgress}%`},
+                  ]}
+                />
               </View>
               <Text style={styles.modernProgressText}>{clearProgress}%</Text>
             </View>
@@ -632,13 +733,17 @@ const TVGuideSettingsScreen: React.FC = () => {
             <TouchableOpacity
               style={[
                 styles.modernActionButton,
-                isClearingCache && styles.disabledActionButton
+                isClearingCache && styles.disabledActionButton,
               ]}
               onPress={handleClearEPGCache}
               disabled={isClearingCache}
               activeOpacity={0.8}>
               <LinearGradient
-                colors={isClearingCache ? ['#9E9E9E', '#757575'] : ['#F44336', '#D32F2F']}
+                colors={
+                  isClearingCache
+                    ? ['#9E9E9E', '#757575']
+                    : ['#F44336', '#D32F2F']
+                }
                 style={styles.actionButtonGradient}
                 start={{x: 0, y: 0}}
                 end={{x: 1, y: 1}}>
@@ -684,10 +789,14 @@ const TVGuideSettingsScreen: React.FC = () => {
               end={{x: 1, y: 1}}>
               <View style={styles.infoCardHeader}>
                 <Icon name="help-outline" size={14} color="#4CAF50" />
-                <Text style={styles.modernInfoTitle}>Qu'est-ce que l'EPG ?</Text>
+                <Text style={styles.modernInfoTitle}>
+                  Qu'est-ce que l'EPG ?
+                </Text>
               </View>
               <Text style={styles.modernInfoText}>
-                L'EPG (Electronic Program Guide) est un guide électronique des programmes qui affiche les informations sur les émissions TV actuelles et à venir.
+                L'EPG (Electronic Program Guide) est un guide électronique des
+                programmes qui affiche les informations sur les émissions TV
+                actuelles et à venir.
               </Text>
             </LinearGradient>
 
@@ -699,36 +808,59 @@ const TVGuideSettingsScreen: React.FC = () => {
               end={{x: 1, y: 1}}>
               <View style={styles.infoCardHeader}>
                 <Icon name="priority-high" size={14} color="#FF9800" />
-                <Text style={styles.modernInfoTitle}>Priorités EPG automatiques</Text>
+                <Text style={styles.modernInfoTitle}>
+                  Priorités EPG automatiques
+                </Text>
               </View>
               <View style={styles.priorityList}>
                 <View style={styles.priorityItem}>
-                  <View style={[styles.priorityBadge, {backgroundColor: '#4CAF50'}]}>
+                  <View
+                    style={[
+                      styles.priorityBadge,
+                      {backgroundColor: '#4CAF50'},
+                    ]}>
                     <Text style={styles.priorityNumber}>1</Text>
                   </View>
-                  <Text style={styles.priorityText}>EPG intégré playlist (url-tvg)</Text>
+                  <Text style={styles.priorityText}>
+                    EPG intégré playlist (url-tvg)
+                  </Text>
                 </View>
                 <View style={styles.priorityItem}>
-                  <View style={[styles.priorityBadge, {backgroundColor: '#FF9800'}]}>
+                  <View
+                    style={[
+                      styles.priorityBadge,
+                      {backgroundColor: '#FF9800'},
+                    ]}>
                     <Text style={styles.priorityNumber}>2</Text>
                   </View>
-                  <Text style={styles.priorityText}>EPG manuel assigné par utilisateur</Text>
+                  <Text style={styles.priorityText}>
+                    EPG manuel assigné par utilisateur
+                  </Text>
                 </View>
                 <View style={styles.priorityItem}>
-                  <View style={[styles.priorityBadge, {backgroundColor: '#2196F3'}]}>
+                  <View
+                    style={[
+                      styles.priorityBadge,
+                      {backgroundColor: '#2196F3'},
+                    ]}>
                     <Text style={styles.priorityNumber}>3</Text>
                   </View>
-                  <Text style={styles.priorityText}>EPG global (solution de secours)</Text>
+                  <Text style={styles.priorityText}>
+                    EPG global (solution de secours)
+                  </Text>
                 </View>
                 <View style={styles.priorityItem}>
-                  <View style={[styles.priorityBadge, {backgroundColor: '#9E9E9E'}]}>
+                  <View
+                    style={[
+                      styles.priorityBadge,
+                      {backgroundColor: '#9E9E9E'},
+                    ]}>
                     <Text style={styles.priorityNumber}>4</Text>
                   </View>
                   <Text style={styles.priorityText}>Aucun EPG</Text>
                 </View>
               </View>
             </LinearGradient>
-
           </View>
         </LinearGradient>
       </ScrollView>
@@ -741,8 +873,8 @@ const TVGuideSettingsScreen: React.FC = () => {
         icon="file-download"
         iconColor="#4A90E2"
         buttons={[
-          { text: 'Annuler', style: 'cancel', onPress: () => {} },
-          { text: 'Télécharger', onPress: () => startEPGDownload() },
+          {text: 'Annuler', style: 'cancel', onPress: () => {}},
+          {text: 'Télécharger', onPress: () => startEPGDownload()},
         ]}
         onClose={() => setShowDownloadDialog(false)}
       />
@@ -754,8 +886,8 @@ const TVGuideSettingsScreen: React.FC = () => {
         icon="refresh"
         iconColor="#FF9800"
         buttons={[
-          { text: 'Annuler', style: 'cancel', onPress: () => {} },
-          { text: 'Actualiser', onPress: () => executeRefreshEPG() },
+          {text: 'Annuler', style: 'cancel', onPress: () => {}},
+          {text: 'Actualiser', onPress: () => executeRefreshEPG()},
         ]}
         onClose={() => setShowRefreshDialog(false)}
       />
@@ -767,8 +899,12 @@ const TVGuideSettingsScreen: React.FC = () => {
         icon="warning"
         iconColor="#F44336"
         buttons={[
-          { text: 'Annuler', style: 'cancel', onPress: () => {} },
-          { text: 'Supprimer', style: 'destructive', onPress: () => executeClearCache() },
+          {text: 'Annuler', style: 'cancel', onPress: () => {}},
+          {
+            text: 'Supprimer',
+            style: 'destructive',
+            onPress: () => executeClearCache(),
+          },
         ]}
         onClose={() => setShowClearCacheDialog(false)}
       />
@@ -780,9 +916,7 @@ const TVGuideSettingsScreen: React.FC = () => {
         message={successMessage}
         icon="check-circle"
         iconColor="#4CAF50"
-        buttons={[
-          { text: 'Parfait !', onPress: () => {} },
-        ]}
+        buttons={[{text: 'Parfait !', onPress: () => {}}]}
         onClose={() => setShowSuccessDialog(false)}
       />
     </LinearGradient>
@@ -835,7 +969,7 @@ const styles = StyleSheet.create({
     borderTopColor: 'rgba(255, 255, 255, 0.2)',
     borderBottomColor: 'rgba(0, 0, 0, 0.1)',
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,
@@ -859,7 +993,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 10,
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: {width: 0, height: 1},
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 3,
@@ -883,7 +1017,7 @@ const styles = StyleSheet.create({
     borderTopColor: 'rgba(255, 255, 255, 0.2)',
     borderBottomColor: 'rgba(0, 0, 0, 0.1)',
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: {width: 0, height: 1},
     shadowOpacity: 0.2,
     shadowRadius: 6,
     elevation: 3,
@@ -923,7 +1057,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: 'rgba(255, 255, 255, 0.3)',
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: {width: 0, height: 1},
     shadowOpacity: 0.3,
     shadowRadius: 2,
     elevation: 2,
@@ -1077,7 +1211,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     marginHorizontal: 4,
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.3,
     shadowRadius: 6,
     elevation: 4,

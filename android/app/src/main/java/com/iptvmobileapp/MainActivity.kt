@@ -6,6 +6,7 @@ import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnabled
 import com.facebook.react.defaults.DefaultReactActivityDelegate
+import com.reactnative.googlecast.api.RNGCCastContext
 
 class MainActivity : ReactActivity() {
 
@@ -24,7 +25,15 @@ class MainActivity : ReactActivity() {
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(null) // react-native-screens fix
-    
+
+    // 📺 Initialize Google Cast context (lazy load)
+    try {
+      RNGCCastContext.getSharedInstance(this)
+    } catch (e: Exception) {
+      // Cast not available on this device (emulator or no Google Play Services)
+      e.printStackTrace()
+    }
+
     // 🎯 FORCER masquage navigation bar (complément au thème)
     hideNavigationBar()
   }

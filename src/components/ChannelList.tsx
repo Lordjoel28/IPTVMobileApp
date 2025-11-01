@@ -104,7 +104,9 @@ const ChannelList: React.FC<ChannelListProps> = ({
   const {selectCategory} = usePlaylistActions();
 
   // 🚀 OPTIMISATION: Récupérer channels depuis l'index (O(1))
-  const categoryChannels = useChannelsByCategory(selectedCategoryFromStore || 'TOUS');
+  const categoryChannels = useChannelsByCategory(
+    selectedCategoryFromStore || 'TOUS',
+  );
 
   // 🚀 OPTIMISATION: Calcul des catégories avec compteurs (depuis store)
   const categoriesWithCounts = useMemo(() => {
@@ -208,15 +210,18 @@ const ChannelList: React.FC<ChannelListProps> = ({
   );
 
   // 🚀 CHANGEMENT CATÉGORIE RAPIDE - Utilise le store
-  const handleCategoryChange = useCallback((category: string) => {
-    selectCategory(category);
+  const handleCategoryChange = useCallback(
+    (category: string) => {
+      selectCategory(category);
 
-    // Reset position scroll
-    flashListRef.current?.scrollToOffset({
-      offset: 0,
-      animated: true,
-    });
-  }, [selectCategory]);
+      // Reset position scroll
+      flashListRef.current?.scrollToOffset({
+        offset: 0,
+        animated: true,
+      });
+    },
+    [selectCategory],
+  );
 
   // 🚀 RENDER CATEGORY OPTIMISÉ - Animation instantanée
   const renderCategoryButton = useCallback(

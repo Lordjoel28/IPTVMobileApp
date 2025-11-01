@@ -328,6 +328,7 @@ const EPGFullScreen: React.FC<EPGFullScreenProps> = ({route}) => {
       program.title,
       'sur',
       channel.name,
+    );
 
     // Retourner vers ChannelPlayerScreen avec la chaîne sélectionnée
     navigation.navigate('ChannelPlayerScreen', {

@@ -25,6 +25,8 @@ export default class Playlist extends Model {
   @field('password') password?: string;
   @date('date_added') dateAdded!: Date;
   @field('expiration_date') expirationDate?: string;
+  @field('account_created_date') accountCreatedDate?: string; // Date de création du compte Xtream
+  @field('connection_info') connectionInfo?: string; // Infos connexions (JSON string)
   @field('channels_count') channelsCount!: number;
   @field('status') status!: 'active' | 'expiring' | 'expired';
   @field('is_active') isActive!: boolean;

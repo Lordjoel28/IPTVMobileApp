@@ -29,7 +29,10 @@ const MiniPlayerContainer: React.FC<MiniPlayerContainerProps> = ({height}) => {
   // Si une chaîne est active, afficher l'espace réservé pour le GlobalVideoPlayer
   // Le GlobalVideoPlayer se positionnera automatiquement ici quand ce n'est pas en fullscreen
   return (
-    <View style={[styles.videoContainer, {height}]}>
+    <TouchableOpacity
+      style={[styles.videoContainer, {height}]}
+      onPress={() => actions.setFullscreen(!isFullscreen)}
+      activeOpacity={0.8}>
       {/* Espace réservé pour le GlobalVideoPlayer qui se positionnera par-dessus */}
       {isFullscreen && (
         <View style={styles.fullscreenIndicator}>
@@ -42,7 +45,7 @@ const MiniPlayerContainer: React.FC<MiniPlayerContainerProps> = ({height}) => {
           </TouchableOpacity>
         </View>
       )}
-    </View>
+    </TouchableOpacity>
   );
 };
 

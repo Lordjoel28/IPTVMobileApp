@@ -10,6 +10,25 @@ import type {Associations} from '@nozbe/watermelondb/Model';
 export default class Channel extends Model {
   static table = 'channels';
 
+  // 🚀 Index optimisés pour les requêtes de catégories et playlists
+  // Accélère les requêtes GROUP BY sur les grandes playlists (+10K chaînes)
+  static indexes = [
+    // Index principal pour accélérer les requêtes par playlist
+    {name: 'idx_channels_playlist_id', columns: ['playlist_id']},
+
+    // Index composite pour accélérer le GROUP BY des catégories
+    {name: 'idx_channels_playlist_group', columns: ['playlist_id', 'group_title']},
+
+    // Index pour les recherches par nom (utile pour la recherche de chaînes)
+    {name: 'idx_channels_name', columns: ['name']},
+
+    // Index pour les favoris (accélère l'affichage des chaînes favorites)
+    {name: 'idx_channels_playlist_favorite', columns: ['playlist_id', 'is_favorite']},
+
+    // Index pour les chaînes récemment regardées
+    {name: 'idx_channels_last_watched', columns: ['last_watched']},
+  ];
+
   static associations: Associations = {
     playlist: {type: 'belongs_to', key: 'playlist_id'},
     category: {type: 'belongs_to', key: 'category_id'},

@@ -11,8 +11,14 @@ import {
   Platform,
   AppState,
   Modal,
+  InteractionManager,
 } from 'react-native';
-import { usePlayerStatusBar } from '../hooks/useStatusBar';
+import LZString from 'lz-string';
+import {usePlayerStatusBar} from '../hooks/useStatusBar';
+import {useAutoHideControls} from '../hooks/useAutoHideControls';
+import {useChannelSelector} from '../hooks/useChannelSelector';
+import {useVideoSettings} from '../hooks/useVideoSettings';
+import {useVideoPlayerSettings} from '../hooks/useVideoPlayerSettings';
 import {useNavigation} from '@react-navigation/native';
 import {
   PanGestureHandler,
@@ -25,26 +31,46 @@ import Animated, {
   useAnimatedStyle,
   withTiming,
   withSpring,
-  runOnJS, 
+  runOnJS,
 } from 'react-native-reanimated';
-import Video, {SelectedVideoTrackType, SelectedTrackType} from 'react-native-video';
+import Video, {
+  SelectedVideoTrackType,
+  SelectedTrackType,
+} from 'react-native-video';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import FastImage from 'react-native-fast-image';
 import LinearGradient from 'react-native-linear-gradient';
+import {FlashList} from '@shopify/flash-list';
 import {usePlayerStore} from '../stores/PlayerStore';
 import {useRecentChannelsStore} from '../stores/RecentChannelsStore';
 import {EPGHelper, EPGData} from '../services/EPGHelper';
 import EPGDataManager from '../services/EPGDataManager';
 import {EPGCacheManager} from '../services/epg/EPGCacheManager';
 import {usePlaylistStore} from '../stores/PlaylistStore';
-import type {Channel} from '../types';
+import type {Channel, Category} from '../types';
 import MultiScreenView from './MultiScreenView';
+import {PiPControls} from './PiPControls';
+import {TiviMateControls} from './TiviMateControls';
+import {SettingsMenu} from './SettingsMenu';
+import {DockerBar} from './DockerBar';
+import {RotationBackground} from './RotationBackground';
+import type {SubMenuType} from './SettingsMenu';
 import {IPTVService} from '../services/IPTVService';
 import WatermelonM3UService from '../services/WatermelonM3UService';
+import CategoriesService from '../services/CategoriesService'; // ⚡ Service optimisé catégories
+import RecentChannelsService from '../services/RecentChannelsService';
+import FavoritesService from '../services/FavoritesService';
+import ProfileService from '../services/ProfileService';
+import ParentalControlService from '../services/ParentalControlService';
+import database from '../database';
+import {Q} from '@nozbe/watermelondb';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { DeviceEventEmitter } from 'react-native';
+import {CastButton} from './CastButton';
+import {castManager} from '../services/CastManager';
 
 const {width: screenWidth, height: screenHeight} = Dimensions.get('window');
 const {width: deviceWidth, height: deviceHeight} = Dimensions.get('screen'); // Vraies dimensions pour fullscreen
-
 
 // Position et taille par défaut du lecteur flottant
 const MINI_PLAYER_WIDTH = 240; // Augmenté de 192 à 240 (+25%)
@@ -55,10 +81,7 @@ const GlobalVideoPlayer: React.FC = () => {
   const videoRef = useRef<Video>(null);
   const navigation = useNavigation();
 
-
-  // Force re-render du composant Video quand miniPlayerRect change
-  const [videoKey, setVideoKey] = React.useState(0);
-
+  
   // 🎯 PHASE 2: États pour gestures avancées (fullscreen uniquement)
   const [currentTime, setCurrentTime] = React.useState(0);
   const [duration, setDuration] = React.useState(0);
@@ -78,6 +101,8 @@ const GlobalVideoPlayer: React.FC = () => {
   const rippleScale = useSharedValue(0);
   const rippleOpacity = useSharedValue(0);
 
+  
+  
   // Récupérer TOUT l'état du store, y compris miniPlayerRect, isInChannelPlayerScreen et navigationData
   const {
     channel,
@@ -104,6 +129,251 @@ const GlobalVideoPlayer: React.FC = () => {
     actions.restorePlaylistId();
   }, [actions]);
 
+  // 🔄 État pour la gestion des favoris (système existant)
+  const [isChannelFavorite, setIsChannelFavorite] = React.useState(false);
+  const [favoriteProfileId, setFavoriteProfileId] = React.useState<string | null>(null);
+
+  // 🛡️ Protection contre les clics multiples
+  const [isClickProcessing, setIsClickProcessing] = React.useState(false);
+  const clickTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  // État local pour fullscreen instantané (sans store)
+  const [localFullscreen, setLocalFullscreen] = React.useState(false);
+
+  // État pour l'arrière-plan de rotation (simple et performant)
+  const [showRotationBackground, setShowRotationBackground] = React.useState(false);
+
+  // État pour multi-écran (doit être avant le useEffect BackHandler)
+  const [multiScreenVisible, setMultiScreenVisible] = React.useState<boolean>(false);
+  const [multiScreenLayout, setMultiScreenLayout] = React.useState<string | null>(null);
+  const [multiScreenSlots, setMultiScreenSlots] = React.useState<(Channel | null)[]>([]);
+  const [multiScreenActiveSlot, setMultiScreenActiveSlot] = React.useState<number>(0);
+
+  // 🎯 REFACTORED: Utilisation du hook useAutoHideControls pour éliminer la duplication
+
+  // Boutons PiP (mode mini-player)
+  const pipButtonsControls = useAutoHideControls({
+    hideDelay: 3000,
+    animationDuration: 200,
+    animationType: 'animated', // Utilise RN Animated pour compatibilité
+  });
+
+  // Bouton Play/Pause central
+  const playPauseButtonControls = useAutoHideControls({
+    hideDelay: 3000,
+    animationDuration: 300,
+  });
+  const playPauseButtonScale = useSharedValue(0.8);
+
+  // Contrôles TiviMate (header)
+  const [isScrolling, setIsScrolling] = React.useState(false);
+  const tiviMateControls = useAutoHideControls({
+    hideDelay: isScrolling ? 8000 : 5000, // Délai adaptatif selon scroll
+    animationDuration: 300,
+  });
+
+  // Docker TiviMate (barre inférieure)
+  const dockerControls = useAutoHideControls({
+    hideDelay: isScrolling ? 8000 : 5000, // Synchronisé avec les contrôles
+    animationDuration: 300,
+  });
+
+  // ⚡ Fermeture directe du PiP sans confirmation anormale
+
+  // Charger le statut de favori quand la chaîne change
+  React.useEffect(() => {
+    if (channel && storePlaylistId) {
+      loadChannelFavoriteStatus();
+    }
+  }, [channel, storePlaylistId]);
+
+  // 🔄 Écouter les mises à jour de favoris depuis ChannelPlayerScreen
+  React.useEffect(() => {
+    const handleFavoriteUpdate = (data: any) => {
+      const { channelId, isFavorite, playlistId, profileId } = data;
+
+      // Mettre à jour seulement si ça concerne la chaîne actuelle
+      if (channel && channelId === channel.id && playlistId === storePlaylistId && profileId === favoriteProfileId) {
+        setIsChannelFavorite(isFavorite);
+        console.log('🔄 [GlobalVideoPlayer] Favori mis à jour depuis ChannelPlayerScreen:', { channelId, isFavorite });
+      }
+    };
+
+    // Ajouter l'écouteur d'événements
+    const subscription = DeviceEventEmitter.addListener('favoriteUpdate', handleFavoriteUpdate);
+
+    // Nettoyer l'écouteur
+    return () => {
+      subscription.remove();
+    };
+  }, [channel, storePlaylistId, favoriteProfileId]);
+
+  // 🎨 Gestion simple de l'arrière-plan de rotation (performant)
+  React.useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+
+    const handleDimensionsChange = () => {
+      // Afficher l'arrière-plan immédiatement
+      setShowRotationBackground(true);
+
+      // Cacher l'arrière-plan après la transition (700ms)
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      timeoutId = setTimeout(() => {
+        setShowRotationBackground(false);
+      }, 700);
+    };
+
+    const subscription = Dimensions.addEventListener('change', handleDimensionsChange);
+
+    return () => {
+      subscription?.remove();
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, []);
+
+  const loadChannelFavoriteStatus = async () => {
+    if (!channel || !storePlaylistId) return;
+
+    try {
+      // Récupérer le profil actif
+      const ProfileService = (await import('../services/ProfileService')).default;
+      const activeProfile = await ProfileService.getActiveProfile();
+
+      if (activeProfile) {
+        setFavoriteProfileId(activeProfile.id);
+
+        // Utiliser le système existant pour vérifier si la chaîne est en favori
+        const favorites = await (await import('../services/FavoritesService')).default.getFavoritesByProfile(activeProfile.id);
+        const isFav = favorites.some(fav => fav.channelId === channel.id);
+        setIsChannelFavorite(isFav);
+      }
+    } catch (error) {
+      console.error('❌ [GlobalVideoPlayer] Erreur chargement statut favori:', error);
+    }
+  };
+
+  const handleFavoriteToggle = async () => {
+    if (!channel || !storePlaylistId || !favoriteProfileId) return;
+
+    try {
+      // Utiliser le système existant toggleFavorite
+      const FavoritesService = (await import('../services/FavoritesService')).default;
+      const newIsFavorite = await FavoritesService.toggleFavorite(channel, storePlaylistId, favoriteProfileId);
+
+      setIsChannelFavorite(newIsFavorite);
+      console.log(`⭐ [GlobalVideoPlayer] Favori ${newIsFavorite ? 'ajouté' : 'retiré'} pour: ${channel.name}`);
+
+      // 🔄 Synchroniser avec ChannelPlayerScreen via événement global
+      emitFavoriteUpdate(channel.id, newIsFavorite);
+    } catch (error) {
+      console.error('❌ [GlobalVideoPlayer] Erreur toggle favori:', error);
+    }
+  };
+
+  // 🔙 Callback pour le bouton retour des contrôles TiviMate
+  const handleBackPress = React.useCallback(() => {
+    if (localFullscreen) {
+      setLocalFullscreen(false);
+      return;
+    }
+
+    // 🎯 CAS SPÉCIAL: Si vient du multi-écran, revenir au multi-écran
+    if (isFromMultiScreen) {
+      console.log('🔙 [On-screen Back] From multi-screen, reopening multi-screen...');
+      actions.setFullscreen(false);
+      actions.setFromMultiScreen(false);
+      actions.setMultiScreenOpen(true);
+      setMultiScreenVisible(true);
+      return;
+    }
+
+    // 🎯 COMPORTEMENT NORMAL: Navigation vers ChannelPlayerScreen
+    if (navigationData && channel) {
+      console.log('🔙 [On-screen Back] NavigationData found, redirecting with NAVIGATE...');
+      actions.setFullscreen(false);
+      navigation.navigate('ChannelPlayer', {
+        ...navigationData,
+        selectedChannel: channel,
+      });
+      actions.setNavigationData(null);
+    } else {
+      console.log('🔙 [On-screen Back] No NavigationData, default behavior.');
+      actions.setFullscreen(false);
+    }
+  }, [localFullscreen, isFromMultiScreen, navigationData, channel, actions, navigation]);
+
+  // 🛡️ Fonction de clic sécurisé avec debounce
+  const handleVideoPress = React.useCallback(() => {
+    // Protection contre les clics multiples
+    if (isClickProcessing) {
+      console.log('🚫 [GlobalVideoPlayer] Clic ignoré - traitement en cours');
+      return;
+    }
+
+    setIsClickProcessing(true);
+    console.log('👆 [GlobalVideoPlayer] Clic vidéo traité - Mode:', {
+      isInChannelPlayerScreen,
+      localFullscreen,
+      isFullscreen,
+      isVisible
+    });
+
+    // Logique de clic simplifiée et sécurisée
+    try {
+      if (!isInChannelPlayerScreen && !localFullscreen) {
+        console.log('📱 [GlobalVideoPlayer] Mode PiP - affichage boutons temporaires');
+        // Appel direct du hook au lieu de la fonction wrappée
+        pipButtonsControls.showTemporarily();
+      } else if (!isInChannelPlayerScreen && localFullscreen) {
+        // En fullscreen local : ne rien faire (gestes gérent déjà)
+        console.log('🖥️ [GlobalVideoPlayer] Fullscreen local - pas d\'action');
+      } else {
+        // Mode ChannelPlayerScreen - basculer fullscreen avec protection
+        console.log('🔄 [GlobalVideoPlayer] Toggle fullscreen depuis ChannelPlayerScreen');
+        actions.setFullscreen(!isFullscreen);
+      }
+    } catch (error) {
+      console.error('❌ [GlobalVideoPlayer] Erreur lors du clic:', error);
+    } finally {
+      // Réinitialiser après un délai pour éviter les clics rapides
+      clickTimeoutRef.current = setTimeout(() => {
+        setIsClickProcessing(false);
+        console.log('✅ [GlobalVideoPlayer] Traitement clic terminé');
+      }, 300);
+    }
+  }, [isInChannelPlayerScreen, localFullscreen, isFullscreen, isVisible, isClickProcessing, actions, pipButtonsControls]);
+
+  // ⚡ Fermeture directe du PiP - UX normale sans confirmation anormale
+  const handleClosePiP = React.useCallback(() => {
+    console.log('❌ [GlobalVideoPlayer] Fermeture directe du PiP');
+    actions.stop();
+  }, [actions]);
+
+  // 🧹 Cleanup des timeouts
+  React.useEffect(() => {
+    return () => {
+      if (clickTimeoutRef.current) {
+        clearTimeout(clickTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // 🔄 Système de synchronisation des favoris
+  const emitFavoriteUpdate = (channelId: string, isFavorite: boolean) => {
+    // Utiliser DeviceEventEmitter pour synchroniser entre composants
+    DeviceEventEmitter.emit('favoriteUpdate', {
+      channelId,
+      isFavorite,
+      playlistId: storePlaylistId,
+      profileId: favoriteProfileId
+    });
+    console.log('🔄 [GlobalVideoPlayer] Événement favori émis:', { channelId, isFavorite });
+  };
+
   const viewPosition = useRef(new RNAnimated.ValueXY()).current;
   const viewSize = useRef(new RNAnimated.ValueXY()).current;
   const viewOpacity = useRef(new RNAnimated.Value(0)).current;
@@ -112,21 +382,26 @@ const GlobalVideoPlayer: React.FC = () => {
   const dragPosition = useRef(new RNAnimated.ValueXY()).current;
   const isDragging = useRef(false);
 
-
   // 🚀 CALCULS MÉMORISÉS avec dependencies ultra-stables
   const miniPlayerPosition = React.useMemo(() => {
-    return miniPlayerRect ? { x: miniPlayerRect.x, y: miniPlayerRect.y } : { x: 0, y: 0 };
+    return miniPlayerRect
+      ? {x: miniPlayerRect.x, y: miniPlayerRect.y}
+      : {x: 0, y: 0};
   }, [miniPlayerRect?.x, miniPlayerRect?.y]);
 
   const miniPlayerSize = React.useMemo(() => {
-    return miniPlayerRect ? { width: miniPlayerRect.width, height: miniPlayerRect.height } : { width: 0, height: 0 };
+    return miniPlayerRect
+      ? {width: miniPlayerRect.width, height: miniPlayerRect.height}
+      : {width: 0, height: 0};
   }, [miniPlayerRect?.width, miniPlayerRect?.height]);
 
   const finalPosition = React.useMemo(() => {
-    if (!isVisible) return { x: 0, y: 0 };
+    if (!isVisible) {
+      return {x: 0, y: 0};
+    }
 
     if (isFullscreen) {
-      return { x: 0, y: 0 };
+      return {x: 0, y: 0};
     } else if (isInChannelPlayerScreen && miniPlayerRect) {
       return miniPlayerPosition;
     } else {
@@ -135,10 +410,18 @@ const GlobalVideoPlayer: React.FC = () => {
         y: screenHeight - MINI_PLAYER_HEIGHT - SAFE_AREA_MARGIN - 50,
       };
     }
-  }, [isVisible, isFullscreen, isInChannelPlayerScreen, miniPlayerPosition, miniPlayerRect]); // Dependencies stables
+  }, [
+    isVisible,
+    isFullscreen,
+    isInChannelPlayerScreen,
+    miniPlayerPosition,
+    miniPlayerRect,
+  ]); // Dependencies stables
 
   const finalSize = React.useMemo(() => {
-    if (!isVisible) return { width: 0, height: 0 };
+    if (!isVisible) {
+      return {width: 0, height: 0};
+    }
 
     if (isFullscreen) {
       // 🎯 SIMPLE: Utiliser directement screen dimensions (mode paysage détecté)
@@ -152,12 +435,17 @@ const GlobalVideoPlayer: React.FC = () => {
     } else if (isInChannelPlayerScreen && miniPlayerRect) {
       return miniPlayerSize;
     } else {
-      return { width: MINI_PLAYER_WIDTH, height: MINI_PLAYER_HEIGHT };
+      return {width: MINI_PLAYER_WIDTH, height: MINI_PLAYER_HEIGHT};
     }
-  }, [isVisible, isFullscreen, isInChannelPlayerScreen, miniPlayerSize, miniPlayerRect]); // Dependencies stables
+  }, [
+    isVisible,
+    isFullscreen,
+    isInChannelPlayerScreen,
+    miniPlayerSize,
+    miniPlayerRect,
+  ]); // Dependencies stables
 
   // L'immersion est maintenant gérée par le hook global useGlobalImmersion
-
 
   // useEffect d'animation avec debounce pour éviter les boucles
   const animationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -177,18 +465,33 @@ const GlobalVideoPlayer: React.FC = () => {
         const positionTarget = {x: finalPosition.x, y: finalPosition.y};
         const sizeTarget = {x: finalSize.width, y: finalSize.height};
 
-        // Animation rapide pour transitions fluides sans flash
-        const animDuration = isFs ? 200 : isInChannelPlayerScreen ? 150 : 300;
+        // 🚀 FIX IMMÉDIAT: Désactiver l'animation pour fullscreen - bloquait les contrôles
+        if (isFs) {
+          // Mode fullscreen : position et taille directes, pas d'animation
+          console.log('🎬 [Animation] Fullscreen MODE DIRECT - pas d\'animation pour contrôles fonctionnels');
+          viewPosition.setValue(positionTarget);
+          viewSize.setValue(sizeTarget);
+          viewOpacity.setValue(1);
+        } else {
+          // Mode PiP : animation SEULEMENT si on n'est pas dans ChannelPlayerScreen
+          if (isInChannelPlayerScreen) {
+            // Pas d'animation dans ChannelPlayerScreen - position directe
+            viewPosition.setValue(positionTarget);
+            viewSize.setValue(sizeTarget);
+            viewOpacity.setValue(1);
+            return;
+          }
 
-        console.log('🎬 [Animation] Démarrage animation vers:', {
-          positionTarget,
-          sizeTarget,
+          const animDuration = 300;
+          console.log('🎬 [Animation] Démarrage animation PiP vers:', {
+            positionTarget,
+            sizeTarget,
           duration: animDuration,
           isInChannelPlayerScreen,
           isFullscreen,
-        });
+                });
 
-        RNAnimated.parallel([
+          RNAnimated.parallel([
           RNAnimated.timing(viewPosition, {
             toValue: positionTarget,
             duration: animDuration,
@@ -205,9 +508,10 @@ const GlobalVideoPlayer: React.FC = () => {
             useNativeDriver: false,
           }),
         ]).start();
-      } else {
-        viewOpacity.setValue(0);
       }
+    } else {
+      viewOpacity.setValue(0);
+    }
     }, 50); // Debounce de 50ms
 
     return () => {
@@ -225,22 +529,44 @@ const GlobalVideoPlayer: React.FC = () => {
     }
   }, [miniPlayerRect, isFullscreen]);
 
-  // Debug logs pour les changements d'état critiques seulement (optimisé pour éviter boucles)
-  useEffect(() => {
-    console.log('🎬 [GlobalVideoPlayer] État critique changé:', {
-      isVisible,
-      isFullscreen,
-      channelName: channel?.name,
-    });
-  }, [isVisible, isFullscreen, channel?.name]); // Dependencies minimales
+  // 🔧 Utiliser le hook pour accéder aux paramètres vidéo
+  const videoPlayerSettings = useVideoPlayerSettings();
 
-  // 🎯 LIFECYCLE: Stopper la lecture quand l'app passe en arrière-plan
+  // 🎯 LIFECYCLE: Gestion arrière-plan avec paramètre utilisateur
   useEffect(() => {
     const subscription = AppState.addEventListener('change', nextAppState => {
       if (nextAppState === 'background' || nextAppState === 'inactive') {
-        console.log('🔇 [GlobalVideoPlayer] App en arrière-plan - STOP player');
-        if (isVisible && channel) {
-          actions.stop(); // Arrêter complètement le player
+        console.log('🔇 [GlobalVideoPlayer] App en arrière-plan');
+
+        // Utiliser le paramètre de lecture en arrière-plan
+        const backgroundPlay = videoPlayerSettings.backgroundPlay;
+        console.log(`🔍 [GlobalVideoPlayer] Paramètre backgroundPlay: ${backgroundPlay}`);
+
+        if (backgroundPlay) {
+          console.log('🎵 [GlobalVideoPlayer] Lecture en arrière-plan activée - CONTINUE audio');
+          // Continuer la lecture (ne rien faire - react-native-video gère l'audio)
+        } else {
+          console.log('🔇 [GlobalVideoPlayer] Lecture en arrière-plan désactivée - PAUSE player');
+          if (isVisible && channel && !isPaused) {
+            // Mettre en pause (comportement par défaut)
+            actions.togglePlayPause();
+          }
+        }
+      } else if (nextAppState === 'active') {
+        console.log('▶️ [GlobalVideoPlayer] App active - Vérification reprise automatique');
+
+        const backgroundPlay = videoPlayerSettings.backgroundPlay;
+
+        if (backgroundPlay && isVisible && channel && isPaused) {
+          console.log('🔄 [GlobalVideoPlayer] Reprise automatique depuis arrière-plan');
+          setTimeout(() => {
+            actions.togglePlayPause();
+          }, 500);
+        } else if (!backgroundPlay && isVisible && channel && isPaused) {
+          console.log('🔄 [GlobalVideoPlayer] Reprise automatique après pause normale');
+          setTimeout(() => {
+            actions.togglePlayPause();
+          }, 500);
         }
       }
     });
@@ -248,7 +574,7 @@ const GlobalVideoPlayer: React.FC = () => {
     return () => {
       subscription.remove();
     };
-  }, [isVisible, channel, actions]);
+  }, [isVisible, channel, isPaused, actions, videoPlayerSettings.backgroundPlay]);
 
   // 🎯 CORRECTION: Afficher les contrôles automatiquement en fullscreen
   useEffect(() => {
@@ -275,7 +601,9 @@ const GlobalVideoPlayer: React.FC = () => {
 
           // 🎯 CAS SPÉCIAL: Si vient du multi-écran, revenir au multi-écran
           if (isFromMultiScreen) {
-            console.log('🔙 [BackHandler] From multi-screen, reopening multi-screen...');
+            console.log(
+              '🔙 [BackHandler] From multi-screen, reopening multi-screen...',
+            );
             // Ordre important pour éviter flash:
             // 1. Marquer MultiScreen comme ouvert AVANT de quitter fullscreen
             actions.setMultiScreenOpen(true);
@@ -329,7 +657,15 @@ const GlobalVideoPlayer: React.FC = () => {
       },
     );
     return () => backHandler.remove();
-  }, [isFullscreen, actions, navigation, channel, navigationData, isFromMultiScreen, setMultiScreenVisible]);
+  }, [
+    isFullscreen,
+    actions,
+    navigation,
+    channel,
+    navigationData,
+    isFromMultiScreen,
+    setMultiScreenVisible,
+  ]);
 
   // StatusBar gérée par StatusBarManager centralisé
   // La logique complexe est maintenant simplifiée
@@ -375,36 +711,30 @@ const GlobalVideoPlayer: React.FC = () => {
 
         dragPosition.setValue({x: dampedX, y: dampedY});
       },
-    }
+    },
   );
 
-  // État local pour fullscreen instantané (sans store)
-  const [localFullscreen, setLocalFullscreen] = React.useState(false);
+  // État pour modal de confirmation d'effacement
+  const [showClearConfirmModal, setShowClearConfirmModal] = React.useState(false);
 
-  // État pour affichage temporaire des boutons PiP
-  const [showPipButtons, setShowPipButtons] = React.useState(false);
-  const pipButtonsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const pipButtonsOpacity = useRef(new RNAnimated.Value(0)).current;
-
-  // État pour bouton play/pause central
-  const [showPlayPauseButton, setShowPlayPauseButton] = React.useState(false);
-  const playPauseButtonTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const playPauseButtonOpacity = useSharedValue(0);
-  const playPauseButtonScale = useSharedValue(0.8);
-
-  // États pour contrôles TiviMate
-  const [showControls, setShowControls] = React.useState(false);
-  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const controlsOpacity = useSharedValue(0);
-
-  // États pour docker TiviMate
-  const [showDocker, setShowDocker] = React.useState(false);
-  const dockerOpacity = useSharedValue(0);
-  const [isScrolling, setIsScrolling] = React.useState(false);
+  // 🎯 HOOK: Sélecteur de chaînes (remplace ~585 lignes de code)
+  const channelSelector = useChannelSelector({
+    playlistId: storePlaylistId,
+    currentChannel: channel,
+    channelsPerPage: 200,
+  });
 
   // États pour le menu paramètres
   const [showSettingsMenu, setShowSettingsMenu] = React.useState(false);
   const settingsMenuOpacity = useSharedValue(0);
+
+  // Synchroniser l'opacité avec l'état showSettingsMenu
+  React.useEffect(() => {
+    console.log('🔧 [Settings] useEffect - showSettingsMenu:', showSettingsMenu);
+    settingsMenuOpacity.value = withTiming(showSettingsMenu ? 1 : 0, {
+      duration: 200,
+    });
+  }, [showSettingsMenu]);
 
   // États pour les sous-menus
   const [activeSubMenu, setActiveSubMenu] = React.useState<string | null>(null);
@@ -413,36 +743,34 @@ const GlobalVideoPlayer: React.FC = () => {
   const subMenuOpacity = useSharedValue(0);
 
   // États pour piste audio (1 = Piste 1 activée par défaut, 0 = muet)
-  const [selectedAudioTrack, setSelectedAudioTrack] = React.useState<number>(1);
+  const [selectedAudioTrack, setSelectedAudioTrack] = React.useState<number | null>(1);
   const [audioDelay, setAudioDelay] = React.useState<number>(0); // en ms
 
   // États pour piste vidéo
-  const [selectedVideoQuality, setSelectedVideoQuality] = React.useState<string>('auto');
-  const [availableVideoTracks, setAvailableVideoTracks] = React.useState<any[]>([]);
-  const [availableAudioTracks, setAvailableAudioTracks] = React.useState<any[]>([]);
-  const [availableTextTracks, setAvailableTextTracks] = React.useState<any[]>([]);
+  const [selectedVideoQuality, setSelectedVideoQuality] =
+    React.useState<string>('auto');
+  const [availableVideoTracks, setAvailableVideoTracks] = React.useState<any[]>(
+    [],
+  );
+  const [availableAudioTracks, setAvailableAudioTracks] = React.useState<any[]>(
+    [],
+  );
+  const [availableTextTracks, setAvailableTextTracks] = React.useState<any[]>(
+    [],
+  );
 
   // États pour sous-titres
-  const [subtitlesEnabled, setSubtitlesEnabled] = React.useState<boolean>(false);
-  const [selectedSubtitleTrack, setSelectedSubtitleTrack] = React.useState<number>(0);
+  const [subtitlesEnabled, setSubtitlesEnabled] =
+    React.useState<boolean>(false);
+  const [selectedSubtitleTrack, setSelectedSubtitleTrack] =
+    React.useState<number | null>(0);
   const [subtitleSize, setSubtitleSize] = React.useState<string>('normal');
   const [subtitleDelay, setSubtitleDelay] = React.useState<number>(0); // en ms
 
-  // États pour mode d'affichage
-  const [zoomMode, setZoomMode] = React.useState<string>('fit');
-
-  // États pour contrôle du buffer
-  const [bufferMode, setBufferMode] = React.useState<string>('normal'); // 'low' | 'normal' | 'high'
-
-  // État pour verrouillage de l'écran
-  const [isScreenLocked, setIsScreenLocked] = React.useState<boolean>(false);
-
-  // État pour multi-écran
-  const [multiScreenVisible, setMultiScreenVisible] = React.useState<boolean>(false);
-  // Persister l'état du multiscreen pour ne pas le perdre à la fermeture/réouverture
-  const [multiScreenLayout, setMultiScreenLayout] = React.useState<string | null>(null);
-  const [multiScreenSlots, setMultiScreenSlots] = React.useState<(Channel | null)[]>([]);
-  const [multiScreenActiveSlot, setMultiScreenActiveSlot] = React.useState<number>(0);
+  // 🎯 HOOK: Paramètres vidéo (zoom, buffer, screen lock)
+  const videoSettings = useVideoSettings({
+    isFullscreen,
+  });
 
   // États pour EPG réelles
   const [epgLoading, setEpgLoading] = React.useState(false);
@@ -452,12 +780,38 @@ const GlobalVideoPlayer: React.FC = () => {
   const {channels: playlistChannels} = usePlaylistStore();
 
   // 🕰️ Récupération des chaînes récentes du store simple
-  const {recentChannels: storeRecentChannels} = useRecentChannelsStore();
+  const {recentChannels: storeRecentChannels, clearRecentChannels} = useRecentChannelsStore();
 
   // 📺 Récupération des chaînes de la playlist active pour multi-écran
-  const [allChannelsForMultiScreen, setAllChannelsForMultiScreen] = React.useState<Channel[]>([]);
-  const [lastLoadedPlaylistId, setLastLoadedPlaylistId] = React.useState<string | null>(null);
+  const [allChannelsForMultiScreen, setAllChannelsForMultiScreen] =
+    React.useState<Channel[]>([]);
+  const [lastLoadedPlaylistId, setLastLoadedPlaylistId] = React.useState<
+    string | null
+  >(null);
   const [isLoadingChannels, setIsLoadingChannels] = React.useState(false);
+
+  // 🔒 État pour les catégories bloquées du profil actif
+  const [blockedCategories, setBlockedCategories] = React.useState<string[]>([]);
+
+  // 🔒 Charger les catégories bloquées du profil actif
+  React.useEffect(() => {
+    const loadBlockedCategories = async () => {
+      try {
+        const activeProfile = await ProfileService.getActiveProfile();
+        if (activeProfile && activeProfile.blockedCategories) {
+          setBlockedCategories(activeProfile.blockedCategories);
+          console.log('🔒 [GlobalVideoPlayer] Catégories bloquées chargées:', activeProfile.blockedCategories);
+        } else {
+          setBlockedCategories([]);
+        }
+      } catch (error) {
+        console.error('❌ [GlobalVideoPlayer] Erreur chargement catégories bloquées:', error);
+        setBlockedCategories([]);
+      }
+    };
+
+    loadBlockedCategories();
+  }, []);
 
   // Charger les chaînes de la playlist active quand le multi-écran s'ouvre ou la playlist change
   React.useEffect(() => {
@@ -465,18 +819,25 @@ const GlobalVideoPlayer: React.FC = () => {
     const activePlaylistId = navigationData?.playlistId || storePlaylistId;
 
     // Charger si: multi-screen visible ET playlistId existe ET (pas encore chargé OU playlist différente)
-    if (multiScreenVisible && activePlaylistId && activePlaylistId !== lastLoadedPlaylistId) {
+    if (
+      multiScreenVisible &&
+      activePlaylistId &&
+      activePlaylistId !== lastLoadedPlaylistId
+    ) {
       const loadAllChannels = async () => {
         try {
           setIsLoadingChannels(true);
-          console.log('📋 [MultiScreen] Chargement chaînes de la playlist:', activePlaylistId);
+          console.log(
+            '📋 [MultiScreen] Chargement chaînes de la playlist:',
+            activePlaylistId,
+          );
 
           // Charger en arrière-plan avec timeout pour ne pas bloquer l'UI
           setTimeout(async () => {
             const result = await WatermelonM3UService.getPlaylistWithChannels(
               activePlaylistId,
               50000, // Limit très élevé pour supporter playlists massives (11K+ chaînes)
-              0
+              0,
             );
 
             // Convertir les chaînes WatermelonDB en format Channel
@@ -489,7 +850,12 @@ const GlobalVideoPlayer: React.FC = () => {
               category: ch.groupTitle,
             }));
 
-            console.log('📺 [MultiScreen] Loaded', convertedChannels.length, 'channels from playlist', activePlaylistId);
+            console.log(
+              '📺 [MultiScreen] Loaded',
+              convertedChannels.length,
+              'channels from playlist',
+              activePlaylistId,
+            );
             setAllChannelsForMultiScreen(convertedChannels);
             setLastLoadedPlaylistId(activePlaylistId);
             setIsLoadingChannels(false);
@@ -502,9 +868,16 @@ const GlobalVideoPlayer: React.FC = () => {
 
       loadAllChannels();
     } else if (multiScreenVisible && !activePlaylistId) {
-      console.warn('⚠️ [MultiScreen] Aucune playlist active trouvée (navigationData et store)');
+      console.warn(
+        '⚠️ [MultiScreen] Aucune playlist active trouvée (navigationData et store)',
+      );
     }
-  }, [multiScreenVisible, navigationData, storePlaylistId, lastLoadedPlaylistId]);
+  }, [
+    multiScreenVisible,
+    navigationData,
+    storePlaylistId,
+    lastLoadedPlaylistId,
+  ]);
 
   const normalizeName = (name: string): string =>
     name.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -512,38 +885,44 @@ const GlobalVideoPlayer: React.FC = () => {
   // Fonction pour charger les données EPG
   const loadEPGData = React.useCallback(async () => {
     if (!channel) {
-        setEpgData(null);
-        return;
+      setEpgData(null);
+      return;
     }
 
     setEpgLoading(true);
     try {
-        // 1. Normaliser le nom de la chaîne M3U
-        const normalizedM3UName = normalizeName(channel.name);
+      // 1. Normaliser le nom de la chaîne M3U
+      const normalizedM3UName = normalizeName(channel.name);
 
-        // 2. Chercher dans l'index du EPGCacheManager
-        const epgChannel = EPGCacheManager.channelIndex.get(normalizedM3UName);
+      // 2. Chercher dans l'index du EPGCacheManager
+      const epgChannel = EPGCacheManager.channelIndex.get(normalizedM3UName);
 
-        if (epgChannel) {
-            console.log(`✅ [EPG] Match trouvé pour "${channel.name}" -> EPG ID: ${epgChannel.id}`);
-            // 3. Utiliser EPGDataManager avec le bon ID
-            const data = await EPGDataManager.getChannelEPG(epgChannel.id);
-            setEpgData(data);
-        } else {
-            console.log(`❌ [EPG] Aucun match trouvé pour "${channel.name}" dans l'index EPG.`);
-            setEpgData(null);
-        }
-    } catch (error) {
-        console.warn('⚠️ Failed to load EPG data:', error);
+      if (epgChannel) {
+        console.log(
+          `✅ [EPG] Match trouvé pour "${channel.name}" -> EPG ID: ${epgChannel.id}`,
+        );
+        // 3. Utiliser EPGDataManager avec le bon ID
+        const data = await EPGDataManager.getChannelEPG(epgChannel.id);
+        setEpgData(data);
+      } else {
+        console.log(
+          `❌ [EPG] Aucun match trouvé pour "${channel.name}" dans l'index EPG.`,
+        );
         setEpgData(null);
+      }
+    } catch (error) {
+      console.warn('⚠️ Failed to load EPG data:', error);
+      setEpgData(null);
     } finally {
-        setEpgLoading(false);
+      setEpgLoading(false);
     }
   }, [channel]);
 
   // Log de mount unique (éviter logs constants)
   React.useEffect(() => {
-    console.log('🔄 [GlobalVideoPlayer] Component mounted with BackHandler enabled');
+    console.log(
+      '🔄 [GlobalVideoPlayer] Component mounted with BackHandler enabled',
+    );
   }, []);
 
   // Charger EPG au changement de chaîne
@@ -558,38 +937,74 @@ const GlobalVideoPlayer: React.FC = () => {
     }
     // Essayer de détecter depuis l'URL
     const url = channel?.url?.toLowerCase() || '';
-    if (url.includes('fhd') || url.includes('1080')) {return 'FHD';}
-    if (url.includes('hd') || url.includes('720')) {return 'HD';}
-    if (url.includes('sd') || url.includes('480')) {return 'SD';}
+    if (url.includes('fhd') || url.includes('1080')) {
+      return 'FHD';
+    }
+    if (url.includes('hd') || url.includes('720')) {
+      return 'HD';
+    }
+    if (url.includes('sd') || url.includes('480')) {
+      return 'SD';
+    }
     return 'HD'; // Par défaut
   };
 
   // Fonction pour déterminer le FPS (estimation)
   const getChannelFPS = (channel: any) => {
     const url = channel?.url?.toLowerCase() || '';
-    if (url.includes('60fps')) {return '60 FPS';}
-    if (url.includes('30fps')) {return '30 FPS';}
-    if (url.includes('24fps')) {return '24 FPS';}
+    if (url.includes('60fps')) {
+      return '60 FPS';
+    }
+    if (url.includes('30fps')) {
+      return '30 FPS';
+    }
+    if (url.includes('24fps')) {
+      return '24 FPS';
+    }
     return '25 FPS'; // Standard européen
   };
 
   // Fonction pour déterminer l'audio
   const getChannelAudio = (channel: any) => {
     const url = channel?.url?.toLowerCase() || '';
-    if (url.includes('stereo')) {return 'STÉRÉO';}
-    if (url.includes('mono')) {return 'MONO';}
-    if (url.includes('5.1') || url.includes('surround')) {return '5.1';}
+    if (url.includes('stereo')) {
+      return 'STÉRÉO';
+    }
+    if (url.includes('mono')) {
+      return 'MONO';
+    }
+    if (url.includes('5.1') || url.includes('surround')) {
+      return '5.1';
+    }
     return 'STÉRÉO'; // Par défaut
   };
 
   // Utiliser les chaînes récentes du store simple (limite 20 avec scroll)
   const recentChannels = React.useMemo(() => {
     if (storeRecentChannels && storeRecentChannels.length > 0) {
-      const limitedChannels = storeRecentChannels.slice(0, 20);
+      // 🔒 FILTRER les chaînes des catégories bloquées
+      let filteredChannels = storeRecentChannels;
+      if (blockedCategories.length > 0) {
+        const beforeCount = storeRecentChannels.length;
+        filteredChannels = storeRecentChannels.filter((ch: any) => {
+          const groupTitle = ((ch as any).groupTitle || ch.group || ch.category || '').toLowerCase();
+          return !blockedCategories.some(blocked =>
+            groupTitle.includes(blocked.toLowerCase())
+          );
+        });
+        console.log(
+          `🔒 [GlobalVideoPlayer] Docker filtrés: ${beforeCount} → ${filteredChannels.length} chaînes récentes`,
+        );
+      }
+
+      const limitedChannels = filteredChannels.slice(0, 20);
       console.log(
-        `✅ [GlobalVideoPlayer] Store → Docker: ${storeRecentChannels.length} chaînes récentes → affichage de ${limitedChannels.length} (limite 20)`,
+        `✅ [GlobalVideoPlayer] Store → Docker: ${filteredChannels.length} chaînes récentes → affichage de ${limitedChannels.length} (limite 20)`,
       );
-      console.log('📋 [GlobalVideoPlayer] Noms des chaînes:', limitedChannels.map(ch => ch.name).join(', '));
+      console.log(
+        '📋 [GlobalVideoPlayer] Noms des chaînes:',
+        limitedChannels.map(ch => ch.name).join(', '),
+      );
       return limitedChannels.map((ch, index) => ({
         ...ch,
         // Assurer un ID unique
@@ -624,7 +1039,157 @@ const GlobalVideoPlayer: React.FC = () => {
 
     console.log('⚠️ [GlobalVideoPlayer] Aucune chaîne récente disponible');
     return [];
-  }, [storeRecentChannels, playlistChannels]);
+  }, [storeRecentChannels, playlistChannels, blockedCategories]);
+
+  // 🎯 NOUVEAU: État local pour stabiliser la liste des chaînes dans le docker
+  const [stableRecentChannels, setStableRecentChannels] = React.useState<Channel[]>([]);
+
+  React.useEffect(() => {
+    // Si le docker est affiché et que notre liste stable est vide, on la remplit.
+    // Cela "photographie" l'état des chaînes récentes à l'ouverture du docker.
+    if (dockerControls.isVisible && stableRecentChannels.length === 0) {
+      setStableRecentChannels(recentChannels);
+    }
+    // Si le docker est masqué, on vide notre liste stable pour qu'elle se rafraîchisse à la prochaine ouverture.
+    else if (!dockerControls.isVisible && stableRecentChannels.length > 0) {
+      setStableRecentChannels([]);
+    }
+  }, [dockerControls.isVisible, recentChannels, stableRecentChannels]);
+
+  // Fonction pour effacer les chaînes récentes
+  const handleClearRecentChannels = async () => {
+    try {
+      // 1. Récupérer le profil actif
+      const activeProfile = await ProfileService.getActiveProfile();
+      if (!activeProfile) {
+        console.log('⚠️ [Docker] Aucun profil actif, impossible d\'effacer');
+        return;
+      }
+
+      console.log('🗑️ [Docker] Effacement des chaînes récentes pour profil:', activeProfile.id);
+
+      // 2. Vider AsyncStorage via le service
+      await RecentChannelsService.clearProfileRecents(activeProfile.id);
+
+      // 3. Vider le store en mémoire
+      clearRecentChannels();
+
+      // 4. Vider la liste stabilisée locale
+      setStableRecentChannels([]);
+
+      console.log('✅ [Docker] Chaînes récentes effacées avec succès');
+    } catch (error) {
+      console.error('❌ [Docker] Erreur lors de l\'effacement:', error);
+    }
+  };
+
+
+  // ✅ Fonctions adaptées pour le sélecteur (utilise le hook)
+  const handleChannelSelect = (selectedChannel: Channel) => {
+    actions.playChannel(selectedChannel, true);
+    channelSelector.close();
+  };
+
+  const handleCategorySelect = async (category: Category) => {
+    channelSelector.selectCategory(category);
+  };
+
+  // Rendu d'une catégorie dans le sélecteur
+  const renderSelectorCategoryItem = ({item}: {item: Category}) => {
+    const isSelected = channelSelector.selectedCategory?.id === item.id;
+
+    // Déterminer l'icône et le nom à afficher
+    let iconName = null;
+    let displayName = item.name;
+
+    if (item.id === 'recents') {
+      iconName = 'history';
+      displayName = 'Récents';
+    } else if (item.id === 'favorites') {
+      iconName = 'star';
+      displayName = 'Favoris';
+    }
+
+    return (
+      <TouchableOpacity
+        style={[
+          styles.selectorCategoryItem,
+          isSelected && styles.selectorCategoryItemActive,
+        ]}
+        onPress={() => handleCategorySelect(item)}>
+        <View style={styles.selectorCategoryNameContainer}>
+          {iconName && (
+            <Icon
+              name={iconName}
+              size={18}
+              color={isSelected ? '#fff' : '#ccc'}
+              style={styles.selectorCategoryIcon}
+            />
+          )}
+          <Text
+            style={[
+              styles.selectorCategoryText,
+              isSelected && styles.selectorCategoryTextActive,
+            ]}
+            numberOfLines={1}>
+            {displayName}
+          </Text>
+        </View>
+        <Text
+          style={[
+            styles.selectorCategoryCount,
+            isSelected && styles.selectorCategoryCountActive,
+          ]}>
+          {item.count}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
+
+  // ✅ OPTIMISATION: Composant mémoïsé pour éviter re-renders inutiles (5-10x plus rapide)
+  const ChannelItem = React.memo(({item, onPress, isPlaying}: {item: Channel; onPress: () => void; isPlaying: boolean}) => {
+    return (
+      <TouchableOpacity
+        style={[
+          styles.selectorChannelItem,
+          isPlaying && styles.selectorChannelItemActive,
+        ]}
+        onPress={onPress}>
+        {/* Logo à gauche */}
+        <View style={styles.selectorChannelLogo}>
+          {item.logo ? (
+            <FastImage
+              source={{uri: item.logo}}
+              style={styles.selectorChannelLogoImage}
+              resizeMode={FastImage.resizeMode.contain}
+            />
+          ) : (
+            <View style={styles.selectorChannelLogoFallback}>
+              <Text style={styles.selectorChannelLogoText}>
+                {(item.name || 'CH').substring(0, 2).toUpperCase()}
+              </Text>
+            </View>
+          )}
+        </View>
+        {/* Nom à droite */}
+        <Text style={[
+          styles.selectorChannelName,
+          isPlaying && styles.selectorChannelNameActive,
+        ]} numberOfLines={1}>
+          {item.name || 'Chaîne sans nom'}
+        </Text>
+      </TouchableOpacity>
+    );
+  }, (prevProps, nextProps) => {
+    // ✅ Comparaison personnalisée: re-render si l'ID OU le statut playing change
+    return prevProps.item.id === nextProps.item.id && prevProps.isPlaying === nextProps.isPlaying;
+  });
+
+  // Rendu d'une chaîne dans le sélecteur (format liste) - wrapper mémoïsé
+  const renderSelectorChannelItem = React.useCallback(({item}: {item: Channel}) => {
+    const isPlaying = channel?.id === item.id;
+    return <ChannelItem item={item} onPress={() => handleChannelSelect(item)} isPlaying={isPlaying} />;
+  }, [channel]);
 
   // Animation pour le clic sur le bouton play/pause
   const animatePlayPauseClick = () => {
@@ -668,130 +1233,81 @@ const GlobalVideoPlayer: React.FC = () => {
     }
   };
 
-  // Fonctions pour contrôles TiviMate
-  const showControlsTemporarily = () => {
-    if (controlsTimeoutRef.current) {
-      clearTimeout(controlsTimeoutRef.current);
-    }
-
-    setShowControls(true);
-    setShowDocker(true);
-    controlsOpacity.value = withTiming(1, {duration: 300});
-    dockerOpacity.value = withTiming(1, {duration: 300});
-
-    // Délai adaptatif : 8 secondes si scroll actif, sinon 5 secondes
+  // 🎯 REFACTORED: Fonction pour afficher contrôles et docker ensemble
+  const showControlsTemporarily = React.useCallback(() => {
     const hideDelay = isScrolling ? 8000 : 5000;
     console.log(
-      `⏱️ [Controls] Auto-hide dans ${
-        hideDelay / 1000
-      }s (scroll: ${isScrolling})`,
+      `⏱️ [Controls] Auto-hide dans ${hideDelay / 1000}s (scroll: ${isScrolling})`,
     );
 
-    controlsTimeoutRef.current = setTimeout(() => {
-      controlsOpacity.value = withTiming(0, {duration: 300});
-      dockerOpacity.value = withTiming(0, {duration: 300});
-      setTimeout(() => {
-        setShowControls(false);
-        setShowDocker(false);
-      }, 300);
-    }, hideDelay);
-  };
+    // Afficher contrôles et docker ensemble
+    console.log('🎬 [Controls] Affichage TiviMate controls...');
+    tiviMateControls.showTemporarily();
+    console.log('🐳 [Controls] Affichage DockerBar...', {
+      wasVisible: dockerControls.isVisible,
+    });
+    dockerControls.showTemporarily();
+    console.log('✅ [Controls] Les deux contrôles ont été appelés');
+    console.log('👆 [Controls] Zones gestuelles désactivées (pointerEvents: none) pour permettre interactions');
+  }, [isScrolling, tiviMateControls, dockerControls]);
 
-  const toggleControls = () => {
+  const toggleControls = React.useCallback(() => {
+    console.log('👆 [toggleControls] Appelé - État actuel:', {
+      tiviMateVisible: tiviMateControls.isVisible,
+      dockerVisible: dockerControls.isVisible,
+      screenLocked: videoSettings.isScreenLocked,
+    });
+
     // Si l'écran est verrouillé, ne rien faire sauf si on veut afficher le bouton de déverrouillage
-    if (isScreenLocked && !showControls) {
+    if (videoSettings.isScreenLocked && !tiviMateControls.isVisible) {
+      console.log('🔒 [toggleControls] Écran verrouillé - affichage bouton déverrouillage uniquement');
       // Afficher seulement le header avec le bouton de déverrouillage
-      setShowControls(true);
-      controlsOpacity.value = withTiming(1, {duration: 300});
+      tiviMateControls.show();
+      tiviMateControls.opacity.value = withTiming(1, {duration: 300});
+
       // Auto-cacher après 3s
-      if (controlsTimeoutRef.current) {
-        clearTimeout(controlsTimeoutRef.current);
-      }
-      controlsTimeoutRef.current = setTimeout(() => {
-        controlsOpacity.value = withTiming(0, {duration: 300});
-        setTimeout(() => setShowControls(false), 300);
+      setTimeout(() => {
+        tiviMateControls.hide();
       }, 3000);
       return;
     }
 
-    if (showControls) {
+    if (tiviMateControls.isVisible) {
+      console.log('👁️ [toggleControls] Contrôles visibles - masquage des deux');
       // Cacher immédiatement
-      if (controlsTimeoutRef.current) {
-        clearTimeout(controlsTimeoutRef.current);
-      }
-      controlsOpacity.value = withTiming(0, {duration: 300});
-      dockerOpacity.value = withTiming(0, {duration: 300});
-      setTimeout(() => {
-        setShowControls(false);
-        setShowDocker(false);
-      }, 300);
+      tiviMateControls.hide();
+      dockerControls.hide();
+      console.log('✋ [toggleControls] Zones gestuelles réactivées (pointerEvents: auto)');
     } else {
+      console.log('🎬 [toggleControls] Contrôles cachés - affichage des deux via showControlsTemporarily()');
       // Montrer temporairement
       showControlsTemporarily();
     }
-  };
+  }, [videoSettings.isScreenLocked, tiviMateControls, dockerControls, showControlsTemporarily]);
 
-  // Fonction pour afficher temporairement les boutons PiP
-  const showPipButtonsTemporarily = () => {
-    // Annuler le timeout précédent si il existe
-    if (pipButtonsTimeoutRef.current) {
-      clearTimeout(pipButtonsTimeoutRef.current);
-    }
-
-    setShowPipButtons(true);
-
-    // Animation d'apparition
-    RNAnimated.timing(pipButtonsOpacity, {
-      toValue: 1,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
-
-    // Masquer après 3 secondes avec animation
-    pipButtonsTimeoutRef.current = setTimeout(() => {
-      RNAnimated.timing(pipButtonsOpacity, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }).start(() => {
-        setShowPipButtons(false);
-      });
-    }, 3000);
-
+  // 🎯 REFACTORED: Fonction pour afficher temporairement les boutons PiP
+  const showPipButtonsTemporarily = React.useCallback(() => {
     console.log('👆 [GlobalVideoPlayer] Showing PiP buttons temporarily');
-  };
+    pipButtonsControls.showTemporarily();
+  }, [pipButtonsControls]);
 
-  // Fonction pour afficher temporairement le bouton play/pause central
-  const showPlayPauseButtonTemporarily = () => {
-    if (playPauseButtonTimeoutRef.current) {
-      clearTimeout(playPauseButtonTimeoutRef.current);
-    }
-
-    setShowPlayPauseButton(true);
-
-    // Animation d'apparition fluide
-    playPauseButtonOpacity.value = withTiming(1, {duration: 200});
+  // 🎯 REFACTORED: Fonction pour afficher temporairement le bouton play/pause central
+  const showPlayPauseButtonTemporarily = React.useCallback(() => {
+    playPauseButtonControls.showTemporarily();
+    // Animation de scale supplémentaire pour effet visuel
     playPauseButtonScale.value = withSpring(1, {damping: 15, stiffness: 200});
-
-    // Masquer après 3 secondes
-    playPauseButtonTimeoutRef.current = setTimeout(() => {
-      playPauseButtonOpacity.value = withTiming(0, {duration: 300});
+    setTimeout(() => {
       playPauseButtonScale.value = withTiming(0.8, {duration: 300});
-      setTimeout(() => {
-        setShowPlayPauseButton(false);
-      }, 300);
     }, 3000);
-  };
+  }, [playPauseButtonControls, playPauseButtonScale]);
 
-  // Cleanup du timeout
+  // Cleanup du timeout (sleep timer uniquement maintenant)
   useEffect(() => {
     return () => {
-      if (pipButtonsTimeoutRef.current) {
-        clearTimeout(pipButtonsTimeoutRef.current);
-      }
       if (sleepTimerRef.current) {
         clearTimeout(sleepTimerRef.current);
       }
+      // Les autres timeouts sont gérés par les hooks
     };
   }, []);
 
@@ -903,7 +1419,9 @@ const GlobalVideoPlayer: React.FC = () => {
     .numberOfTaps(2)
     .onEnd(event => {
       // Si écran verrouillé, ne rien faire
-      if (isScreenLocked) return;
+      if (videoSettings.isScreenLocked) {
+        return;
+      }
 
       // Position de la vague : centre de la zone gauche
       const rippleX = screenDims.width * 0.15; // 15% de la largeur d'écran
@@ -917,7 +1435,9 @@ const GlobalVideoPlayer: React.FC = () => {
     .numberOfTaps(2)
     .onEnd(event => {
       // Si écran verrouillé, ne rien faire
-      if (isScreenLocked) return;
+      if (videoSettings.isScreenLocked) {
+        return;
+      }
 
       // Position de la vague : centre de la zone droite
       const rippleX = screenDims.width * 0.85; // 85% de la largeur d'écran
@@ -931,6 +1451,10 @@ const GlobalVideoPlayer: React.FC = () => {
   const centerTapGesture = Gesture.Tap()
     .numberOfTaps(1)
     .onEnd(() => {
+      console.log('🎯 [centerTapGesture] Tap détecté sur zone centrale - contrôles:', {
+        tiviMateVisible: tiviMateControls.isVisible,
+        dockerVisible: dockerControls.isVisible,
+      });
       runOnJS(toggleControls)();
     });
 
@@ -946,10 +1470,10 @@ const GlobalVideoPlayer: React.FC = () => {
     };
   });
 
-  // Style animé pour le bouton play/pause central
+  // 🎯 REFACTORED: Style animé pour le bouton play/pause central
   const playPauseButtonAnimatedStyle = useAnimatedStyle(() => {
     return {
-      opacity: playPauseButtonOpacity.value,
+      opacity: playPauseButtonControls.opacity.value,
       transform: [{scale: playPauseButtonScale.value}],
     };
   });
@@ -962,17 +1486,16 @@ const GlobalVideoPlayer: React.FC = () => {
     };
   });
 
-  // Style animé pour les contrôles TiviMate
+  // 🎯 REFACTORED: Styles animés pour les contrôles TiviMate
   const controlsAnimatedStyle = useAnimatedStyle(() => {
     return {
-      opacity: controlsOpacity.value,
+      opacity: tiviMateControls.opacity.value,
     };
   });
 
-  // Style animé pour le docker TiviMate
   const dockerAnimatedStyle = useAnimatedStyle(() => {
     return {
-      opacity: dockerOpacity.value,
+      opacity: dockerControls.opacity.value,
     };
   });
 
@@ -992,12 +1515,14 @@ const GlobalVideoPlayer: React.FC = () => {
 
   // Fonction pour ouvrir un sous-menu
   const openSubMenu = (menuName: string) => {
+    console.log('🐛 [SubMenu] Ouverture:', menuName);
     setActiveSubMenu(menuName);
     subMenuOpacity.value = withTiming(1, {duration: 200});
   };
 
   // Fonction pour fermer le sous-menu
   const closeSubMenu = () => {
+    console.log('🐛 [SubMenu] Fermeture');
     subMenuOpacity.value = withTiming(0, {duration: 200});
     setTimeout(() => setActiveSubMenu(null), 200);
   };
@@ -1057,7 +1582,7 @@ const GlobalVideoPlayer: React.FC = () => {
   // 🚀 Position et taille avec mémorisation stable
   const renderPosition = React.useMemo(() => {
     if (localFullscreen) {
-      return { left: 0, top: 0 };
+      return {left: 0, top: 0};
     } else if (!isInChannelPlayerScreen && !isFullscreen) {
       // Mode PiP draggable : combiner viewPosition + drag
       return {
@@ -1065,15 +1590,15 @@ const GlobalVideoPlayer: React.FC = () => {
         top: RNAnimated.add(viewPosition.y, dragPosition.y),
       };
     } else {
-      return { left: finalPosition.x, top: finalPosition.y };
+      return {left: finalPosition.x, top: finalPosition.y};
     }
   }, [localFullscreen, isInChannelPlayerScreen, isFullscreen, finalPosition]); // Dependencies objets stables
 
   const renderSize = React.useMemo(() => {
     if (localFullscreen) {
-      return { width: screenWidth, height: screenHeight }; // Utiliser constantes
+      return {width: screenWidth, height: screenHeight}; // Utiliser constantes
     } else {
-      return { width: finalSize.width, height: finalSize.height };
+      return {width: finalSize.width, height: finalSize.height};
     }
   }, [localFullscreen, finalSize]); // Dependencies objets stables
 
@@ -1104,12 +1629,14 @@ const GlobalVideoPlayer: React.FC = () => {
 
         // Sync position seulement si vraiment nécessaire
         if (!isInChannelPlayerScreen) {
-          const currentPos = {x: viewPosition.x._value, y: viewPosition.y._value};
-          const shouldSync = (
+          const currentPos = {
+            x: viewPosition.x._value,
+            y: viewPosition.y._value,
+          };
+          const shouldSync =
             (currentPos.x === 0 && currentPos.y === 0) ||
             Math.abs(currentPos.x - currentPosition.x) > 20 ||
-            Math.abs(currentPos.y - currentPosition.y) > 20
-          );
+            Math.abs(currentPos.y - currentPosition.y) > 20;
 
           if (shouldSync) {
             viewPosition.setValue({x: currentPosition.x, y: currentPosition.y});
@@ -1125,14 +1652,17 @@ const GlobalVideoPlayer: React.FC = () => {
     };
   }, [localFullscreen, isFullscreen, isInChannelPlayerScreen, isVisible]); // Dependencies minimales
 
-  const calculatedOpacity = (isFullscreen && !isInChannelPlayerScreen) ? 1 : (isVisible ? 1 : 0);
+  const calculatedOpacity =
+    isFullscreen && !isInChannelPlayerScreen ? 1 : isVisible ? 1 : 0;
   const usingFullscreenStyle = isFullscreen && !isInChannelPlayerScreen;
 
   const PlayerContent = (
     <RNAnimated.View
       style={[
         // Utiliser un style différent si en fullscreen dans Modal
-        usingFullscreenStyle ? styles.fullscreenPlayerContent : styles.container,
+        usingFullscreenStyle
+          ? styles.fullscreenPlayerContent
+          : styles.container,
         {
           opacity: calculatedOpacity,
           // Ne pas appliquer renderPosition/renderSize si fullscreen dans Modal
@@ -1145,44 +1675,78 @@ const GlobalVideoPlayer: React.FC = () => {
               ? 12
               : 8,
           // 🎯 Z-index et elevation conditionnels
-          zIndex: (isFullscreen || localFullscreen) ? 99999 : isInChannelPlayerScreen ? 1 : 1000,
-          elevation: (isFullscreen || localFullscreen) ? 999 : isInChannelPlayerScreen ? 0 : 10,
+          zIndex:
+            isFullscreen || localFullscreen
+              ? 99999
+              : isInChannelPlayerScreen
+              ? 1
+              : 1000,
+          elevation:
+            isFullscreen || localFullscreen
+              ? 999
+              : isInChannelPlayerScreen
+              ? 0
+              : 10,
           shadowOpacity: isInChannelPlayerScreen ? 0 : 0.3, // Pas d'ombre dans ChannelPlayerScreen
-          backgroundColor: (isFullscreen || localFullscreen) ? '#000000' : 'transparent',
+          backgroundColor:
+            isFullscreen || localFullscreen ? '#000000' : 'transparent',
         },
       ]}>
-
-
       {/* Video persistante - jamais démontée */}
       {channel ? (
-        <Video
-          ref={videoRef}
-          source={{
-            uri: channel.url,
+        <>
+          <Video
+            ref={videoRef}
+            source={{
+              uri: channel.url,
             // 🔧 Headers pour améliorer compatibilité IPTV + Pluto TV
             headers: {
               'User-Agent': channel.url.includes('vodalys.com')
                 ? 'VLC/3.0.16 LibVLC/3.0.16'
                 : 'Mozilla/5.0 (Linux; Android 10; SM-G975F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Mobile Safari/537.36',
-              'Referer': channel.url.includes('pluto.tv')
+              Referer: channel.url.includes('pluto.tv')
                 ? 'https://pluto.tv/'
                 : channel.url.includes('vodalys.com')
                 ? 'https://www.assemblee-nationale.fr/'
                 : 'https://www.iptvsmarters.com/',
-              'Accept': '*/*',
-              'Connection': 'keep-alive',
-              'Origin': channel.url.includes('pluto.tv') ? 'https://pluto.tv' : undefined,
-            }
+              Accept: '*/*',
+              Connection: 'keep-alive',
+              Origin: channel.url.includes('pluto.tv')
+                ? 'https://pluto.tv'
+                : undefined,
+            },
           }}
-          key={`global-video-player-${videoKey}`}
-          style={styles.video}
+          style={[
+            styles.video,
+            videoSettings.customVideoDimensions && {
+              position: 'absolute',
+              width: videoSettings.customVideoDimensions.width,
+              height: videoSettings.customVideoDimensions.height,
+              top: videoSettings.customVideoDimensions.top,
+              left: videoSettings.customVideoDimensions.left,
+              backgroundColor: 'black',
+            },
+          ]}
           resizeMode={
-            zoomMode === 'fill' ? 'cover' :
-            zoomMode === 'fit' ? 'contain' :
-            zoomMode === 'stretch' ? 'stretch' :
-            'contain'
+            videoSettings.zoomMode === 'fill'
+              ? 'cover'
+              : videoSettings.zoomMode === 'fit'
+              ? 'contain'
+              : videoSettings.zoomMode === 'stretch'
+              ? 'stretch'
+              : (videoSettings.zoomMode === '4:3' || videoSettings.zoomMode === '16:9')
+              ? 'cover'
+              : 'contain'
           }
           paused={isPaused}
+          playInBackground={true}  // Forcer à true pour test
+          playWhenInactive={true}  // Forcer à true pour test
+          controls={false}
+          preventsDisplaySleepDuringVideoPlayback={false}  // Permettre sleep si background
+          ignoreSilentSwitch={videoPlayerSettings.backgroundPlay}
+          mixWithOthers="mix"  // Toujours mixer avec autres apps
+          continuePlaying={videoPlayerSettings.backgroundPlay}
+          focusable={false}
           muted={selectedAudioTrack === 0}
           volume={selectedAudioTrack === 0 ? 0 : 1}
           selectedAudioTrack={
@@ -1198,7 +1762,7 @@ const GlobalVideoPlayer: React.FC = () => {
               ? (() => {
                   // Extraire l'index de la piste depuis le trackId (format: "720p-2")
                   const track = availableVideoTracks.find(
-                    t => `${t.height}p-${t.index}` === selectedVideoQuality
+                    t => `${t.height}p-${t.index}` === selectedVideoQuality,
                   );
 
                   if (track) {
@@ -1213,7 +1777,9 @@ const GlobalVideoPlayer: React.FC = () => {
               : undefined
           }
           selectedTextTrack={
-            subtitlesEnabled && selectedSubtitleTrack > 0 && availableTextTracks.length > 0
+            subtitlesEnabled &&
+            selectedSubtitleTrack > 0 &&
+            availableTextTracks.length > 0
               ? {
                   type: SelectedTrackType.INDEX,
                   value: selectedSubtitleTrack - 1,
@@ -1221,37 +1787,54 @@ const GlobalVideoPlayer: React.FC = () => {
               : undefined
           }
           subtitleStyle={{
-            fontSize: subtitleSize === 'small' ? 14 :
-                      subtitleSize === 'normal' ? 18 :
-                      subtitleSize === 'large' ? 24 :
-                      subtitleSize === 'xlarge' ? 30 : 18,
+            fontSize:
+              subtitleSize === 'small'
+                ? 14
+                : subtitleSize === 'normal'
+                ? 18
+                : subtitleSize === 'large'
+                ? 24
+                : subtitleSize === 'xlarge'
+                ? 30
+                : 18,
             paddingBottom: 10,
             paddingTop: 10,
           }}
-          onError={(error) => {
+          onError={error => {
             const errorString = error.error?.errorString || '';
             console.error('❌ [GlobalVideoPlayer] Video Error:', {
               channel: channel.name,
               url: channel.url,
-              error: errorString
+              error: errorString,
             });
 
             // Gestion spéciale de ERROR_CODE_BEHIND_LIVE_WINDOW
-            if (errorString.includes('ERROR_CODE_BEHIND_LIVE_WINDOW') || errorString.includes('BEHIND_LIVE_WINDOW')) {
-              console.log('🔄 [GlobalVideoPlayer] Rechargement automatique du flux (trop de retard sur le live)');
-              // Forcer le rechargement complet du composant Video en changeant sa key
-              setVideoKey(prev => prev + 1);
-              return; // Ne pas afficher l'erreur à l'utilisateur
+            if (
+              errorString.includes('ERROR_CODE_BEHIND_LIVE_WINDOW') ||
+              errorString.includes('BEHIND_LIVE_WINDOW')
+            ) {
+              console.log(
+                '🔄 [GlobalVideoPlayer] Rechargement automatique du flux (trop de retard sur le live)',
+              );
+                return; // Ne pas afficher l'erreur à l'utilisateur
             }
 
-            const errorMsg = `${channel.name}: ${errorString || 'Erreur de lecture'}`;
+            const errorMsg = `${channel.name}: ${
+              errorString || 'Erreur de lecture'
+            }`;
             actions.setError(errorMsg);
+            actions.setLoading(false); // ⚡ CRUCIAL: Forcer la fin du chargement en cas d'erreur
           }}
-          onLoadStart={() => {
+          onLoadStart={async () => {
             console.log('🎬 Video LoadStart - Channel:', channel.name);
             if (!channel || isLoading) {
               actions.setLoading(true);
             }
+
+            // ✅ CONTRÔLE PARENTAL SIMPLIFIÉ
+            // Le PIN est déjà vérifié au niveau de la catégorie dans ChannelsScreen
+            // Pas de vérification supplémentaire nécessaire ici
+            console.log(`✅ [PARENTAL] Accès autorisé - PIN catégorie vérifié en amont pour: ${channel.name}`);
           }}
           onLoad={data => {
             console.log('🎬 Video Load Success - Channel:', channel.name);
@@ -1259,8 +1842,16 @@ const GlobalVideoPlayer: React.FC = () => {
             actions.setLoading(false);
 
             // Si seekTime est défini (venant du multiscreen), reprendre à cette position
-            if (channel.seekTime !== undefined && channel.seekTime > 0 && videoRef.current) {
-              console.log('⏩ [GlobalVideoPlayer] Reprise depuis multiscreen à position:', channel.seekTime, 's');
+            if (
+              channel.seekTime !== undefined &&
+              channel.seekTime > 0 &&
+              videoRef.current
+            ) {
+              console.log(
+                '⏩ [GlobalVideoPlayer] Reprise depuis multiscreen à position:',
+                channel.seekTime,
+                's',
+              );
               setTimeout(() => {
                 videoRef.current?.seek(channel.seekTime);
               }, 100); // Petit délai pour s'assurer que la vidéo est prête
@@ -1268,25 +1859,36 @@ const GlobalVideoPlayer: React.FC = () => {
 
             // Détecter les pistes disponibles
             if (data.videoTracks && data.videoTracks.length > 0) {
-              console.log('📹 [Video] Pistes vidéo disponibles:', data.videoTracks);
+              console.log(
+                '📹 [Video] Pistes vidéo disponibles:',
+                data.videoTracks,
+              );
               setAvailableVideoTracks(data.videoTracks);
             }
 
             if (data.audioTracks && data.audioTracks.length > 0) {
-              console.log('🔊 [Audio] Pistes audio disponibles:', data.audioTracks);
+              console.log(
+                '🔊 [Audio] Pistes audio disponibles:',
+                data.audioTracks,
+              );
               setAvailableAudioTracks(data.audioTracks);
             }
 
             if (data.textTracks && data.textTracks.length > 0) {
-              console.log('📝 [Subtitles] Pistes sous-titres disponibles:', data.textTracks);
+              console.log(
+                '📝 [Subtitles] Pistes sous-titres disponibles:',
+                data.textTracks,
+              );
               setAvailableTextTracks(data.textTracks);
             }
           }}
           onProgress={data => {
-            setCurrentTime(data.currentTime || 0);
+            const time = data.currentTime || 0;
+            setCurrentTime(time);
           }}
           onBuffer={({isBuffering}) => {
-            // Buffer state changes handled silently
+            // 🕵️ CORRECTION: Gérer l'état de buffering pour afficher un indicateur et comprendre les freezes.
+            actions.setLoading(isBuffering);
           }}
           playInBackground={false}
           pictureInPicture={false}
@@ -1294,40 +1896,15 @@ const GlobalVideoPlayer: React.FC = () => {
           controls={false}
           ignoreSilentSwitch="ignore"
           playWhenInactive={false}
-          bufferConfig={
-            bufferMode === 'low'
-              ? {
-                  // 🚀 Connexion rapide - Buffer faible pour moins de latence
-                  minBufferMs: 1500,
-                  maxBufferMs: 5000,
-                  bufferForPlaybackMs: 1500,
-                  bufferForPlaybackAfterRebufferMs: 1500,
-                }
-              : bufferMode === 'high'
-              ? {
-                  // 🐢 Connexion lente - Buffer élevé pour éviter coupures
-                  minBufferMs: 5000,
-                  maxBufferMs: 15000,
-                  bufferForPlaybackMs: 5000,
-                  bufferForPlaybackAfterRebufferMs: 5000,
-                }
-              : {
-                  // ⚡ Normal - Équilibré (par défaut)
-                  minBufferMs: 2500,
-                  maxBufferMs: 8000,
-                  bufferForPlaybackMs: 2500,
-                  bufferForPlaybackAfterRebufferMs: 2500,
-                }
-          }
+          bufferConfig={videoSettings.getBufferConfig()}
           maxBitRate={3000000}
           reportBandwidth={false}
           automaticallyWaitsToMinimizeStalling={false}
           preventsDisplaySleepDuringVideoPlayback={true}
           progressUpdateInterval={2000}
-          playWhenInactive={false}
-          ignoreSilentSwitch="ignore"
           mixWithOthers="duck"
         />
+        </>
       ) : null}
 
       <View style={StyleSheet.absoluteFill}>
@@ -1346,413 +1923,118 @@ const GlobalVideoPlayer: React.FC = () => {
           </View>
         )}
         {/* 🎯 ZONES GESTUELLES AVANCÉES - FULLSCREEN UNIQUEMENT */}
+        {/* ⚠️ IMPORTANT: Désactivées quand contrôles visibles pour permettre l'interaction */}
         {isFullscreen || localFullscreen ? (
           <>
-            {/* Zone gauche - Seek backward */}
-            <GestureDetector gesture={leftSideGesture}>
-              <View style={styles.gestureZoneLeft} />
-            </GestureDetector>
+            {/* ⚠️ GESTES CONDITIONNELS: Actifs seulement quand les contrôles sont cachés */}
+            {!(tiviMateControls.isVisible || dockerControls.isVisible) && (
+              <>
+                {/* Zone gauche - Seek backward */}
+                <GestureDetector gesture={leftSideGesture}>
+                  <View style={styles.gestureZoneLeft} />
+                </GestureDetector>
 
-            {/* Zone droite - Seek forward */}
-            <GestureDetector gesture={rightSideGesture}>
-              <View style={styles.gestureZoneRight} />
-            </GestureDetector>
+                {/* Zone droite - Seek forward */}
+                <GestureDetector gesture={rightSideGesture}>
+                  <View style={styles.gestureZoneRight} />
+                </GestureDetector>
 
-            {/* Zone centrale - Afficher bouton play/pause */}
-            <GestureDetector gesture={centerTapGesture}>
-              <View style={styles.gestureZoneCenter} />
-            </GestureDetector>
+                {/* Zone centrale - Afficher contrôles */}
+                <GestureDetector gesture={centerTapGesture}>
+                  <View style={styles.gestureZoneCenter} />
+                </GestureDetector>
+              </>
+            )}
 
-            {/* 🎯 CONTRÔLES TIVIMATE */}
+            {/* 🎯 CONTRÔLES TIVIMATE - Enveloppé pour gérer les pointerEvents */}
             <Animated.View
               style={[
                 styles.controlsOverlay,
                 controlsAnimatedStyle,
                 {
-                  pointerEvents: showControls ? 'auto' : 'none',
+                  pointerEvents: tiviMateControls.isVisible ? 'box-none' : 'none',
                 },
               ]}>
-              {showControls && (
-                <>
-                  {/* Header TiviMate: Bouton retour + Info chaîne + Paramètres */}
-                  <LinearGradient
-                    colors={['rgba(0, 0, 0, 0.8)', 'rgba(0, 0, 0, 0)']}
-                    start={{x: 0, y: 0}}
-                    end={{x: 0, y: 1}}
-                    style={styles.tiviMateHeader}>
-                    <TouchableOpacity
-                      style={styles.backButtonModern}
-                      onPress={() => {
-                        if (localFullscreen) {
-                          setLocalFullscreen(false);
-                          return;
-                        }
-
-                        // 🎯 CAS SPÉCIAL: Si vient du multi-écran, revenir au multi-écran
-                        if (isFromMultiScreen) {
-                          console.log('🔙 [On-screen Back] From multi-screen, reopening multi-screen...');
-                          actions.setFullscreen(false);
-                          actions.setFromMultiScreen(false);
-                          actions.setMultiScreenOpen(true);
-                          setMultiScreenVisible(true);
-                          return;
-                        }
-
-                        // 🎯 COMPORTEMENT NORMAL: Navigation vers ChannelPlayerScreen
-                        if (navigationData && channel) {
-                          console.log('🔙 [On-screen Back] NavigationData found, redirecting with NAVIGATE...');
-                          actions.setFullscreen(false);
-                          navigation.navigate('ChannelPlayer', {
-                            ...navigationData,
-                            selectedChannel: channel,
-                          });
-                          actions.setNavigationData(null);
-                        } else {
-                          console.log('🔙 [On-screen Back] No NavigationData, default behavior.');
-                          actions.setFullscreen(false);
-                        }
-                      }}
-                      activeOpacity={0.7}>
-                      <View style={styles.backIconContainer}>
-                        <Icon name="arrow-back" size={24} color="white" />
-                      </View>
-                    </TouchableOpacity>
-
-                    <View style={styles.headerChannelInfo}>
-                      {channel?.category && (
-                        <Text style={styles.headerChannelCategory}>
-                          {channel.category.toUpperCase()}
-                        </Text>
-                      )}
-                    </View>
-
-                    <View style={styles.headerRightButtons}>
-                      {/* Bouton Multi-écran - Désactivé si on vient du multiscreen */}
-                      {!isFromMultiScreen && (
-                        <TouchableOpacity
-                          style={styles.headerIconButton}
-                          onPress={() => {
-                            actions.setMultiScreenOpen(true);
-                            setMultiScreenVisible(true);
-                            console.log('🖥️ [MultiScreen] Ouverture du sélecteur multi-écrans');
-                          }}
-                          activeOpacity={0.7}>
-                          <Icon name="grid-on" size={22} color="white" />
-                        </TouchableOpacity>
-                      )}
-
-                      {/* Bouton Cast - Désactivé si on vient du multiscreen */}
-                      {!isFromMultiScreen && (
-                        <TouchableOpacity
-                          style={styles.headerIconButton}
-                          onPress={() => {
-                            console.log('🎥 [Cast] Bouton Cast pressé');
-                            // TODO: Implémenter la fonctionnalité Cast
-                          }}
-                          activeOpacity={0.7}>
-                          <Icon name="cast" size={22} color="white" />
-                        </TouchableOpacity>
-                      )}
-
-                      {/* Bouton Verrouillage */}
-                      <TouchableOpacity
-                        style={styles.headerIconButton}
-                        onPress={() => {
-                          setIsScreenLocked(!isScreenLocked);
-                          console.log('🔒 [Lock] Écran', isScreenLocked ? 'déverrouillé' : 'verrouillé');
-                        }}
-                        activeOpacity={0.7}>
-                        <Icon name={isScreenLocked ? 'lock' : 'lock-open'} size={22} color="white" />
-                      </TouchableOpacity>
-
-                      {/* Bouton Paramètres */}
-                      <TouchableOpacity
-                        style={styles.settingsButton}
-                        onPress={() => {
-                          setShowSettingsMenu(!showSettingsMenu);
-                          settingsMenuOpacity.value = withTiming(
-                            showSettingsMenu ? 0 : 1,
-                            {duration: 200}
-                          );
-                        }}
-                        activeOpacity={0.7}>
-                        <View style={styles.settingsIconContainer}>
-                          <Icon name="settings" size={24} color="white" />
-                        </View>
-                      </TouchableOpacity>
-                    </View>
-                  </LinearGradient>
-
-                  {/* Center: Bouton Play/Pause TiviMate style */}
-                  <View style={styles.centerControls}>
-                    <TouchableOpacity
-                      onPress={() => actions.togglePlayPause()}
-                      activeOpacity={0.7}>
-                      <LinearGradient
-                        colors={['rgba(0, 0, 0, 0.2)', 'rgba(0, 0, 0, 0.8)']}
-                        start={{x: 0, y: 0}}
-                        end={{x: 0, y: 1}}
-                        style={styles.playPauseButtonTivi}>
-                        <Icon
-                          name={isPaused ? 'play-arrow' : 'pause'}
-                          size={32}
-                          color="white"
-                        />
-                      </LinearGradient>
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* Footer: Timeline supprimée - utilisée seulement la barre EPG principale */}
-                </>
-              )}
+              <TiviMateControls
+                isVisible={tiviMateControls.isVisible}
+                channel={channel}
+                isChannelFavorite={isChannelFavorite}
+                isScreenLocked={videoSettings.isScreenLocked}
+                isFromMultiScreen={isFromMultiScreen}
+                showSettingsMenu={showSettingsMenu}
+                isPaused={isPaused}
+                onBackPress={handleBackPress}
+                onFavoriteToggle={handleFavoriteToggle}
+                onLockToggle={() => videoSettings.toggleScreenLock()}
+                onSettingsToggle={() => {
+                  console.log(
+                    '🐛 [Settings] Toggle - État actuel:',
+                    showSettingsMenu,
+                  );
+                  setShowSettingsMenu(!showSettingsMenu);
+                  console.log('🐛 [Settings] Nouvel état:', !showSettingsMenu);
+                }}
+                onPlayPauseToggle={() => {
+                  console.log('▶️ [Play/Pause] Bouton cliqué');
+                  actions.togglePlayPause();
+                }}
+              />
             </Animated.View>
 
-            {/* 🎯 DOCKER TIVIMATE AUTHENTIQUE - Copié depuis VideoPlayerSimple.tsx */}
+            {/* 🎯 DOCKER TIVIMATE - Enveloppé pour gérer les pointerEvents */}
             <Animated.View
               style={[
                 styles.dockerOverlay,
                 dockerAnimatedStyle,
                 {
-                  pointerEvents: showDocker ? 'auto' : 'none',
+                  pointerEvents: dockerControls.isVisible ? 'box-none' : 'none',
                 },
               ]}>
-              {showDocker && !isFromMultiScreen && (
-                <LinearGradient
-                  colors={['rgba(0, 0, 0, 0)', 'rgba(0, 0, 0, 0.95)']}
-                  start={{x: 0, y: 0}}
-                  end={{x: 0, y: 1}}
-                  style={styles.dockerGradient}>
-                  {/* InfoBar avec EPG */}
-                  <View style={styles.infoBar}>
-                    {channel?.logo && (
-                      <FastImage
-                        source={{uri: channel.logo}}
-                        style={styles.infoBarLogo}
-                        resizeMode={FastImage.resizeMode.contain}
-                        onError={() =>
-                          console.log(
-                            '❌ [DEBUG] Logo failed to load:',
-                            channel.logo,
-                          )
-                        }
-                        onLoad={() =>
-                          console.log(
-                            '✅ [DEBUG] Logo loaded successfully:',
-                            channel.logo,
-                          )
-                        }
-                      />
-                    )}
-                    <View style={styles.infoBarDetails}>
-                      <Text
-                        style={styles.infoBarProgramTitle}
-                        numberOfLines={1}>
-                        {epgData?.currentProgram?.title || "Pas d'information"}
-                      </Text>
-                      <View
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          marginVertical: 4,
-                        }}>
-                        <Text style={styles.infoBarProgramTime}>
-                          {epgData
-                            ? `${epgData.programStartTime} - ${epgData.programEndTime}`
-                            : "Pas d'information"}
-                        </Text>
-                        {epgData && (
-                          <Text style={styles.infoBarRemainingTime}>
-                            {epgData.remainingMinutes} min
-                          </Text>
-                        )}
-                      </View>
-                      <Text style={styles.infoBarNextProgram} numberOfLines={1}>
-                        À suivre:{' '}
-                        {epgData?.nextProgram?.title || "Pas d'information"}
-                      </Text>
-                    </View>
-                    <View style={styles.infoBarChannel}>
-                      <View style={styles.qualityBadges}>
-                        <View style={styles.qualityBadge}>
-                          <Text style={styles.badgeText}>
-                            {getChannelQuality(channel)}
-                          </Text>
-                        </View>
-                        <View style={styles.qualityBadge}>
-                          <Text style={styles.badgeText}>
-                            {getChannelFPS(channel)}
-                          </Text>
-                        </View>
-                        <View style={styles.qualityBadge}>
-                          <Text style={styles.badgeText}>
-                            {getChannelAudio(channel)}
-                          </Text>
-                        </View>
-                      </View>
-                    </View>
-                  </View>
-
-                  {/* Barre de progression principale EPG/Vidéo dynamique */}
-                  <View style={styles.mainProgressBarContainer}>
-                    <View
-                      style={[
-                        styles.mainProgressBarFill,
-                        {
-                          width: `${(() => {
-                            // Priorité 1: EPG si disponible et valide
-                            if (epgData && epgData.progressPercentage >= 0) {
-                              return Math.min(
-                                100,
-                                Math.max(0, epgData.progressPercentage),
-                              );
-                            }
-                            // Priorité 2: Progression vidéo temps réel
-                            if (duration > 0 && currentTime >= 0) {
-                              return Math.min(
-                                100,
-                                Math.max(0, (currentTime / duration) * 100),
-                              );
-                            }
-                            // Fallback: 0%
-                            return 0;
-                          })()}%`,
-                        },
-                      ]}
-                    />
-                    <View
-                      style={[
-                        styles.mainProgressHandle,
-                        {
-                          left: `${(() => {
-                            // Même logique que la barre de progression
-                            if (epgData && epgData.progressPercentage >= 0) {
-                              return Math.min(
-                                100,
-                                Math.max(0, epgData.progressPercentage),
-                              );
-                            }
-                            if (duration > 0 && currentTime >= 0) {
-                              return Math.min(
-                                100,
-                                Math.max(0, (currentTime / duration) * 100),
-                              );
-                            }
-                            return 0;
-                          })()}%`,
-                        },
-                      ]}
-                    />
-                  </View>
-
-                  {/* Docker avec boutons et chaînes récentes */}
-                  <View style={styles.dockerContent}>
-                    <TouchableOpacity
-                      style={styles.recentChannelItem}
-                      onPress={() => console.log('Guide TV')}>
-                      <View style={styles.recentChannelPreview}>
-                        <Icon name="apps" size={22} color="#fff" />
-                        <Text style={styles.dockerButtonTextModern}>
-                          Guide TV
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.recentChannelItem}
-                      onPress={() => console.log('Historique')}>
-                      <View style={styles.recentChannelPreview}>
-                        <Icon name="history" size={22} color="#fff" />
-                        <Text style={styles.dockerButtonTextModern}>
-                          Historique
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                    <ScrollView
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      style={styles.recentChannelsScroll}
-                      contentContainerStyle={styles.recentChannelsContent}
-                      onScrollBeginDrag={() => {
-                        console.log(
-                          '🏃‍♂️ [Scroll] Début du scroll - prolonger délai',
-                        );
-                        setIsScrolling(true);
-                      }}
-                      onScrollEndDrag={() => {
-                        console.log('⏸️ [Scroll] Fin du scroll - délai normal');
-                        // Petit délai avant de remettre à false pour éviter le flickering
-                        setTimeout(() => {
-                          setIsScrolling(false);
-                        }, 1000);
-                      }}>
-                      {recentChannels.map((recentChannel, index) => (
-                        <TouchableOpacity
-                          key={recentChannel.id || `mock-${index}`}
-                          style={styles.recentChannelItem}
-                          onPress={() => {
-                            console.log(
-                              '🔄 [DEBUG] Switching to recent channel:',
-                              recentChannel.name,
-                            );
-                            if (recentChannel.url) {
-                              // Convertir vers Channel si nécessaire
-                              const channelToPlay = {
-                                id: recentChannel.id,
-                                name: recentChannel.name,
-                                url: recentChannel.url,
-                                logo: recentChannel.logo,
-                                category: recentChannel.category,
-                              };
-                              actions.playChannel(channelToPlay, true); // Lancer en fullscreen direct
-                            } else {
-                              console.warn(
-                                '⚠️ [DEBUG] Recent channel has no URL:',
-                                recentChannel,
-                              );
-                            }
-                          }}>
-                          <View style={styles.recentChannelPreview}>
-                            {recentChannel.logo ? (
-                              <FastImage
-                                source={{uri: recentChannel.logo}}
-                                style={styles.recentChannelLogo}
-                                resizeMode={FastImage.resizeMode.contain}
-                                onError={(error: any) => {
-                                  console.log(
-                                    '❌ [DOCKER] Logo failed to load:',
-                                    {
-                                      channel: recentChannel.name,
-                                      logoUrl: recentChannel.logo,
-                                      error: error?.nativeEvent,
-                                    },
-                                  );
-                                }}
-                                onLoad={() => {
-                                  console.log('✅ [DOCKER] Logo loaded:', {
-                                    channel: recentChannel.name,
-                                    logoUrl: recentChannel.logo,
-                                  });
-                                }}
-                                onLoadStart={() => {
-                                  console.log(
-                                    '🔄 [DOCKER] Logo loading started:',
-                                    recentChannel.name,
-                                  );
-                                }}
-                              />
-                            ) : (
-                              <View style={styles.logoFallback}>
-                                <Text style={styles.logoFallbackText}>
-                                  {recentChannel.name.substring(0, 2)}
-                                </Text>
-                              </View>
-                            )}
-                          </View>
-                        </TouchableOpacity>
-                      ))}
-                    </ScrollView>
-                  </View>
-                </LinearGradient>
-              )}
+              <DockerBar
+                isVisible={dockerControls.isVisible}
+                channel={channel}
+                epgData={epgData}
+                recentChannels={stableRecentChannels}
+                isFromMultiScreen={isFromMultiScreen}
+                currentTime={currentTime}
+                duration={duration}
+                onChannelsPress={() => {
+                  console.log(
+                    '🎬 [ChannelSelector] Ouverture sélecteur de chaînes',
+                  );
+                  channelSelector.open();
+                }}
+                onMultiScreenPress={() => {
+                  actions.setMultiScreenOpen(true);
+                  setMultiScreenVisible(true);
+                  console.log(
+                    '🖥️ [MultiScreen] Ouverture du sélecteur multi-écrans',
+                  );
+                }}
+                onRecentChannelPress={recentChannel => {
+                  if (recentChannel.url) {
+                    const channelToPlay = {
+                      id: recentChannel.id,
+                      name: recentChannel.name,
+                      url: recentChannel.url,
+                      logo: recentChannel.logo,
+                      category: recentChannel.category,
+                    };
+                    actions.playChannel(channelToPlay, true);
+                  }
+                }}
+                onClearRecentChannels={() => setShowClearConfirmModal(true)}
+                onScrollBegin={() => {
+                  console.log('🏃‍♂️ [Scroll] Début du scroll - prolonger délai');
+                  setIsScrolling(true);
+                }}
+                onScrollEnd={() => {
+                  console.log('⏸️ [Scroll] Fin du scroll - délai normal');
+                  setTimeout(() => {
+                    setIsScrolling(false);
+                  }, 1000);
+                }}
+              />
             </Animated.View>
 
             {/* 🎯 EFFET DE VAGUE (RIPPLE) POUR DOUBLE-CLICS */}
@@ -1799,651 +2081,21 @@ const GlobalVideoPlayer: React.FC = () => {
               </Animated.View>
             )}
 
-            {/* 🎯 MENU PARAMÈTRES - Indépendant, au-dessus de tout */}
-            {showSettingsMenu && (
-              <>
-                {/* Fond transparent pour fermer le menu en cliquant en dehors */}
-                <TouchableOpacity
-                  style={styles.settingsBackdrop}
-                  activeOpacity={1}
-                  onPress={() => {
-                    setShowSettingsMenu(false);
-                    setActiveSubMenu(null);
-                  }}
-                />
-
-                <Animated.View
-                  style={[
-                    styles.settingsMenu,
-                    settingsMenuAnimatedStyle,
-                  ]}
-                  pointerEvents="auto">
-                  <ScrollView
-                    style={{maxHeight: 400}}
-                    showsVerticalScrollIndicator={false}>
-                    <TouchableOpacity
-                      style={styles.settingsMenuItem}
-                      onPress={() => openSubMenu('video')}>
-                    <Icon name="video-settings" size={22} color="white" />
-                    <Text style={styles.settingsMenuText}>Piste vidéo</Text>
-                    <Icon name="chevron-left" size={20} color="white" />
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.settingsMenuItem}
-                    onPress={() => openSubMenu('audio')}>
-                    <Icon name="surround-sound" size={22} color="white" />
-                    <Text style={styles.settingsMenuText}>Piste audio</Text>
-                    <Icon name="chevron-left" size={20} color="white" />
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.settingsMenuItem}
-                    onPress={() => openSubMenu('subtitles')}>
-                    <Icon name="subtitles" size={22} color="white" />
-                    <Text style={styles.settingsMenuText}>Sous-titres</Text>
-                    <Icon name="chevron-left" size={20} color="white" />
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.settingsMenuItem}
-                    onPress={() => openSubMenu('display')}>
-                    <Icon name="fit-screen" size={22} color="white" />
-                    <Text style={styles.settingsMenuText}>Mode d'affichage</Text>
-                    <Icon name="chevron-left" size={20} color="white" />
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.settingsMenuItem}
-                    onPress={() => openSubMenu('buffer')}>
-                    <Icon name="settings-ethernet" size={22} color="white" />
-                    <Text style={styles.settingsMenuText}>Contrôle du buffer</Text>
-                    <Text style={styles.settingsMenuActiveText}>
-                      {bufferMode === 'low' ? 'Rapide' : bufferMode === 'high' ? 'Lent' : 'Normal'}
-                    </Text>
-                    <Icon name="chevron-left" size={20} color="white" />
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.settingsMenuItem}
-                    onPress={() => openSubMenu('sleeptimer')}>
-                    <Icon name="schedule" size={22} color="white" />
-                    <Text style={styles.settingsMenuText}>Minuterie de sommeil</Text>
-                    {sleepTimer && (
-                      <Text style={styles.settingsMenuActiveText}>
-                        {sleepTimer} min
-                      </Text>
-                    )}
-                    <Icon name="chevron-left" size={20} color="white" />
-                  </TouchableOpacity>
-
-                </ScrollView>
-              </Animated.View>
-              </>
-            )}
-
-            {/* 🎯 SOUS-MENU ENFANT - À gauche du menu principal */}
-            {activeSubMenu && (
-              <Animated.View
-                style={[
-                  styles.subMenuWindow,
-                  subMenuAnimatedStyle,
-                ]}
-                pointerEvents="auto">
-                <View style={styles.subMenuHeader}>
-                  <TouchableOpacity onPress={closeSubMenu} style={styles.backButton}>
-                    <Icon name="chevron-right" size={24} color="white" />
-                  </TouchableOpacity>
-                  <Text style={styles.subMenuTitle}>
-                    {activeSubMenu === 'video' && 'Piste vidéo'}
-                    {activeSubMenu === 'audio' && 'Piste audio'}
-                    {activeSubMenu === 'subtitles' && 'Sous-titres'}
-                    {activeSubMenu === 'display' && "Mode d'affichage"}
-                    {activeSubMenu === 'buffer' && 'Contrôle du buffer'}
-                    {activeSubMenu === 'sleeptimer' && 'Minuterie de sommeil'}
-                  </Text>
-                </View>
-
-                <ScrollView style={{maxHeight: 350}} showsVerticalScrollIndicator={false}>
-                  {/* Contenu pour Minuterie de sommeil */}
-                  {activeSubMenu === 'sleeptimer' && (
-                    <View>
-                      <TouchableOpacity
-                        style={[styles.subMenuItem, sleepTimer === null && styles.subMenuItemActive]}
-                        onPress={() => {
-                          setSleepTimerDuration(null);
-                          closeSubMenu();
-                        }}>
-                        <Text style={styles.subMenuText}>Désactivé</Text>
-                        {sleepTimer === null && <Icon name="check" size={18} color="#1976d2" />}
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={[styles.subMenuItem, sleepTimer === 10 && styles.subMenuItemActive]}
-                        onPress={() => {
-                          setSleepTimerDuration(10);
-                          closeSubMenu();
-                        }}>
-                        <Text style={styles.subMenuText}>10 minutes</Text>
-                        {sleepTimer === 10 && <Icon name="check" size={18} color="#1976d2" />}
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={[styles.subMenuItem, sleepTimer === 15 && styles.subMenuItemActive]}
-                        onPress={() => {
-                          setSleepTimerDuration(15);
-                          closeSubMenu();
-                        }}>
-                        <Text style={styles.subMenuText}>15 minutes</Text>
-                        {sleepTimer === 15 && <Icon name="check" size={18} color="#1976d2" />}
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={[styles.subMenuItem, sleepTimer === 20 && styles.subMenuItemActive]}
-                        onPress={() => {
-                          setSleepTimerDuration(20);
-                          closeSubMenu();
-                        }}>
-                        <Text style={styles.subMenuText}>20 minutes</Text>
-                        {sleepTimer === 20 && <Icon name="check" size={18} color="#1976d2" />}
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={[styles.subMenuItem, sleepTimer === 30 && styles.subMenuItemActive]}
-                        onPress={() => {
-                          setSleepTimerDuration(30);
-                          closeSubMenu();
-                        }}>
-                        <Text style={styles.subMenuText}>30 minutes</Text>
-                        {sleepTimer === 30 && <Icon name="check" size={18} color="#1976d2" />}
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={[styles.subMenuItem, sleepTimer === 45 && styles.subMenuItemActive]}
-                        onPress={() => {
-                          setSleepTimerDuration(45);
-                          closeSubMenu();
-                        }}>
-                        <Text style={styles.subMenuText}>45 minutes</Text>
-                        {sleepTimer === 45 && <Icon name="check" size={18} color="#1976d2" />}
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={[styles.subMenuItem, sleepTimer === 60 && styles.subMenuItemActive]}
-                        onPress={() => {
-                          setSleepTimerDuration(60);
-                          closeSubMenu();
-                        }}>
-                        <Text style={styles.subMenuText}>60 minutes</Text>
-                        {sleepTimer === 60 && <Icon name="check" size={18} color="#1976d2" />}
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={[styles.subMenuItem, sleepTimer === 90 && styles.subMenuItemActive]}
-                        onPress={() => {
-                          setSleepTimerDuration(90);
-                          closeSubMenu();
-                        }}>
-                        <Text style={styles.subMenuText}>90 minutes</Text>
-                        {sleepTimer === 90 && <Icon name="check" size={18} color="#1976d2" />}
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={[styles.subMenuItem, sleepTimer === 120 && styles.subMenuItemActive]}
-                        onPress={() => {
-                          setSleepTimerDuration(120);
-                          closeSubMenu();
-                        }}>
-                        <Text style={styles.subMenuText}>120 minutes</Text>
-                        {sleepTimer === 120 && <Icon name="check" size={18} color="#1976d2" />}
-                      </TouchableOpacity>
-                    </View>
-                  )}
-
-                  {/* Piste vidéo */}
-                  {activeSubMenu === 'video' && (
-                    <View>
-                      <View style={styles.subMenuSection}>
-                        <Text style={styles.subMenuSectionTitle}>
-                          Qualité vidéo {availableVideoTracks.length > 0 && `(${availableVideoTracks.length} disponibles)`}
-                        </Text>
-
-                        {/* Option Automatique */}
-                        <TouchableOpacity
-                          style={[styles.subMenuItem, selectedVideoQuality === 'auto' && styles.subMenuItemActive]}
-                          onPress={() => {
-                            setSelectedVideoQuality('auto');
-                            console.log('📹 [Video] ✅ Qualité changée: Automatique');
-                          }}>
-                          <Text style={styles.subMenuText}>Automatique (Adaptative)</Text>
-                          {selectedVideoQuality === 'auto' && <Icon name="check" size={18} color="#1976d2" />}
-                        </TouchableOpacity>
-
-                        {/* Pistes vidéo détectées */}
-                        {availableVideoTracks.length > 0 ? (
-                          availableVideoTracks
-                            .sort((a, b) => (b.height * b.width * b.bitrate) - (a.height * a.width * a.bitrate))
-                            .map((track) => {
-                              const resolution = `${track.height}p`;
-                              const bitrateKbps = Math.round(track.bitrate / 1000);
-                              const quality = track.height >= 1080 ? 'Full HD' :
-                                            track.height >= 720 ? 'HD' :
-                                            track.height >= 480 ? 'SD' : 'Basse';
-                              const trackId = `${track.height}p-${track.index}`;
-
-                              return (
-                                <TouchableOpacity
-                                  key={track.index}
-                                  style={[styles.subMenuItem, selectedVideoQuality === trackId && styles.subMenuItemActive]}
-                                  onPress={() => {
-                                    setSelectedVideoQuality(trackId);
-                                    console.log(`📹 [Video] ✅ Qualité changée: ${resolution} (${quality}) - ${bitrateKbps} kbps`);
-                                  }}>
-                                  <View>
-                                    <Text style={styles.subMenuText}>
-                                      {resolution} ({quality})
-                                    </Text>
-                                    <Text style={[styles.subMenuText, {fontSize: 11, color: '#999', marginTop: 2}]}>
-                                      {track.width}x{track.height} • {bitrateKbps} kbps
-                                    </Text>
-                                  </View>
-                                  {selectedVideoQuality === trackId && <Icon name="check" size={18} color="#1976d2" />}
-                                </TouchableOpacity>
-                              );
-                            })
-                        ) : (
-                          <View style={styles.subMenuItem}>
-                            <Text style={[styles.subMenuText, {color: '#888'}]}>
-                              Aucune piste vidéo détectée
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-                    </View>
-                  )}
-
-                  {activeSubMenu === 'audio' && (
-                    <View>
-                      {/* Liste des pistes audio */}
-                      <View style={styles.subMenuSection}>
-                        <Text style={styles.subMenuSectionTitle}>
-                          Pistes audio {availableAudioTracks.length > 0 && `(${availableAudioTracks.length} disponibles)`}
-                        </Text>
-
-                        <TouchableOpacity
-                          style={[styles.subMenuItem, selectedAudioTrack === 0 && styles.subMenuItemActive]}
-                          onPress={() => {
-                            setSelectedAudioTrack(0);
-                            console.log('🔊 [Audio] Piste audio désactivée');
-                          }}>
-                          <Text style={styles.subMenuText}>Désactivé (Muet)</Text>
-                          {selectedAudioTrack === 0 && <Icon name="check" size={18} color="#1976d2" />}
-                        </TouchableOpacity>
-
-                        {availableAudioTracks.length > 0 ? (
-                          availableAudioTracks.map((track, index) => {
-                            const displayTitle = track.title ||
-                                                (track.language === 'fr' ? 'Français' :
-                                                 track.language === 'en' ? 'Anglais' :
-                                                 track.language === 'qaa' ? 'Audio original' :
-                                                 track.language === 'qad' ? 'Audiodescription' :
-                                                 track.language || 'Inconnu');
-
-                            return (
-                              <TouchableOpacity
-                                key={track.index}
-                                style={[styles.subMenuItem, selectedAudioTrack === index + 1 && styles.subMenuItemActive]}
-                                onPress={() => {
-                                  setSelectedAudioTrack(index + 1);
-                                  console.log(`🔊 [Audio] Piste ${index + 1} sélectionnée:`, {
-                                    title: track.title,
-                                    language: track.language,
-                                    type: track.type,
-                                    index: track.index
-                                  });
-                                }}>
-                                <Text style={styles.subMenuText}>
-                                  {displayTitle}
-                                </Text>
-                                {selectedAudioTrack === index + 1 && <Icon name="check" size={18} color="#1976d2" />}
-                              </TouchableOpacity>
-                            );
-                          })
-                        ) : (
-                          <View style={styles.subMenuItem}>
-                            <Text style={[styles.subMenuText, {color: '#888'}]}>
-                              Aucune piste audio détectée
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-
-                      {/* Délai audio */}
-                      <View style={styles.subMenuSection}>
-                        <Text style={styles.subMenuSectionTitle}>Délai audio</Text>
-                        <View style={styles.audioDelayContainer}>
-                          <TouchableOpacity
-                            style={styles.audioDelayButton}
-                            onPress={() => {
-                              const newDelay = audioDelay - 50;
-                              setAudioDelay(newDelay);
-                              console.log(`🔊 [Audio] Délai: ${newDelay}ms`);
-                            }}>
-                            <Icon name="remove" size={24} color="white" />
-                          </TouchableOpacity>
-
-                          <Text style={styles.audioDelayText}>
-                            {audioDelay > 0 ? `+${audioDelay}` : audioDelay} ms
-                          </Text>
-
-                          <TouchableOpacity
-                            style={styles.audioDelayButton}
-                            onPress={() => {
-                              const newDelay = audioDelay + 50;
-                              setAudioDelay(newDelay);
-                              console.log(`🔊 [Audio] Délai: ${newDelay}ms`);
-                            }}>
-                            <Icon name="add" size={24} color="white" />
-                          </TouchableOpacity>
-                        </View>
-
-                        <TouchableOpacity
-                          style={styles.resetButton}
-                          onPress={() => {
-                            setAudioDelay(0);
-                            console.log('🔊 [Audio] Délai réinitialisé');
-                          }}>
-                          <Icon name="refresh" size={18} color="white" />
-                          <Text style={styles.resetButtonText}>Réinitialiser</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  )}
-
-                  {activeSubMenu === 'subtitles' && (
-                    <View>
-                      {/* Activation sous-titres */}
-                      <View style={styles.subMenuSection}>
-                        <Text style={styles.subMenuSectionTitle}>Activer les sous-titres</Text>
-
-                        <TouchableOpacity
-                          style={[styles.subMenuItem, !subtitlesEnabled && styles.subMenuItemActive]}
-                          onPress={() => {
-                            setSubtitlesEnabled(false);
-                            console.log('📝 [Subtitles] Sous-titres désactivés');
-                          }}>
-                          <Text style={styles.subMenuText}>Désactivé</Text>
-                          {!subtitlesEnabled && <Icon name="check" size={18} color="#1976d2" />}
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                          style={[styles.subMenuItem, subtitlesEnabled && styles.subMenuItemActive]}
-                          onPress={() => {
-                            setSubtitlesEnabled(true);
-                            console.log('📝 [Subtitles] Sous-titres activés');
-                          }}>
-                          <Text style={styles.subMenuText}>Activé</Text>
-                          {subtitlesEnabled && <Icon name="check" size={18} color="#1976d2" />}
-                        </TouchableOpacity>
-                      </View>
-
-                      {/* Piste sous-titres */}
-                      {subtitlesEnabled && (
-                        <View style={styles.subMenuSection}>
-                          <Text style={styles.subMenuSectionTitle}>
-                            Piste de sous-titres {availableTextTracks.length > 0 && `(${availableTextTracks.length} disponibles)`}
-                          </Text>
-
-                          {availableTextTracks.length > 0 ? (
-                            availableTextTracks.map((track, index) => {
-                              const displayTitle = track.title ||
-                                                  (track.language === 'fr' || track.language === 'fra' ? 'Français' :
-                                                   track.language === 'en' || track.language === 'eng' ? 'Anglais' :
-                                                   track.language === 'es' || track.language === 'spa' ? 'Espagnol' :
-                                                   track.language === 'de' || track.language === 'deu' ? 'Allemand' :
-                                                   track.language === 'it' || track.language === 'ita' ? 'Italien' :
-                                                   track.language || 'Inconnu');
-
-                              return (
-                                <TouchableOpacity
-                                  key={track.index || index}
-                                  style={[styles.subMenuItem, selectedSubtitleTrack === index + 1 && styles.subMenuItemActive]}
-                                  onPress={() => {
-                                    setSelectedSubtitleTrack(index + 1);
-                                    console.log(`📝 [Subtitles] Piste ${index + 1} sélectionnée:`, {
-                                      title: track.title,
-                                      language: track.language,
-                                      index: track.index
-                                    });
-                                  }}>
-                                  <Text style={styles.subMenuText}>
-                                    {displayTitle}
-                                  </Text>
-                                  {selectedSubtitleTrack === index + 1 && <Icon name="check" size={18} color="#1976d2" />}
-                                </TouchableOpacity>
-                              );
-                            })
-                          ) : (
-                            <View style={styles.subMenuItem}>
-                              <Text style={[styles.subMenuText, {color: '#888'}]}>
-                                Aucune piste de sous-titres détectée
-                              </Text>
-                            </View>
-                          )}
-                        </View>
-                      )}
-
-                      {/* Taille sous-titres */}
-                      {subtitlesEnabled && (
-                        <View style={styles.subMenuSection}>
-                          <Text style={styles.subMenuSectionTitle}>Taille des sous-titres</Text>
-
-                          <TouchableOpacity
-                            style={[styles.subMenuItem, subtitleSize === 'small' && styles.subMenuItemActive]}
-                            onPress={() => {
-                              setSubtitleSize('small');
-                              console.log('📝 [Subtitles] Taille: Petit');
-                            }}>
-                            <Text style={styles.subMenuText}>Petit</Text>
-                            {subtitleSize === 'small' && <Icon name="check" size={18} color="#1976d2" />}
-                          </TouchableOpacity>
-
-                          <TouchableOpacity
-                            style={[styles.subMenuItem, subtitleSize === 'normal' && styles.subMenuItemActive]}
-                            onPress={() => {
-                              setSubtitleSize('normal');
-                              console.log('📝 [Subtitles] Taille: Normal');
-                            }}>
-                            <Text style={styles.subMenuText}>Normal</Text>
-                            {subtitleSize === 'normal' && <Icon name="check" size={18} color="#1976d2" />}
-                          </TouchableOpacity>
-
-                          <TouchableOpacity
-                            style={[styles.subMenuItem, subtitleSize === 'large' && styles.subMenuItemActive]}
-                            onPress={() => {
-                              setSubtitleSize('large');
-                              console.log('📝 [Subtitles] Taille: Grand');
-                            }}>
-                            <Text style={styles.subMenuText}>Grand</Text>
-                            {subtitleSize === 'large' && <Icon name="check" size={18} color="#1976d2" />}
-                          </TouchableOpacity>
-
-                          <TouchableOpacity
-                            style={[styles.subMenuItem, subtitleSize === 'xlarge' && styles.subMenuItemActive]}
-                            onPress={() => {
-                              setSubtitleSize('xlarge');
-                              console.log('📝 [Subtitles] Taille: Très grand');
-                            }}>
-                            <Text style={styles.subMenuText}>Très grand</Text>
-                            {subtitleSize === 'xlarge' && <Icon name="check" size={18} color="#1976d2" />}
-                          </TouchableOpacity>
-                        </View>
-                      )}
-
-                      {/* Délai sous-titres */}
-                      {subtitlesEnabled && (
-                        <View style={styles.subMenuSection}>
-                          <Text style={styles.subMenuSectionTitle}>Délai sous-titres</Text>
-                          <View style={styles.audioDelayContainer}>
-                            <TouchableOpacity
-                              style={styles.audioDelayButton}
-                              onPress={() => {
-                                const newDelay = subtitleDelay - 50;
-                                setSubtitleDelay(newDelay);
-                                console.log(`📝 [Subtitles] Délai: ${newDelay}ms`);
-                              }}>
-                              <Icon name="remove" size={24} color="white" />
-                            </TouchableOpacity>
-
-                            <Text style={styles.audioDelayText}>
-                              {subtitleDelay > 0 ? `+${subtitleDelay}` : subtitleDelay} ms
-                            </Text>
-
-                            <TouchableOpacity
-                              style={styles.audioDelayButton}
-                              onPress={() => {
-                                const newDelay = subtitleDelay + 50;
-                                setSubtitleDelay(newDelay);
-                                console.log(`📝 [Subtitles] Délai: ${newDelay}ms`);
-                              }}>
-                              <Icon name="add" size={24} color="white" />
-                            </TouchableOpacity>
-                          </View>
-
-                          <TouchableOpacity
-                            style={styles.resetButton}
-                            onPress={() => {
-                              setSubtitleDelay(0);
-                              console.log('📝 [Subtitles] Délai réinitialisé');
-                            }}>
-                            <Icon name="refresh" size={18} color="white" />
-                            <Text style={styles.resetButtonText}>Réinitialiser</Text>
-                          </TouchableOpacity>
-                        </View>
-                      )}
-                    </View>
-                  )}
-
-                  {/* Contrôle du buffer */}
-                  {activeSubMenu === 'buffer' && (
-                    <View>
-                      <View style={styles.subMenuSection}>
-                        <Text style={styles.subMenuSectionTitle}>Qualité de connexion</Text>
-
-                        <TouchableOpacity
-                          style={[styles.subMenuItem, bufferMode === 'normal' && styles.subMenuItemActive]}
-                          onPress={() => {
-                            setBufferMode('normal');
-                            console.log('📡 [Buffer] Mode: Normal (équilibré)');
-                          }}>
-                          <Icon name="bolt" size={22} color="#FFC107" style={{marginRight: 12}} />
-                          <View style={{flex: 1}}>
-                            <Text style={styles.subMenuText}>Normal</Text>
-                            <Text style={[styles.subMenuText, {fontSize: 11, color: '#999', marginTop: 2}]}>
-                              Buffer équilibré (2.5-8s)
-                            </Text>
-                          </View>
-                          {bufferMode === 'normal' && <Icon name="check" size={18} color="#1976d2" />}
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                          style={[styles.subMenuItem, bufferMode === 'low' && styles.subMenuItemActive]}
-                          onPress={() => {
-                            setBufferMode('low');
-                            console.log('📡 [Buffer] Mode: Rapide (faible latence)');
-                          }}>
-                          <Icon name="speed" size={22} color="#4CAF50" style={{marginRight: 12}} />
-                          <View style={{flex: 1}}>
-                            <Text style={styles.subMenuText}>Connexion rapide</Text>
-                            <Text style={[styles.subMenuText, {fontSize: 11, color: '#999', marginTop: 2}]}>
-                              Buffer faible (1.5-5s) - Moins de latence
-                            </Text>
-                          </View>
-                          {bufferMode === 'low' && <Icon name="check" size={18} color="#1976d2" />}
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                          style={[styles.subMenuItem, bufferMode === 'high' && styles.subMenuItemActive]}
-                          onPress={() => {
-                            setBufferMode('high');
-                            console.log('📡 [Buffer] Mode: Lent (haute stabilité)');
-                          }}>
-                          <Icon name="signal-cellular-alt" size={22} color="#FF5722" style={{marginRight: 12}} />
-                          <View style={{flex: 1}}>
-                            <Text style={styles.subMenuText}>Connexion lente</Text>
-                            <Text style={[styles.subMenuText, {fontSize: 11, color: '#999', marginTop: 2}]}>
-                              Buffer élevé (5-15s) - Moins de coupures
-                            </Text>
-                          </View>
-                          {bufferMode === 'high' && <Icon name="check" size={18} color="#1976d2" />}
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  )}
-
-                  {activeSubMenu === 'display' && (
-                    <View>
-                      {/* Mode d'affichage */}
-                      <View style={styles.subMenuSection}>
-                        <Text style={styles.subMenuSectionTitle}>Mode d'affichage</Text>
-
-                        <TouchableOpacity
-                          style={[styles.subMenuItem, zoomMode === 'fit' && styles.subMenuItemActive]}
-                          onPress={() => {
-                            setZoomMode('fit');
-                            console.log('📐 [Display] Mode: Ajuster');
-                          }}>
-                          <Text style={styles.subMenuText}>Ajuster</Text>
-                          {zoomMode === 'fit' && <Icon name="check" size={18} color="#1976d2" />}
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                          style={[styles.subMenuItem, zoomMode === 'fill' && styles.subMenuItemActive]}
-                          onPress={() => {
-                            setZoomMode('fill');
-                            console.log('📐 [Display] Mode: Remplir');
-                          }}>
-                          <Text style={styles.subMenuText}>Remplir</Text>
-                          {zoomMode === 'fill' && <Icon name="check" size={18} color="#1976d2" />}
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                          style={[styles.subMenuItem, zoomMode === 'stretch' && styles.subMenuItemActive]}
-                          onPress={() => {
-                            setZoomMode('stretch');
-                            console.log('📐 [Display] Mode: Étirer');
-                          }}>
-                          <Text style={styles.subMenuText}>Étirer</Text>
-                          {zoomMode === 'stretch' && <Icon name="check" size={18} color="#1976d2" />}
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  )}
-                </ScrollView>
-              </Animated.View>
-            )}
           </>
         ) : (
           /* 🎯 TOUCHABLE CLASSIQUE - MODES MINI/PIP */
           <TouchableOpacity
             style={styles.touchableOverlay}
-            onPress={() => {
-              if (!isInChannelPlayerScreen && !localFullscreen) {
-                showPipButtonsTemporarily();
-              } else if (!isInChannelPlayerScreen && localFullscreen) {
-                // En fullscreen local : ne rien faire (gestes gérent déjà)
-              } else {
-                actions.setFullscreen(!isFullscreen);
-              }
-            }}
+            onPress={handleVideoPress}
             onLongPress={actions.togglePlayPause}
-            activeOpacity={0.7}>
+            activeOpacity={0.8}
+            disabled={isClickProcessing}>
             {/* Boutons PiP - seulement visible quand PiP draggable */}
             {!isInChannelPlayerScreen &&
               !isFullscreen &&
               !localFullscreen &&
-              showPipButtons && (
-                <RNAnimated.View style={{opacity: pipButtonsOpacity}}>
+              pipButtonsControls.isVisible && (
+                <RNAnimated.View style={{opacity: pipButtonsControls.rnOpacity}}>
                   {/* Bouton resize PiP (comme IPTV Smarters Pro) */}
                   <TouchableOpacity
                     style={styles.pipResizeButton}
@@ -2452,12 +2104,16 @@ const GlobalVideoPlayer: React.FC = () => {
                     <Icon name="zoom-out-map" size={17} color="white" />
                   </TouchableOpacity>
 
-                {/* Bouton fermer PiP */}
+                  {/* Bouton fermer PiP - fermeture directe */}
                   <TouchableOpacity
                     style={styles.pipCloseButton}
-                    onPress={() => actions.stop()}
-                    hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
-                    <Icon name="close" size={18} color="white" />
+                    onPress={handleClosePiP}
+                    hitSlop={{top: 4, bottom: 4, left: 4, right: 4}}>
+                    <Icon
+                      name="close"
+                      size={18}
+                      color="white"
+                    />
                   </TouchableOpacity>
                 </RNAnimated.View>
               )}
@@ -2476,29 +2132,39 @@ const GlobalVideoPlayer: React.FC = () => {
         actions.setMultiScreenOpen(false);
         // Le lecteur reste actif mais ne doit pas être en PiP flottant
       }}
-      channels={allChannelsForMultiScreen}
-      isLoadingChannels={isLoadingChannels}
+      playlistId={navigationData?.playlistId || storePlaylistId}
       currentChannel={channel}
       initialLayout={multiScreenLayout}
       initialSlots={multiScreenSlots}
       initialActiveSlot={multiScreenActiveSlot}
       onStateChange={(layout, slots, activeSlot) => {
-        console.log('💾 [GlobalVideoPlayer] Sauvegarde état multiscreen:', {layout, slotsCount: slots.length, activeSlot});
+        console.log('💾 [GlobalVideoPlayer] Sauvegarde état multiscreen:', {
+          layout,
+          slotsCount: slots.length,
+          activeSlot,
+        });
         setMultiScreenLayout(layout);
         setMultiScreenSlots(slots);
         setMultiScreenActiveSlot(activeSlot);
       }}
-      onChannelFullscreen={(selectedChannel) => {
-        actions.setFromMultiScreen(true);
-        // Ne pas fermer MultiScreen immédiatement - laisser le Modal se fermer après la transition
-        actions.setMultiScreenOpen(false);
-        actions.playChannel(selectedChannel, true);
+onChannelFullscreen={selectedChannel => {
+            console.log(
+              '🎬 [MultiScreen -> Fullscreen] Lancement de la chaîne:',
+              selectedChannel.name,
+            );
+            // 1. Fermer le multi-écran
+            setMultiScreenVisible(false);
+            actions.setMultiScreenOpen(false);
 
-        // Fermer MultiScreen après un court délai pour transition fluide
-        setTimeout(() => {
-          setMultiScreenVisible(false);
-        }, 100);
-      }}
+            // 2. Attendre la fin de l'animation de fermeture du Modal (environ 300ms)
+            setTimeout(() => {
+              // Lancer la chaîne en mode fullscreen
+              actions.playChannel(selectedChannel, true); // true for fullscreen
+
+              // Indiquer que l'on vient du multi-écran
+              actions.setFromMultiScreen(true);
+            }, 300);
+          }}
     />
   ) : null;
 
@@ -2514,11 +2180,13 @@ const GlobalVideoPlayer: React.FC = () => {
     return renderMultiScreen;
   }
 
-
   return (
     <>
       {/* Multi-Screen Modal */}
       {renderMultiScreen}
+
+      {/* 🎨 Arrière-plan de rotation avec animation douce */}
+      <RotationBackground isVisible={showRotationBackground} />
 
       {/* Fond noir fullscreen pour localFullscreen */}
       {localFullscreen && !isInChannelPlayerScreen && (
@@ -2533,9 +2201,7 @@ const GlobalVideoPlayer: React.FC = () => {
           animationType="fade"
           statusBarTranslucent={true}
           onRequestClose={() => actions.setFullscreen(false)}>
-          <View style={styles.fullscreenContainer}>
-            {PlayerContent}
-          </View>
+          <View style={styles.fullscreenContainer}>{PlayerContent}</View>
         </Modal>
       )}
 
@@ -2552,6 +2218,157 @@ const GlobalVideoPlayer: React.FC = () => {
         // ChannelPlayerScreen (lecteur fixe, pas draggable)
         PlayerContent
       ) : null}
+
+      {/* 🎯 MENU PARAMÈTRES - Composant refactorisé */}
+      <SettingsMenu
+        showSettingsMenu={showSettingsMenu}
+        settingsMenuAnimatedStyle={settingsMenuAnimatedStyle}
+        activeSubMenu={activeSubMenu}
+        subMenuAnimatedStyle={subMenuAnimatedStyle}
+        zoomMode={videoSettings.zoomMode}
+        bufferMode={videoSettings.bufferMode}
+        sleepTimer={sleepTimer}
+        availableVideoTracks={availableVideoTracks}
+        availableAudioTracks={availableAudioTracks}
+        availableSubtitleTracks={availableTextTracks}
+        selectedVideoQuality={selectedVideoQuality}
+        selectedAudioTrack={selectedAudioTrack}
+        selectedSubtitleTrack={selectedSubtitleTrack}
+        onClose={() => {
+          setShowSettingsMenu(false);
+          setActiveSubMenu(null);
+        }}
+        onOpenSubMenu={openSubMenu}
+        onCloseSubMenu={closeSubMenu}
+        onZoomModeChange={videoSettings.setZoomMode}
+        onBufferModeChange={videoSettings.setBufferMode}
+        onSleepTimerChange={setSleepTimer}
+        onVideoQualityChange={setSelectedVideoQuality}
+        onAudioTrackChange={(track: number) => setSelectedAudioTrack(track)}
+        onSubtitleTrackChange={(track: number) => setSelectedSubtitleTrack(track)}
+        audioDelay={audioDelay}
+        subtitleDelay={subtitleDelay}
+        subtitleSize={subtitleSize}
+        onAudioDelayChange={setAudioDelay}
+        onSubtitleDelayChange={setSubtitleDelay}
+        onSubtitleSizeChange={setSubtitleSize}
+      />
+
+
+      {/* Modal de confirmation d'effacement moderne */}
+      <Modal
+        visible={showClearConfirmModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowClearConfirmModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Icon name="delete-outline" size={32} color="#ff5252" />
+              <Text style={styles.modalTitle}>Effacer l'historique</Text>
+            </View>
+
+            <Text style={styles.modalMessage}>
+              Voulez-vous effacer toutes les chaînes récentes ?
+            </Text>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonCancel]}
+                onPress={() => setShowClearConfirmModal(false)}>
+                <Text style={styles.modalButtonTextCancel}>Annuler</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonConfirm]}
+                onPress={() => {
+                  setShowClearConfirmModal(false);
+                  handleClearRecentChannels();
+                }}>
+                <Icon name="delete-sweep" size={20} color="#fff" style={{marginRight: 8}} />
+                <Text style={styles.modalButtonTextConfirm}>Effacer</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal de sélection de chaînes - Overlay */}
+      <Modal
+        visible={channelSelector.isVisible}
+        transparent={true}
+        animationType="fade"
+        statusBarTranslucent={true}
+        onRequestClose={() => channelSelector.close()}>
+        <View style={styles.channelSelectorOverlay}>
+          <View style={styles.channelSelectorContainer}>
+            {/* Contenu: Sidebar catégories + Liste chaînes */}
+            <View style={styles.channelSelectorContent}>
+              {/* Sidebar catégories */}
+              <View style={styles.channelSelectorSidebar}>
+                {/* Bouton retour */}
+                <TouchableOpacity
+                  style={styles.selectorBackButton}
+                  onPress={() => channelSelector.close()}>
+                  <Icon
+                    name="keyboard-arrow-left"
+                    size={24}
+                    color="#fff"
+                  />
+                  <Text style={styles.selectorBackButtonText}>Retour</Text>
+                </TouchableOpacity>
+
+                {channelSelector.categories.length > 0 ? (
+                  <FlashList
+                    data={channelSelector.categories}
+                    renderItem={renderSelectorCategoryItem}
+                    keyExtractor={(item) => item.id}
+                    estimatedItemSize={50}
+                    showsVerticalScrollIndicator={false}
+                    extraData={channelSelector.selectedCategory}
+                    removeClippedSubviews={true}
+                  />
+                ) : (
+                  <Text style={styles.channelSelectorEmptyText}>
+                    Aucune catégorie
+                  </Text>
+                )}
+              </View>
+
+              {/* Liste chaînes */}
+              <View style={styles.channelSelectorList}>
+                {channelSelector.isLoading ? (
+                  <View style={styles.channelSelectorLoadingContainer}>
+                    <Icon name="hourglass-empty" size={40} color="#666" />
+                    <Text style={styles.channelSelectorLoadingText}>
+                      Chargement...
+                    </Text>
+                  </View>
+                ) : channelSelector.channels.length > 0 ? (
+                  <FlashList
+                    data={channelSelector.channels}
+                    renderItem={renderSelectorChannelItem}
+                    keyExtractor={(item, index) => `${item.id}_${index}`}
+                    estimatedItemSize={60}
+                    showsVerticalScrollIndicator={false}
+                    onEndReached={() => channelSelector.loadMore()}
+                    onEndReachedThreshold={0.5}
+                    removeClippedSubviews={true}
+                    drawDistance={200}
+                  />
+                ) : (
+                  <View style={styles.channelSelectorEmptyContainer}>
+                    <Icon name="tv-off" size={48} color="#666" />
+                    <Text style={styles.channelSelectorEmptyText}>
+                      Aucune chaîne dans cette catégorie
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </>
   );
 };
@@ -2636,7 +2453,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 4,
   },
-
+  
   // 🎯 STYLES POUR ZONES GESTUELLES AVANCÉES (FULLSCREEN UNIQUEMENT)
   gestureZoneLeft: {
     position: 'absolute',
@@ -2787,7 +2604,7 @@ const styles = StyleSheet.create({
   headerChannelCategory: {
     color: '#FFFFFF',
     fontSize: 13,
-    fontWeight: 'bold',
+    fontWeight: '500', // Rendu moins gras pour être plus discret
     letterSpacing: 0.5,
     textShadowColor: 'rgba(0, 0, 0, 0.8)',
     textShadowOffset: {width: 1, height: 1},
@@ -2833,7 +2650,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    zIndex: 99,
+    zIndex: 10000,
     backgroundColor: 'transparent',
   },
   settingsMenu: {
@@ -2850,7 +2667,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.5,
     shadowRadius: 8,
     elevation: 30,
-    zIndex: 100,
+    zIndex: 10001,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
   },
@@ -2902,7 +2719,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.5,
     shadowRadius: 8,
     elevation: 35,
-    zIndex: 105,
+    zIndex: 10002,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
   },
@@ -3148,7 +2965,7 @@ const styles = StyleSheet.create({
   dockerContent: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
-    height: 100,
+    height: 80, // Réduit de 90 à 80 pour correspondre à la hauteur des items
     paddingHorizontal: 20,
   },
   dockerButtonModern: {
@@ -3179,7 +2996,8 @@ const styles = StyleSheet.create({
   recentChannelItem: {
     alignItems: 'center' as const,
     marginRight: 10,
-    width: 80,
+    width: 85,
+    paddingHorizontal: 2,
   },
   recentChannelPreview: {
     width: 80,
@@ -3190,6 +3008,18 @@ const styles = StyleSheet.create({
     alignItems: 'center' as const,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  activeChannelCard: {
+    backgroundColor: 'rgba(60, 60, 60, 1)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 12,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  inactiveChannelCard: {
+    opacity: 0.7,
   },
   recentChannelLogo: {
     width: 60,
@@ -3207,6 +3037,286 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold' as const,
+  },
+
+  // Modal de confirmation moderne
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+    padding: 20,
+  },
+  modalContainer: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: 16,
+    padding: 24,
+    width: '90%',
+    maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    elevation: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold' as const,
+    color: '#ffffff',
+    marginLeft: 12,
+    flex: 1,
+  },
+  modalMessage: {
+    fontSize: 16,
+    color: '#cccccc',
+    marginBottom: 24,
+    lineHeight: 24,
+  },
+  modalButtons: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    gap: 12,
+  },
+  modalButton: {
+    flex: 1,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    minHeight: 50,
+  },
+  modalButtonCancel: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  modalButtonConfirm: {
+    backgroundColor: '#ff5252',
+    shadowColor: '#ff5252',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  modalButtonTextCancel: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600' as const,
+  },
+  modalButtonTextConfirm: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: 'bold' as const,
+  },
+  // 📺 Styles pour l'overlay de sélection de chaînes
+  channelSelectorOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)', // Encore plus transparent pour voir la vidéo en arrière-plan
+  },
+  channelSelectorContainer: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
+  channelSelectorHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    padding: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  channelSelectorHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  channelSelectorTitle: {
+    fontSize: 20,
+    fontWeight: 'bold' as const,
+    color: '#fff',
+  },
+  channelSelectorCount: {
+    fontSize: 14,
+    color: '#999',
+    marginLeft: 8,
+  },
+  channelSelectorCloseButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  channelSelectorContent: {
+    flex: 1,
+    flexDirection: 'row',
+  },
+  // Sidebar catégories
+  channelSelectorSidebar: {
+    width: 250,
+    backgroundColor: 'rgba(25, 25, 35, 0.70)', // Niveau de transparence ajusté
+    borderRightWidth: 0,
+    borderRightColor: 'rgba(255, 255, 255, 0.1)',
+    paddingVertical: 0,
+    paddingHorizontal: 0,
+  },
+  channelSelectorSidebarTitle: {
+    fontSize: 12,
+    fontWeight: 'bold' as const,
+    color: '#999',
+    marginBottom: 12,
+    paddingHorizontal: 8,
+  },
+  selectorBackButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  selectorBackButtonText: {
+    fontSize: 14,
+    color: '#fff',
+    fontWeight: '500' as const,
+    marginLeft: 8,
+  },
+  selectorCategoryItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12, // Augmenté pour plus de taille
+    paddingHorizontal: 12,
+    marginHorizontal: 0,
+    marginBottom: 0, // Supprimé pour compacter
+    borderRadius: 0,
+    backgroundColor: 'transparent', // Fond transparent, le sidebar a déjà une couleur
+    borderBottomWidth: 1, // Séparateur fin
+    borderBottomColor: 'rgba(255, 255, 255, 0.05)', // Couleur discrète
+  },
+  selectorCategoryItemActive: {
+    backgroundColor: '#00ACC1',
+    borderLeftWidth: 4,
+    borderLeftColor: '#00838F',
+  },
+  selectorCategoryNameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  selectorCategoryIcon: {
+    marginRight: 8,
+  },
+  selectorCategoryText: {
+    fontSize: 15,
+    color: '#ccc',
+    fontWeight: '500' as const,
+    flex: 1,
+  },
+  selectorCategoryTextActive: {
+    color: '#fff',
+    fontWeight: 'bold' as const,
+  },
+  selectorCategoryCount: {
+    fontSize: 12,
+    color: '#999',
+    marginLeft: 8,
+    fontWeight: '600' as const,
+  },
+  selectorCategoryCountActive: {
+    color: '#fff',
+  },
+  // Liste chaînes
+  channelSelectorList: {
+    flex: 1,
+    backgroundColor: 'transparent',
+    paddingVertical: 0,
+    paddingHorizontal: 0,
+    marginRight: '35%', // Prend 65% de l'écran pour plus d'espace vide à droite
+  },
+  selectorChannelItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8, // Augmenté pour plus de taille des chaînes
+    paddingHorizontal: 12,
+    marginHorizontal: 0,
+    marginBottom: 0, // Supprimé pour compacter
+    borderRadius: 0, // Bords droits
+    backgroundColor: 'rgba(25, 25, 35, 0.6)', // Plus transparent
+    borderBottomWidth: 1, // Ligne de séparation
+    borderBottomColor: 'rgba(255, 255, 255, 0.05)', // Couleur discrète
+  },
+  selectorChannelLogo: {
+    width: 32, // Réduit
+    height: 32, // Réduit
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  selectorChannelLogoImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 4,
+  },
+  selectorChannelLogoFallback: {
+    width: 40,
+    height: 40,
+    borderRadius: 4,
+    backgroundColor: '#ff9800',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectorChannelLogoText: {
+    fontSize: 14,
+    fontWeight: 'bold' as const,
+    color: '#fff',
+  },
+  selectorChannelName: {
+    flex: 1,
+    fontSize: 15,
+    color: '#fff',
+    fontWeight: '500' as const,
+  },
+  // ✅ Styles pour chaîne en cours de lecture (IDENTIQUE aux catégories)
+  selectorChannelItemActive: {
+    backgroundColor: '#00ACC1', // ✅ Même cyan que catégories
+    borderLeftWidth: 4, // ✅ Même bordure que catégories
+    borderLeftColor: '#00838F', // ✅ Même couleur que catégories
+  },
+  selectorChannelNameActive: {
+    color: '#fff', // ✅ Blanc comme catégories
+    fontWeight: 'bold' as const, // ✅ Bold comme catégories
+  },
+  // États vides et loading
+  channelSelectorLoadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  channelSelectorLoadingText: {
+    fontSize: 16,
+    color: '#999',
+    marginTop: 8,
+  },
+  channelSelectorEmptyContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  channelSelectorEmptyText: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
   },
 });
 

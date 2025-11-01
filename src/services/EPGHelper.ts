@@ -95,12 +95,12 @@ class EPGHelperClass {
 
     const programStartTime = startTime.toLocaleTimeString('fr-FR', {
       hour: '2-digit',
-      minute: '2-digit', 
+      minute: '2-digit',
     });
 
     const programEndTime = endTime.toLocaleTimeString('fr-FR', {
       hour: '2-digit',
-      minute: '2-digit', 
+      minute: '2-digit',
     });
 
     // Programmes mock réalistes selon l'heure et la chaîne
@@ -143,12 +143,14 @@ class EPGHelperClass {
           20: 'Journal du soir',
           21: 'Prime time',
           23: 'Émission de soirée',
-        }
+        },
       };
 
       const channelPrograms = programs[channelId] || programs.default;
       const exactProgram = channelPrograms[hour];
-      if (exactProgram) {return exactProgram;}
+      if (exactProgram) {
+        return exactProgram;
+      }
 
       // Trouver le programme le plus proche
       const availableHours = Object.keys(channelPrograms)

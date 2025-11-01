@@ -25,7 +25,7 @@ class EPGPerformanceTest {
         scrollPerformance: 'Excellent',
         cacheHitRate: 0,
         memoryUsage: 'Optimized',
-      }
+      },
     };
   }
 
@@ -154,9 +154,9 @@ class EPGPerformanceTest {
       '├─────────────────────────────┼──────────────┼──────────────┤',
     );
     console.log(
-      `│ Temps de chargement         │ ${(      this.results.oldEPG.loadTime / 1000
-      ).toFixed(1)}s        │ ${(      this.results.newEPG.loadTime / 1000
-      ).toFixed(
+      `│ Temps de chargement         │ ${(
+        this.results.oldEPG.loadTime / 1000
+      ).toFixed(1)}s        │ ${(this.results.newEPG.loadTime / 1000).toFixed(
         1,
       )}s        │`,
     );
@@ -164,7 +164,7 @@ class EPGPerformanceTest {
       `│ Chaînes supportées          │ ${this.results.oldEPG.channelsSupported}           │ ${this.results.newEPG.channelsSupported}+         │`,
     );
     console.log(
-      `│ Scroll horizontal           │ ❌ Cassé      │ ✅ Fluide     │`,
+      '│ Scroll horizontal           │ ❌ Cassé      │ ✅ Fluide     │',
     );
     console.log(
       `│ Cache intelligent           │ ❌ Aucun      │ ${this.results.newEPG.cacheHitRate.toFixed(
@@ -172,16 +172,16 @@ class EPGPerformanceTest {
       )}% hits    │`,
     );
     console.log(
-      `│ Virtualisation              │ ❌ Non        │ ✅ FlatList   │`,
+      '│ Virtualisation              │ ❌ Non        │ ✅ FlatList   │',
     );
     console.log(
-      `│ Sync chaîne sélectionnée    │ ❌ Désync     │ ✅ Temps réel │`,
+      '│ Sync chaîne sélectionnée    │ ❌ Désync     │ ✅ Temps réel │',
     );
     console.log(
-      `│ Préchargement               │ ❌ Non        │ ✅ Intelligent│`,
+      '│ Préchargement               │ ❌ Non        │ ✅ Intelligent│',
     );
     console.log(
-      `│ Métriques performance       │ ❌ Aucune     │ ✅ Temps réel │`,
+      '│ Métriques performance       │ ❌ Aucune     │ ✅ Temps réel │',
     );
     console.log(
       '└─────────────────────────────┴──────────────┴──────────────┘',

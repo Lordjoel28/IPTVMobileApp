@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import { Theme } from '../themes/themeConfig';
+import {Theme} from '../themes/themeConfig';
 
 interface ThemePreviewCardProps {
   theme: Theme;
@@ -22,8 +22,8 @@ interface ThemePreviewCardProps {
   onPreview?: (themeId: string) => void;
 }
 
-const { width: screenWidth } = Dimensions.get('window');
-const cardWidth = (screenWidth - 60) / 2; // 2 colonnes avec marges
+const {width: screenWidth} = Dimensions.get('window');
+const cardWidth = (screenWidth - 80) / 3; // 3 colonnes avec marges
 
 const ThemePreviewCard: React.FC<ThemePreviewCardProps> = ({
   theme,
@@ -62,26 +62,25 @@ const ThemePreviewCard: React.FC<ThemePreviewCardProps> = ({
     <TouchableOpacity
       style={[
         styles.card,
-        { width: cardWidth },
+        {width: cardWidth},
         isSelected && styles.selectedCard,
       ]}
       onPress={handlePress}
       onLongPress={handleLongPress}
       activeOpacity={0.8}>
-
       {/* Gradient de prévisualisation du thème */}
       <LinearGradient
         colors={theme.colors.background.gradient}
         style={styles.gradientPreview}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
+        start={{x: 0, y: 0}}
+        end={{x: 1, y: 1}}
       />
 
       {/* Couleur d'accent en coin */}
       <View
         style={[
           styles.accentDot,
-          { backgroundColor: theme.colors.accent.primary }
+          {backgroundColor: theme.colors.accent.primary},
         ]}
       />
 
@@ -95,11 +94,16 @@ const ThemePreviewCard: React.FC<ThemePreviewCardProps> = ({
           />
         </View>
 
-        <Text style={[styles.themeName, { color: theme.colors.text.primary }]}>
+        <Text style={[styles.themeName, {color: theme.colors.text.primary}]}>
           {theme.name}
         </Text>
 
-        <Text style={[styles.themeDescription, { color: theme.colors.text.secondary }]} numberOfLines={2}>
+        <Text
+          style={[
+            styles.themeDescription,
+            {color: theme.colors.text.secondary},
+          ]}
+          numberOfLines={2}>
           {theme.description}
         </Text>
       </View>
@@ -112,24 +116,15 @@ const ThemePreviewCard: React.FC<ThemePreviewCardProps> = ({
         </View>
       )}
 
-      {/* Indicateur de mode sombre/clair */}
-      <View style={[
-        styles.modeBadge,
-        { backgroundColor: theme.isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)' }
-      ]}>
-        <Icon
-          name={theme.isDark ? 'nights-stay' : 'wb-sunny'}
-          size={12}
-          color={theme.isDark ? '#FFD700' : '#FF6B35'}
-        />
-      </View>
-
+  
       {/* Bordure de sélection */}
       {isSelected && (
-        <View style={[
-          styles.selectionBorder,
-          { borderColor: theme.colors.accent.primary }
-        ]} />
+        <View
+          style={[
+            styles.selectionBorder,
+            {borderColor: theme.colors.accent.primary},
+          ]}
+        />
       )}
     </TouchableOpacity>
   );
@@ -142,7 +137,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginBottom: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: {width: 0, height: 4},
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 6,
@@ -150,7 +145,7 @@ const styles = StyleSheet.create({
   },
 
   selectedCard: {
-    transform: [{ scale: 1.02 }],
+    transform: [{scale: 1.02}],
   },
 
   gradientPreview: {
@@ -177,7 +172,7 @@ const styles = StyleSheet.create({
     padding: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'rgba(0,0,0,0.15)',
   },
 
   iconContainer: {
@@ -192,18 +187,18 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'center',
     marginBottom: 4,
-    textShadowColor: 'rgba(0,0,0,0.7)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    textShadowColor: 'rgba(0,0,0,0.9)',
+    textShadowOffset: {width: 0, height: 1},
+    textShadowRadius: 3,
   },
 
   themeDescription: {
     fontSize: 11,
     textAlign: 'center',
     lineHeight: 14,
-    textShadowColor: 'rgba(0,0,0,0.7)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+    textShadowColor: 'rgba(0,0,0,0.9)',
+    textShadowOffset: {width: 0, height: 1},
+    textShadowRadius: 3,
   },
 
   selectedBadge: {
@@ -225,17 +220,7 @@ const styles = StyleSheet.create({
     marginLeft: 2,
   },
 
-  modeBadge: {
-    position: 'absolute',
-    bottom: 8,
-    right: 8,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
+  
   selectionBorder: {
     position: 'absolute',
     top: 0,

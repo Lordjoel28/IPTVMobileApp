@@ -31,7 +31,7 @@ interface ModernDialogProps {
   icon?: string;
   iconColor?: string;
   buttons: DialogButton[];
-  stats?: { channels: number; programmes: number } | null;
+  stats?: {channels: number; programmes: number} | null;
   onClose: () => void;
 }
 
@@ -67,7 +67,10 @@ export const ModernDialog: React.FC<ModernDialogProps> = ({
       animationType="fade"
       statusBarTranslucent
       onRequestClose={onClose}>
-      <StatusBar backgroundColor="rgba(0, 0, 0, 0.75)" barStyle="light-content" />
+      <StatusBar
+        backgroundColor="rgba(0, 0, 0, 0.75)"
+        barStyle="light-content"
+      />
       <View style={styles.overlay}>
         <View style={styles.dialogContainer}>
           <LinearGradient
@@ -76,7 +79,6 @@ export const ModernDialog: React.FC<ModernDialogProps> = ({
             start={{x: 0, y: 0}}
             end={{x: 1, y: 1}}
             locations={[0, 0.3, 0.7, 1]}>
-
             {/* Header avec icône */}
             <View style={styles.header}>
               {icon && (
@@ -101,14 +103,18 @@ export const ModernDialog: React.FC<ModernDialogProps> = ({
                   <View style={styles.statIconContainer}>
                     <Icon name="tv" size={16} color="#4A90E2" />
                   </View>
-                  <Text style={styles.statNumber}>{stats.channels.toLocaleString()}</Text>
+                  <Text style={styles.statNumber}>
+                    {stats.channels.toLocaleString()}
+                  </Text>
                   <Text style={styles.statLabel}>chaînes</Text>
                 </View>
                 <View style={styles.statItem}>
                   <View style={styles.statIconContainer}>
                     <Icon name="event" size={16} color="#FF9800" />
                   </View>
-                  <Text style={styles.statNumber}>{stats.programmes.toLocaleString()}</Text>
+                  <Text style={styles.statNumber}>
+                    {stats.programmes.toLocaleString()}
+                  </Text>
                   <Text style={styles.statLabel}>programmes</Text>
                 </View>
               </View>
@@ -136,7 +142,7 @@ export const ModernDialog: React.FC<ModernDialogProps> = ({
                     <Text
                       style={[
                         styles.buttonText,
-                        { color: getButtonTextColor(button.style) },
+                        {color: getButtonTextColor(button.style)},
                       ]}>
                       {button.text}
                     </Text>
@@ -166,7 +172,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     overflow: 'hidden',
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 8 },
+    shadowOffset: {width: 0, height: 8},
     shadowOpacity: 0.4,
     shadowRadius: 20,
     elevation: 10,

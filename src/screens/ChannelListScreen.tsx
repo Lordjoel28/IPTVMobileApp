@@ -18,6 +18,8 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import {VirtualizedChannelList} from '../components/VirtualizedChannelList';
 import type {Channel} from '../types';
+import FavoritesService from '../services/FavoritesService';
+import ProfileService from '../services/ProfileService';
 
 interface ChannelListScreenProps {
   route?: {
@@ -41,12 +43,31 @@ const ChannelListScreen: React.FC<ChannelListScreenProps> = ({
   const [currentChannel, setCurrentChannel] = useState<Channel | null>(null);
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeProfileId, setActiveProfileId] = useState<string | null>(null);
 
   const playlistName = route?.params?.playlistName || 'Playlist IPTV';
+  const playlistId = route?.params?.playlistId || '';
 
   const loadChannels = useCallback(async () => {
     try {
       setLoading(true);
+
+      // Récupérer le profil actif
+      const activeProfile = await ProfileService.getActiveProfile();
+      if (activeProfile) {
+        setActiveProfileId(activeProfile.id);
+
+        // Charger les favoris du profil actif
+        const profileFavorites = await FavoritesService.getFavoritesByProfile(
+          activeProfile.id,
+        );
+        const favoriteChannelIds = profileFavorites.map(fav => fav.channelId);
+        setFavorites(favoriteChannelIds);
+        console.log(
+          `⭐ ${favoriteChannelIds.length} favoris chargés pour profil:`,
+          activeProfile.name,
+        );
+      }
 
       // Récupérer les chaînes depuis les paramètres ou IPTVService
       const channelsFromParams = route?.params?.channels;
@@ -86,16 +107,44 @@ const ChannelListScreen: React.FC<ChannelListScreenProps> = ({
     );
   };
 
-  const handleToggleFavorite = (channelId: string) => {
-    setFavorites(prev => {
-      const isCurrentlyFavorite = prev.includes(channelId);
-      if (isCurrentlyFavorite) {
-        return prev.filter(id => id !== channelId);
-      } else {
-        return [...prev, channelId];
+  const handleToggleFavorite = async (channelId: string) => {
+    try {
+      if (!activeProfileId) {
+        console.log('❌ Aucun profil actif');
+        return;
       }
-    });
-    console.log(`⭐ Favoris toggled pour channel ${channelId}`);
+
+      // Trouver la chaîne correspondante
+      const channel = channels.find(ch => ch.id === channelId);
+      if (!channel) {
+        console.log('❌ Chaîne introuvable');
+        return;
+      }
+
+      // Toggle le favori dans le service
+      const isFavorite = await FavoritesService.toggleFavorite(
+        channel,
+        playlistId,
+        activeProfileId,
+      );
+
+      // Mettre à jour l'état local
+      setFavorites(prev => {
+        if (isFavorite) {
+          return [...prev, channelId];
+        } else {
+          return prev.filter(id => id !== channelId);
+        }
+      });
+
+      console.log(
+        `⭐ Favori ${isFavorite ? 'ajouté' : 'retiré'} pour chaîne:`,
+        channel.name,
+      );
+    } catch (error) {
+      console.error('❌ Erreur toggle favori:', error);
+      Alert.alert('Erreur', 'Impossible de modifier les favoris');
+    }
   };
 
   const handleBack = () => {
@@ -191,18 +240,18 @@ const ChannelListScreen: React.FC<ChannelListScreenProps> = ({
           )}
         </View>
 
-      {/* TextInput invisible pour capturer la saisie */}
-      {showSearch && (
-        <TextInput
-          style={styles.invisibleTextInput}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          autoFocus={true}
-          autoCapitalize="none"
-          autoCorrect={false}
-          returnKeyType="search"
-        />
-      )}
+        {/* TextInput invisible pour capturer la saisie */}
+        {showSearch && (
+          <TextInput
+            style={styles.invisibleTextInput}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoFocus={true}
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="search"
+          />
+        )}
 
         <TouchableOpacity style={styles.searchButton} onPress={toggleSearch}>
           <Icon

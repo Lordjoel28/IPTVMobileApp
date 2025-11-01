@@ -14,7 +14,6 @@ import SearchManager, {
   SearchResult,
 } from './search/SearchManager';
 import UserManager, {User, AuthResult} from './users/UserManager';
-import ParentalController from './users/ParentalController';
 import StorageAdapter from '../storage/StorageAdapter';
 import {Channel} from './parsers/UltraOptimizedM3UParser';
 
@@ -155,7 +154,6 @@ export class IPTVService {
   private playlistManager: PlaylistManager;
   private searchManager: SearchManager;
   private userManager: UserManager;
-  private parentalController: ParentalController;
 
   // Config et state
   private config: IPTVServiceConfig;
@@ -184,7 +182,6 @@ export class IPTVService {
     this.playlistManager = new PlaylistManager(this.config.storage);
     this.searchManager = new SearchManager(this.storage);
     this.userManager = new UserManager(this.storage);
-    this.parentalController = new ParentalController(this.storage);
     this.performanceMonitor = new PerformanceMonitor();
   }
 
@@ -253,8 +250,8 @@ export class IPTVService {
       await this.userManager.initialize();
 
       if (this.config.enableParentalControl) {
-        console.log('🔒 Initializing Parental Controller...');
-        await this.parentalController.initialize();
+        console.log('🔒 Parental Control enabled (managed by ParentalControlService)');
+        // Parental control is now handled by ParentalControlService
       }
 
       console.log('📋 Initializing Playlist Manager...');
@@ -477,7 +474,9 @@ export class IPTVService {
       return {allowed: false, reason: 'Utilisateur non authentifié'};
     }
 
-    return this.parentalController.checkChannelAccess(user, channel);
+    // Parental control is now handled by ParentalControlService and useParentalControl hook
+    // This method is deprecated - use ParentalControlService.checkAccess() instead
+    return {allowed: true};
   }
 
   async requestTemporaryUnlock(
@@ -492,12 +491,9 @@ export class IPTVService {
       return {success: false, error: 'Action non autorisée'};
     }
 
-    return this.parentalController.requestTemporaryUnlock(
-      user,
-      parentPin,
-      categories,
-      durationMinutes,
-    );
+    // Parental control is now handled by ParentalControlService
+    // This method is deprecated - use ParentalControlService.grantTemporaryAccess() instead
+    return {success: false, error: 'Use ParentalControlService instead'};
   }
 
   /**
@@ -606,7 +602,7 @@ export class IPTVService {
       : null;
     const userStats = this.userManager.getStats();
     const parentalStats = this.config.enableParentalControl
-      ? this.parentalController.getStats()
+      ? {totalBlocks: 0, temporaryUnlocks: 0, recentAttempts: 0}
       : null;
     const storageStats = this.storage.getStats();
 
@@ -719,7 +715,8 @@ export class IPTVService {
       await this.userManager.cleanup();
 
       if (this.config.enableParentalControl) {
-        await this.parentalController.cleanup();
+        // Parental control cleanup is now handled by ParentalControlService
+        console.log('🔒 Parental control cleanup (handled by ParentalControlService)');
       }
 
       await this.storage.cleanup();

@@ -122,6 +122,39 @@ class WatermelonXtreamService {
               ).toISOString();
             }
           }
+
+          // Date de création du compte Xtream Codes depuis l'API
+          if (accountInfo?.user_info?.created_at) {
+            const createdTimestamp = parseInt(accountInfo.user_info.created_at);
+            if (!isNaN(createdTimestamp)) {
+              const realCreatedDate = new Date(createdTimestamp * 1000);
+              playlist.accountCreatedDate = realCreatedDate.toISOString();
+              console.log('📅 [Xtream] Date de création réelle sauvegardée:', realCreatedDate.toISOString());
+            }
+          } else if (accountInfo?.user_info?.reg_date) {
+            // Alternative: certains serveurs utilisent reg_date
+            const regTimestamp = parseInt(accountInfo.user_info.reg_date);
+            if (!isNaN(regTimestamp)) {
+              const realCreatedDate = new Date(regTimestamp * 1000);
+              playlist.accountCreatedDate = realCreatedDate.toISOString();
+              console.log('📅 [Xtream] Date de création (reg_date) sauvegardée:', realCreatedDate.toISOString());
+            }
+          } else {
+            console.log('⚠️ [Xtream] Aucune date de création trouvée dans l\'API');
+          }
+
+          // Connexions actives Xtream (0 ou 1)
+          if (accountInfo?.user_info?.active_cons !== undefined) {
+            const activeConnections = parseInt(accountInfo.user_info.active_cons);
+            const maxConnections = parseInt(accountInfo.user_info.max_connections || '1');
+
+            const connectionData = {
+              activeConnections: activeConnections, // 0 ou 1
+              maxConnections: maxConnections
+            };
+            playlist.connectionInfo = JSON.stringify(connectionData);
+            console.log('🔗 [Xtream] Connexion active:', activeConnections, '/', maxConnections);
+          }
         });
 
       onProgress?.(65, '📂 Import des catégories...');
@@ -148,13 +181,16 @@ class WatermelonXtreamService {
         createdCategories.push(...categoryRecords);
       }
 
-      // Créer un map: Xtream categoryId -> WatermelonDB Category ID
-      const xtreamCategoryIdMap = new Map<string, string>();
-      createdCategories.forEach(cat => {
-        xtreamCategoryIdMap.set(cat.categoryId!, cat.id);
-      });
+      console.log(`✅ ${createdCategories.length} catégories créées`);
 
-      console.log(`🗺️ Map catégories créée: ${xtreamCategoryIdMap.size} entrées`);
+      // 🗺️ Créer un Map: categoryId → categoryName pour le filtrage mode enfant
+      const categoryIdToNameMap = new Map<string, string>();
+      categories.forEach(cat => {
+        categoryIdToNameMap.set(cat.category_id, cat.category_name);
+      });
+      console.log(
+        `🗺️ Map categoryId → categoryName créée: ${categoryIdToNameMap.size} entrées`,
+      );
 
       onProgress?.(
         70,
@@ -178,9 +214,8 @@ class WatermelonXtreamService {
           database.get<Channel>('channels').prepareCreate(ch => {
             ch.playlistId = playlist.id;
 
-            // Mapper Xtream categoryId vers WatermelonDB Category ID
-            const watermelonCategoryId = xtreamCategoryIdMap.get(channel.category_id);
-            ch.categoryId = watermelonCategoryId || null;
+            // 🔧 CORRECTION: Utiliser directement l'Xtream category_id (pas le mapping WatermelonDB)
+            ch.categoryId = channel.category_id || null;
 
             ch.name = channel.name || 'Sans nom';
             ch.streamUrl = this.buildXtreamStreamUrl(
@@ -189,13 +224,6 @@ class WatermelonXtreamService {
             );
 
             // NORMALISATION LOGOS lors de l'import
-            console.log(
-              '🔍 Logo original pour',
-              channel.name + ':',
-              channel.stream_icon,
-            );
-            console.log('🔍 URL serveur:', credentials.url);
-
             ch.logoUrl = this.normalizeLogoUrl(
               channel.stream_icon,
               credentials.url,
@@ -205,10 +233,10 @@ class WatermelonXtreamService {
               credentials.url,
             );
 
-            console.log('🔍 Logo normalisé:', ch.logoUrl);
-
-            // NORMALISATION CATÉGORIES lors de l'import
-            ch.groupTitle = this.normalizeCategoryName(channel.category_name);
+            // 🗺️ NORMALISATION CATÉGORIES: Utiliser le Map pour récupérer le vrai nom
+            const categoryName =
+              categoryIdToNameMap.get(channel.category_id) || '';
+            ch.groupTitle = this.normalizeCategoryName(categoryName);
 
             // Champs Xtream spécifiques
             ch.num = channel.num;
@@ -249,36 +277,110 @@ class WatermelonXtreamService {
 
   /**
    * 🔍 Récupérer une playlist avec lazy loading des chaînes
+   * @param blockedCategories - Catégories à exclure (mode enfant)
    */
   async getPlaylistWithChannels(
     playlistId: string,
     limit: number = 25000,
     offset: number = 0,
+    blockedCategories?: string[],
   ) {
     try {
       const playlist = await database
         .get<Playlist>('playlists')
         .find(playlistId);
 
-      // Lazy loading: récupérer seulement les chaînes demandées
-      const channels = await database
+      // 🔒 FILTRAGE MODE ENFANT: Si mode enfant, charger plus de chaînes pour compenser le filtrage
+      const fetchLimit =
+        blockedCategories && blockedCategories.length > 0
+          ? limit * 3 // Charger 3x plus pour compenser les chaînes filtrées
+          : limit;
+
+      if (blockedCategories && blockedCategories.length > 0) {
+        console.log(
+          `🔒 [WatermelonXtream] Mode enfant actif - Filtrage JavaScript: ${blockedCategories.join(
+            ', ',
+          )}`,
+        );
+      }
+
+      // Lazy loading: récupérer les chaînes (avant filtrage)
+      let channels = await database
         .get<Channel>('channels')
         .query(
           Q.where('playlist_id', playlistId),
           Q.skip(offset),
-          Q.take(limit),
+          Q.take(fetchLimit),
         )
         .fetch();
 
+      // 🔒 FILTRAGE MODE ENFANT: Filtrer en JavaScript après la requête
+      if (blockedCategories && blockedCategories.length > 0) {
+        const beforeCount = channels.length;
+
+        // 🔍 DEBUG: Afficher les 5 premiers groupTitle pour vérifier
+        console.log('🔍 DEBUG groupTitle des 5 premières chaînes:');
+        channels.slice(0, 5).forEach((ch, idx) => {
+          console.log(
+            `   [${idx}] "${ch.name}" → groupTitle: "${ch.groupTitle}"`,
+          );
+        });
+
+        channels = channels.filter(ch => {
+          const groupTitle = (ch.groupTitle || '').toLowerCase();
+          const channelName = (ch.name || '').toLowerCase();
+
+          // 🔍 Améliorer le filtrage pour détecter toutes les variations adultes
+          const hasBlockedKeyword = blockedCategories.some(blocked => {
+            const blockedLower = blocked.toLowerCase();
+
+            // Vérification exacte et partielle
+            return groupTitle.includes(blockedLower) ||
+                   groupTitle.includes(blockedLower.replace(/\s+/g, ' ')) ||
+                   channelName.includes(blockedLower) ||
+                   channelName.includes(blockedLower.replace(/\s+/g, ' ')) ||
+                   // Cas spécial: "XX | FOR ADULT" → détecter "ADULT" même si séparé
+                   (blockedLower.includes('adult') && groupTitle.includes('adult')) ||
+                   (blockedLower.includes('xxx') && groupTitle.includes('xxx')) ||
+                   (blockedLower.includes('porn') && groupTitle.includes('porn'));
+          });
+
+          // Exclure si un mot-clé bloqué est détecté
+          return !hasBlockedKeyword;
+        });
+        console.log(
+          `🔒 [WatermelonXtream] Filtrage: ${beforeCount} → ${channels.length} chaînes`,
+        );
+
+        // Limiter au nombre demandé après filtrage
+        channels = channels.slice(0, limit);
+      }
+
+      // Récupérer TOUTES les catégories (même les bloquées)
+      // 🔒 Les catégories bloquées seront affichées avec un cadenas dans l'interface
       const categories = await database
         .get<Category>('categories')
         .query(Q.where('playlist_id', playlistId))
         .fetch();
 
+      // 🔍 CRITICAL: Mapper les objets WatermelonDB vers le type Channel attendu
+      const mappedChannels = channels.map(ch => ({
+        id: ch.id,
+        name: ch.name,
+        url: ch.streamUrl,
+        logo: ch.logoUrl,
+        group: ch.groupTitle,
+        category: ch.categoryId,
+        tvgId: ch.tvgId,
+        quality: ch.isHD ? 'HD' : undefined,
+        isAdult: ch.isAdult,
+        epgId: ch.tvgId,
+      }));
+
       return {
         playlist,
-        channels,
-        categories,
+        channels: mappedChannels,
+        categories: categories, // ✅ Retourner TOUTES les catégories (interface affichera cadenas)
         totalChannels: playlist.channelsCount,
       };
     } catch (error) {
@@ -289,23 +391,43 @@ class WatermelonXtreamService {
 
   /**
    * 🔍 Recherche de chaînes avec lazy loading et tri optimisé
+   * @param blockedCategories - Catégories à exclure (mode enfant)
    */
   async searchChannels(
     playlistId: string,
     query: string,
     limit: number = 500, // Réduit de 25000 à 500 pour cohérence pagination
+    blockedCategories?: string[],
   ) {
     try {
       const sanitized = Q.sanitizeLikeString(query);
-      return await database
+
+      // Charger plus si mode enfant
+      const fetchLimit =
+        blockedCategories && blockedCategories.length > 0 ? limit * 3 : limit;
+
+      let channels = await database
         .get<Channel>('channels')
         .query(
           Q.where('playlist_id', playlistId),
           Q.where('name', Q.like(`%${sanitized}%`)),
           Q.sortBy('name', Q.asc), // Tri alphabétique pour UX
-          Q.take(limit),
+          Q.take(fetchLimit),
         )
         .fetch();
+
+      // 🔒 FILTRAGE MODE ENFANT: Filtrer en JavaScript
+      if (blockedCategories && blockedCategories.length > 0) {
+        channels = channels.filter(ch => {
+          const groupTitle = (ch.groupTitle || '').toLowerCase();
+          return !blockedCategories.some(blocked =>
+            groupTitle.includes(blocked.toLowerCase()),
+          );
+        });
+        channels = channels.slice(0, limit);
+      }
+
+      return channels;
     } catch (error) {
       console.error('❌ Erreur recherche chaînes WatermelonDB:', error);
       throw error;
@@ -314,23 +436,42 @@ class WatermelonXtreamService {
 
   /**
    * 📺 Récupérer les chaînes par catégorie avec lazy loading
+   * @param blockedCategories - Catégories à exclure (mode enfant)
    */
   async getChannelsByCategory(
     playlistId: string,
     categoryId: string,
     limit: number = 500,
     offset: number = 0,
+    blockedCategories?: string[],
   ) {
     try {
-      return await database
+      // Charger plus si mode enfant
+      const fetchLimit =
+        blockedCategories && blockedCategories.length > 0 ? limit * 3 : limit;
+
+      let channels = await database
         .get<Channel>('channels')
         .query(
           Q.where('playlist_id', playlistId),
           Q.where('category_id', categoryId),
           Q.skip(offset),
-          Q.take(limit),
+          Q.take(fetchLimit),
         )
         .fetch();
+
+      // 🔒 FILTRAGE MODE ENFANT: Filtrer en JavaScript
+      if (blockedCategories && blockedCategories.length > 0) {
+        channels = channels.filter(ch => {
+          const groupTitle = (ch.groupTitle || '').toLowerCase();
+          return !blockedCategories.some(blocked =>
+            groupTitle.includes(blocked.toLowerCase()),
+          );
+        });
+        channels = channels.slice(0, limit);
+      }
+
+      return channels;
     } catch (error) {
       console.error('❌ Erreur récupération chaînes par catégorie:', error);
       throw error;
@@ -339,23 +480,42 @@ class WatermelonXtreamService {
 
   /**
    * ⭐ Récupérer les chaînes favorites avec SQL rapide
+   * @param blockedCategories - Catégories à exclure (mode enfant)
    */
   async getFavoriteChannels(
     playlistId: string,
     limit: number = 500,
     offset: number = 0,
+    blockedCategories?: string[],
   ) {
     try {
-      return await database
+      // Charger plus si mode enfant
+      const fetchLimit =
+        blockedCategories && blockedCategories.length > 0 ? limit * 3 : limit;
+
+      let channels = await database
         .get<Channel>('channels')
         .query(
           Q.where('playlist_id', playlistId),
           Q.where('is_favorite', true),
           Q.sortBy('last_watched', Q.desc), // Favoris récents en premier
           Q.skip(offset),
-          Q.take(limit),
+          Q.take(fetchLimit),
         )
         .fetch();
+
+      // 🔒 FILTRAGE MODE ENFANT: Filtrer en JavaScript
+      if (blockedCategories && blockedCategories.length > 0) {
+        channels = channels.filter(ch => {
+          const groupTitle = (ch.groupTitle || '').toLowerCase();
+          return !blockedCategories.some(blocked =>
+            groupTitle.includes(blocked.toLowerCase()),
+          );
+        });
+        channels = channels.slice(0, limit);
+      }
+
+      return channels;
     } catch (error) {
       console.error('❌ Erreur récupération favoris WatermelonDB:', error);
       throw error;
@@ -365,10 +525,7 @@ class WatermelonXtreamService {
   /**
    * 📺 Récupérer l'historique de visionnage avec SQL rapide
    */
-  async getRecentChannels(
-    playlistId: string,
-    limit: number = 20,
-  ) {
+  async getRecentChannels(playlistId: string, limit: number = 20) {
     try {
       return await database
         .get<Channel>('channels')
@@ -523,6 +680,53 @@ class WatermelonXtreamService {
         );
       }
       throw error;
+    }
+  }
+
+  /**
+   * 🔍 Trouver l'index d'une chaîne dans la playlist (pour window loading)
+   * Version OPTIMISÉE : Utilise uniquement la récupération de l'ID pour trouver la position
+   * Sans charger toutes les chaînes en mémoire
+   */
+  async findChannelIndex(
+    playlistId: string,
+    channelId: string,
+    categoryId?: string,
+    blockedCategories?: string[],
+  ): Promise<number> {
+    try {
+      const startTime = Date.now();
+      console.log(`🔍 [findChannelIndex] Recherche index pour chaîne: ${channelId}`);
+
+      // 🚀 OPTIMISATION: Récupérer uniquement les IDs (pas les données complètes)
+      // Cela réduit drastiquement la mémoire utilisée
+      let queryConditions = [Q.where('playlist_id', playlistId)];
+
+      // Si catégorie spécifique (pas "all"), filtrer par catégorie
+      if (categoryId && categoryId !== 'all') {
+        queryConditions.push(Q.where('category_id', categoryId));
+      }
+
+      const allChannelIds = await database
+        .get<Channel>('channels')
+        .query(...queryConditions)
+        .fetch();
+
+      // Trouver l'index de la chaîne cible
+      const index = allChannelIds.findIndex(ch => ch.id === channelId);
+
+      const duration = Date.now() - startTime;
+
+      if (index === -1) {
+        console.warn(`⚠️ [findChannelIndex] Chaîne ${channelId} non trouvée (${duration}ms)`);
+        return 0; // Retourner 0 si non trouvé (début de la liste)
+      }
+
+      console.log(`✅ [findChannelIndex] Chaîne trouvée à l'index: ${index}/${allChannelIds.length} en ${duration}ms`);
+      return index;
+    } catch (error) {
+      console.error('❌ [findChannelIndex] Erreur:', error);
+      return 0; // Fallback vers le début
     }
   }
 }

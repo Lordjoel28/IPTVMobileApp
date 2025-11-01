@@ -12,12 +12,15 @@ import type {RootStackParamList} from '../types';
 
 // Screens
 import HomeScreen from '../screens/HomeScreen'; // Votre interface originale
+import AddProfileScreen from '../screens/AddProfileScreen';
 import ChannelListScreen from '../screens/ChannelListScreen';
 import ChannelPlayerScreen from '../screens/ChannelPlayerScreen';
 import PlaylistsScreen from '../screens/PlaylistsScreen';
 import FavoritesScreen from '../screens/FavoritesScreen';
-import SearchScreen from '../screens/SearchScreen';
+import FinalSearchScreenWrapper from '../screens/FinalSearchScreenWrapper';
 import SettingsScreen from '../screens/SettingsScreen';
+import AccountScreen from '../screens/AccountScreen';
+import AccountInfoScreen from '../screens/AccountInfoScreen';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -56,6 +59,16 @@ const SimpleAppNavigator: React.FC = () => {
         options={{
           title: '📱 IPTV Mobile',
           headerShown: false, // Interface custom dans HomeScreen
+        }}
+      />
+
+      {/* Ajouter un profil */}
+      <Stack.Screen
+        name="AddProfile"
+        component={AddProfileScreen}
+        options={{
+          title: 'Ajouter un profil',
+          headerBackTitleVisible: false,
         }}
       />
 
@@ -105,20 +118,14 @@ const SimpleAppNavigator: React.FC = () => {
         }}
       />
 
-      {/* Recherche */}
+      {/* Recherche optimisée FinalSearch */}
       <Stack.Screen
-        name="Search"
-        component={SearchScreen}
+        name="FinalSearch"
+        component={FinalSearchScreenWrapper}
         options={{
-          title: 'Recherche',
-          headerRight: () => (
-            <Icon
-              name="filter-list"
-              size={24}
-              color="#FFFFFF"
-              style={{marginRight: 15}}
-            />
-          ),
+          title: 'Recherche Optimisée',
+          headerShown: false, // Interface custom dans FinalSearchScreen
+          gestureEnabled: false,
         }}
       />
 
@@ -136,6 +143,26 @@ const SimpleAppNavigator: React.FC = () => {
               style={{marginRight: 15}}
             />
           ),
+        }}
+      />
+
+      {/* Compte */}
+      <Stack.Screen
+        name="Account"
+        component={AccountScreen}
+        options={{
+          title: 'Mon Compte',
+          headerShown: false, // Interface custom dans AccountScreen
+        }}
+      />
+
+      {/* Informations du compte */}
+      <Stack.Screen
+        name="AccountInfo"
+        component={AccountInfoScreen}
+        options={{
+          title: 'Informations du compte',
+          headerShown: false, // Interface custom dans AccountInfoScreen
         }}
       />
     </Stack.Navigator>

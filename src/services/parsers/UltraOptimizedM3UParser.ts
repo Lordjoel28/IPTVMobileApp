@@ -9,12 +9,14 @@ export interface Channel {
   name: string;
   url: string;
   logo?: string;
+  group?: string;
   category?: string;
   quality?: string;
   language?: string;
   country?: string;
   tvgId?: string;
   groupTitle?: string;
+  type?: 'M3U' | 'XTREAM';
 }
 
 export interface ParseResult {

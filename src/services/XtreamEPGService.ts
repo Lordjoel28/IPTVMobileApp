@@ -119,7 +119,7 @@ class XtreamEPGService {
     } catch (error) {
       if (error.name === 'AbortError') {
         console.error(
-          "❌ [XtreamEPG] Timeout de 15s dépassé pour le téléchargement EPG depuis:",
+          '❌ [XtreamEPG] Timeout de 15s dépassé pour le téléchargement EPG depuis:',
           credentials.server,
         );
       } else {

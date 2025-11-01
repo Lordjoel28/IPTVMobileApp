@@ -3,8 +3,8 @@
  * Modèle SQLite pour les programmes EPG
  */
 
-import { Model } from '@nozbe/watermelondb';
-import { field, readonly, date } from '@nozbe/watermelondb/decorators';
+import {Model} from '@nozbe/watermelondb';
+import {field, readonly, date} from '@nozbe/watermelondb/decorators';
 
 export default class EPGProgramme extends Model {
   static table = 'epg_programmes';

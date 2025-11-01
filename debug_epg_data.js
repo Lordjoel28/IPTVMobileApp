@@ -20,10 +20,10 @@ const simulateEPGData = () => {
   const shortTitleEPG = {
     currentProgram: {
       id: 'real-123',
-      title: 'JT',  // ← Titre trop court selon ancienne validation
+      title: 'JT', // ← Titre trop court selon ancienne validation
       description: '',
       startTime: new Date().toISOString(),
-      endTime: new Date(Date.now() + 60*60*1000).toISOString(),
+      endTime: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
     },
     nextProgram: null,
     progressPercentage: 45,
@@ -37,16 +37,16 @@ const simulateEPGData = () => {
     currentProgram: {
       id: 'real-456',
       title: 'Journal de 20h',
-      description: '',  // ← Description vide
+      description: '', // ← Description vide
       startTime: new Date().toISOString(),
-      endTime: new Date(Date.now() + 60*60*1000).toISOString(),
+      endTime: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
     },
     nextProgram: {
       id: 'real-457',
       title: 'Koh-Lanta',
-      description: 'Court',  // ← Description courte
-      startTime: new Date(Date.now() + 60*60*1000).toISOString(),
-      endTime: new Date(Date.now() + 2*60*60*1000).toISOString(),
+      description: 'Court', // ← Description courte
+      startTime: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      endTime: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
     },
     progressPercentage: 75,
     remainingMinutes: 15,
@@ -65,7 +65,9 @@ const simulateEPGData = () => {
   testNewValidation(shortTitleEPG, 'Titre court');
   testNewValidation(noDescriptionEPG, 'Sans description');
 
-  console.log('\n✅ Solution: La nouvelle validation accepte plus de données EPG réelles');
+  console.log(
+    '\n✅ Solution: La nouvelle validation accepte plus de données EPG réelles',
+  );
   console.log('=================================\n');
 };
 
@@ -76,13 +78,16 @@ function testOldValidation(data, caseName) {
     return;
   }
 
-  const isValid = (
+  const isValid =
     data.currentProgram.title.length > 3 &&
     !data.currentProgram.title.includes('...') &&
-    data.currentProgram.description.length > 10  // ← PROBLÈME ICI
-  );
+    data.currentProgram.description.length > 10; // ← PROBLÈME ICI
 
-  console.log(`${isValid ? '✅' : '❌'} ${caseName}: ${data.currentProgram.title} (desc: ${data.currentProgram.description?.length || 0} chars)`);
+  console.log(
+    `${isValid ? '✅' : '❌'} ${caseName}: ${
+      data.currentProgram.title
+    } (desc: ${data.currentProgram.description?.length || 0} chars)`,
+  );
 }
 
 // Nouvelle validation (assouplie)
@@ -92,16 +97,19 @@ function testNewValidation(data, caseName) {
     return;
   }
 
-  const isValid = (
-    data.currentProgram.title.length > 1 &&  // ← Plus tolérant
+  const isValid =
+    data.currentProgram.title.length > 1 && // ← Plus tolérant
     !data.currentProgram.title.includes('...') &&
     data.currentProgram.title !== 'N/A' &&
     data.currentProgram.title !== 'null' &&
-    data.currentProgram.title !== ''
-    // ← Plus de vérification description obligatoire
-  );
+    data.currentProgram.title !== '';
+  // ← Plus de vérification description obligatoire
 
-  console.log(`${isValid ? '✅' : '❌'} ${caseName}: ${data.currentProgram.title} (ACCEPTÉ)`);
+  console.log(
+    `${isValid ? '✅' : '❌'} ${caseName}: ${
+      data.currentProgram.title
+    } (ACCEPTÉ)`,
+  );
 }
 
 // Exécuter le debug

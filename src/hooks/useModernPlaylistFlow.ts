@@ -29,7 +29,7 @@ export const useModernPlaylistFlow = () => {
     selectedPlaylistId,
     loadPlaylist,
     selectCategory,
-    clearAll, 
+    clearAll,
   } = usePlaylistStore();
 
   /**
@@ -90,10 +90,10 @@ export const useModernPlaylistFlow = () => {
       } catch (error) {
         console.error('🔄 MODERN FLOW - Error:', error);
 
-      hideLoading();
+        hideLoading();
         showNotification('❌ Erreur dans le flux moderne', 'error', 5000);
 
-      return false;
+        return false;
       }
     },
     [showLoading, updateLoading, hideLoading, showNotification, loadPlaylist],
@@ -187,15 +187,14 @@ export const useModernPlaylistFlow = () => {
       } catch (error) {
         console.error('🚀🚀 STREAMING FLOW - Error:', error);
 
-      hideLoading();
+        hideLoading();
         showNotification(
           '❌ Erreur parser streaming - fallback vers parser standard',
           'error',
           5000,
         );
 
-
-      // Fallback sur méthode standard
+        // Fallback sur méthode standard
         console.log('🔄 Falling back to standard import');
         return await importPlaylistModern(url, name);
       }
@@ -229,7 +228,6 @@ export const useModernPlaylistFlow = () => {
         console.log(
           '📋 SERVICE LAYER - Category filtering logic could go here',
         );
-
 
         // 3. 🏪 Store Update - State Management
         console.log('🏪 STORE LAYER - Updating selected category');

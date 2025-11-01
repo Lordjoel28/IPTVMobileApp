@@ -10,7 +10,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { PlaylistMetadata } from '../playlist/PlaylistManager';
+import {PlaylistMetadata} from '../playlist/PlaylistManager';
 
 export interface EPGSource {
   id: string;
@@ -50,9 +50,11 @@ export class EPGSourceManager {
    */
   async getBestEPGSource(
     playlistId: string,
-    playlistMetadata?: PlaylistMetadata
+    playlistMetadata?: PlaylistMetadata,
   ): Promise<EPGSourceResult> {
-    console.log(`🔍 Recherche meilleure source EPG pour playlist: ${playlistId}`);
+    console.log(
+      `🔍 Recherche meilleure source EPG pour playlist: ${playlistId}`,
+    );
 
     // 1. PRIORITÉ 1: EPG intégré (url-tvg)
     if (playlistMetadata?.epgUrl) {
@@ -67,7 +69,7 @@ export class EPGSourceManager {
           status: 'active',
         },
         priority: 1,
-        reason: 'EPG intégré à la playlist (url-tvg)'
+        reason: 'EPG intégré à la playlist (url-tvg)',
       };
     }
 
@@ -78,7 +80,7 @@ export class EPGSourceManager {
       return {
         source: manualEPG,
         priority: 2,
-        reason: 'EPG assigné manuellement par l\'utilisateur'
+        reason: "EPG assigné manuellement par l'utilisateur",
       };
     }
 
@@ -89,7 +91,7 @@ export class EPGSourceManager {
       return {
         source: globalEPG,
         priority: 3,
-        reason: 'EPG global (solution de secours)'
+        reason: 'EPG global (solution de secours)',
       };
     }
 
@@ -98,7 +100,7 @@ export class EPGSourceManager {
     return {
       source: null,
       priority: 0,
-      reason: 'Aucune source EPG configurée'
+      reason: 'Aucune source EPG configurée',
     };
   }
 
@@ -108,7 +110,7 @@ export class EPGSourceManager {
   async assignManualEPG(
     playlistId: string,
     playlistName: string,
-    epgUrl: string
+    epgUrl: string,
   ): Promise<boolean> {
     try {
       console.log(`📝 Assignation EPG manuel: ${playlistId} -> ${epgUrl}`);
@@ -143,7 +145,6 @@ export class EPGSourceManager {
 
       console.log('✅ EPG manuel assigné avec succès');
       return true;
-
     } catch (error) {
       console.error('❌ Erreur assignation EPG manuel:', error);
       return false;
@@ -153,17 +154,24 @@ export class EPGSourceManager {
   /**
    * Récupère l'EPG manuel assigné à une playlist
    */
-  private async getManualEPGForPlaylist(playlistId: string): Promise<EPGSource | null> {
+  private async getManualEPGForPlaylist(
+    playlistId: string,
+  ): Promise<EPGSource | null> {
     try {
       const sourcesData = await AsyncStorage.getItem(
-        EPGSourceManager.STORAGE_KEYS.MANUAL_EPG_SOURCES
+        EPGSourceManager.STORAGE_KEYS.MANUAL_EPG_SOURCES,
       );
 
-      if (!sourcesData) return null;
+      if (!sourcesData) {
+        return null;
+      }
 
       const sources: EPGSource[] = JSON.parse(sourcesData);
-      return sources.find(s => s.playlistId === playlistId && s.status === 'active') || null;
-
+      return (
+        sources.find(
+          s => s.playlistId === playlistId && s.status === 'active',
+        ) || null
+      );
     } catch (error) {
       console.error('❌ Erreur récupération EPG manuel:', error);
       return null;
@@ -175,29 +183,35 @@ export class EPGSourceManager {
    */
   private async saveManualEPGSource(epgSource: EPGSource): Promise<void> {
     const sourcesData = await AsyncStorage.getItem(
-      EPGSourceManager.STORAGE_KEYS.MANUAL_EPG_SOURCES
+      EPGSourceManager.STORAGE_KEYS.MANUAL_EPG_SOURCES,
     );
 
     let sources: EPGSource[] = sourcesData ? JSON.parse(sourcesData) : [];
 
     // CORRECTION: Chercher et supprimer la source originale non-assignée avec la même URL.
     // C'est l'étape qui empêche la duplication.
-    const unassignedIndex = sources.findIndex(s => s.url === epgSource.url && !s.playlistId);
+    const unassignedIndex = sources.findIndex(
+      s => s.url === epgSource.url && !s.playlistId,
+    );
 
     if (unassignedIndex !== -1) {
-      console.log('ℹ️ [EPGSourceManager] Suppression de la source non-assignée dupliquée pour la remplacer par l\'assignation.');
+      console.log(
+        "ℹ️ [EPGSourceManager] Suppression de la source non-assignée dupliquée pour la remplacer par l'assignation.",
+      );
       sources.splice(unassignedIndex, 1);
     }
 
     // Supprimer l'ancienne assignation pour cette playlist (si elle existait)
-    const updatedSources = sources.filter(s => s.playlistId !== epgSource.playlistId);
+    const updatedSources = sources.filter(
+      s => s.playlistId !== epgSource.playlistId,
+    );
 
     // Ajouter la nouvelle source (l'assignation)
     updatedSources.push(epgSource);
 
     await AsyncStorage.setItem(
       EPGSourceManager.STORAGE_KEYS.MANUAL_EPG_SOURCES,
-      JSON.stringify(updatedSources)
+      JSON.stringify(updatedSources),
     );
   }
 
@@ -206,13 +220,15 @@ export class EPGSourceManager {
    */
   private async updatePlaylistEPGConfig(
     playlistId: string,
-    config: Partial<PlaylistEPGConfig>
+    config: Partial<PlaylistEPGConfig>,
   ): Promise<void> {
     const configData = await AsyncStorage.getItem(
-      EPGSourceManager.STORAGE_KEYS.PLAYLIST_EPG_CONFIG
+      EPGSourceManager.STORAGE_KEYS.PLAYLIST_EPG_CONFIG,
     );
 
-    const configs: Record<string, PlaylistEPGConfig> = configData ? JSON.parse(configData) : {};
+    const configs: Record<string, PlaylistEPGConfig> = configData
+      ? JSON.parse(configData)
+      : {};
 
     // Fusionner avec configuration existante
     configs[playlistId] = {
@@ -223,7 +239,7 @@ export class EPGSourceManager {
 
     await AsyncStorage.setItem(
       EPGSourceManager.STORAGE_KEYS.PLAYLIST_EPG_CONFIG,
-      JSON.stringify(configs)
+      JSON.stringify(configs),
     );
   }
 
@@ -233,14 +249,15 @@ export class EPGSourceManager {
   private async getGlobalEPGStatus(): Promise<EPGSource | null> {
     try {
       const statusData = await AsyncStorage.getItem(
-        EPGSourceManager.STORAGE_KEYS.GLOBAL_EPG_STATUS
+        EPGSourceManager.STORAGE_KEYS.GLOBAL_EPG_STATUS,
       );
 
-      if (!statusData) return null;
+      if (!statusData) {
+        return null;
+      }
 
       const globalEPG: EPGSource = JSON.parse(statusData);
       return globalEPG.status === 'active' ? globalEPG : null;
-
     } catch (error) {
       console.error('❌ Erreur récupération EPG global:', error);
       return null;
@@ -269,7 +286,7 @@ export class EPGSourceManager {
 
       // Sources manuelles
       const manualData = await AsyncStorage.getItem(
-        EPGSourceManager.STORAGE_KEYS.MANUAL_EPG_SOURCES
+        EPGSourceManager.STORAGE_KEYS.MANUAL_EPG_SOURCES,
       );
       if (manualData) {
         sources.push(...JSON.parse(manualData));
@@ -282,7 +299,6 @@ export class EPGSourceManager {
       }
 
       return sources;
-
     } catch (error) {
       console.error('❌ Erreur récupération sources EPG:', error);
       return [];
@@ -296,7 +312,7 @@ export class EPGSourceManager {
     try {
       // Supprimer source manuelle
       const sourcesData = await AsyncStorage.getItem(
-        EPGSourceManager.STORAGE_KEYS.MANUAL_EPG_SOURCES
+        EPGSourceManager.STORAGE_KEYS.MANUAL_EPG_SOURCES,
       );
 
       if (sourcesData) {
@@ -305,7 +321,7 @@ export class EPGSourceManager {
 
         await AsyncStorage.setItem(
           EPGSourceManager.STORAGE_KEYS.MANUAL_EPG_SOURCES,
-          JSON.stringify(updatedSources)
+          JSON.stringify(updatedSources),
         );
       }
 
@@ -318,7 +334,6 @@ export class EPGSourceManager {
 
       console.log(`✅ Assignation EPG supprimée pour playlist: ${playlistId}`);
       return true;
-
     } catch (error) {
       console.error('❌ Erreur suppression assignation EPG:', error);
       return false;
@@ -340,7 +355,9 @@ export class EPGSourceManager {
       totalSources: allSources.length,
       integratedCount: allSources.filter(s => s.type === 'integrated').length,
       manualCount: allSources.filter(s => s.type === 'manual').length,
-      globalAvailable: allSources.some(s => s.type === 'global' && s.status === 'active'),
+      globalAvailable: allSources.some(
+        s => s.type === 'global' && s.status === 'active',
+      ),
     };
   }
 
@@ -350,14 +367,15 @@ export class EPGSourceManager {
   async getManualSources(): Promise<EPGSource[]> {
     try {
       const sourcesData = await AsyncStorage.getItem(
-        EPGSourceManager.STORAGE_KEYS.MANUAL_EPG_SOURCES
+        EPGSourceManager.STORAGE_KEYS.MANUAL_EPG_SOURCES,
       );
 
-      if (!sourcesData) return [];
+      if (!sourcesData) {
+        return [];
+      }
 
       const sources: EPGSource[] = JSON.parse(sourcesData);
       return sources.filter(s => s.type === 'manual');
-
     } catch (error) {
       console.error('❌ Erreur récupération sources manuelles:', error);
       return [];
@@ -382,7 +400,7 @@ export class EPGSourceManager {
 
       // Récupérer sources existantes
       const sourcesData = await AsyncStorage.getItem(
-        EPGSourceManager.STORAGE_KEYS.MANUAL_EPG_SOURCES
+        EPGSourceManager.STORAGE_KEYS.MANUAL_EPG_SOURCES,
       );
       const sources: EPGSource[] = sourcesData ? JSON.parse(sourcesData) : [];
 
@@ -390,7 +408,9 @@ export class EPGSourceManager {
       const existingSource = sources.find(s => s.url === cleanUrl);
 
       if (existingSource) {
-        console.log(`🔄 Source EPG avec URL existante trouvée, mise à jour du nom: ${cleanUrl}`);
+        console.log(
+          `🔄 Source EPG avec URL existante trouvée, mise à jour du nom: ${cleanUrl}`,
+        );
 
         // Mettre à jour le nom de la source existante
         existingSource.name = sourceData.name.trim();
@@ -399,10 +419,12 @@ export class EPGSourceManager {
         // Sauvegarder
         await AsyncStorage.setItem(
           EPGSourceManager.STORAGE_KEYS.MANUAL_EPG_SOURCES,
-          JSON.stringify(sources)
+          JSON.stringify(sources),
         );
 
-        console.log(`✅ Source EPG manuelle mise à jour: ${existingSource.name}`);
+        console.log(
+          `✅ Source EPG manuelle mise à jour: ${existingSource.name}`,
+        );
         return existingSource;
       }
 
@@ -423,12 +445,11 @@ export class EPGSourceManager {
       // Sauvegarder
       await AsyncStorage.setItem(
         EPGSourceManager.STORAGE_KEYS.MANUAL_EPG_SOURCES,
-        JSON.stringify(sources)
+        JSON.stringify(sources),
       );
 
       console.log(`✅ Source EPG manuelle ajoutée: ${newSource.name}`);
       return newSource;
-
     } catch (error) {
       console.error('❌ Erreur ajout source manuelle:', error);
       throw error;
@@ -438,10 +459,13 @@ export class EPGSourceManager {
   /**
    * Met à jour une source EPG manuelle existante
    */
-  async updateManualSource(sourceId: string, updateData: {
-    name?: string;
-    url?: string;
-  }): Promise<void> {
+  async updateManualSource(
+    sourceId: string,
+    updateData: {
+      name?: string;
+      url?: string;
+    },
+  ): Promise<void> {
     try {
       // Valider l'URL si fournie
       if (updateData.url && !this.validateEPGUrl(updateData.url)) {
@@ -450,7 +474,7 @@ export class EPGSourceManager {
 
       // Récupérer sources existantes
       const sourcesData = await AsyncStorage.getItem(
-        EPGSourceManager.STORAGE_KEYS.MANUAL_EPG_SOURCES
+        EPGSourceManager.STORAGE_KEYS.MANUAL_EPG_SOURCES,
       );
 
       if (!sourcesData) {
@@ -476,11 +500,10 @@ export class EPGSourceManager {
       // Sauvegarder
       await AsyncStorage.setItem(
         EPGSourceManager.STORAGE_KEYS.MANUAL_EPG_SOURCES,
-        JSON.stringify(sources)
+        JSON.stringify(sources),
       );
 
       console.log(`✅ Source EPG manuelle mise à jour: ${sourceId}`);
-
     } catch (error) {
       console.error('❌ Erreur mise à jour source manuelle:', error);
       throw error;
@@ -494,7 +517,7 @@ export class EPGSourceManager {
     try {
       // Récupérer sources existantes
       const sourcesData = await AsyncStorage.getItem(
-        EPGSourceManager.STORAGE_KEYS.MANUAL_EPG_SOURCES
+        EPGSourceManager.STORAGE_KEYS.MANUAL_EPG_SOURCES,
       );
 
       if (!sourcesData) {
@@ -511,11 +534,10 @@ export class EPGSourceManager {
       // Sauvegarder
       await AsyncStorage.setItem(
         EPGSourceManager.STORAGE_KEYS.MANUAL_EPG_SOURCES,
-        JSON.stringify(updatedSources)
+        JSON.stringify(updatedSources),
       );
 
       console.log(`✅ Source EPG manuelle supprimée: ${sourceId}`);
-
     } catch (error) {
       console.error('❌ Erreur suppression source manuelle:', error);
       throw error;
@@ -537,7 +559,7 @@ export class EPGSourceManager {
       if (!this.validateEPGUrl(url)) {
         return {
           success: false,
-          error: 'URL invalide'
+          error: 'URL invalide',
         };
       }
 
@@ -555,29 +577,32 @@ export class EPGSourceManager {
       if (!response.ok) {
         return {
           success: false,
-          error: `Erreur HTTP: ${response.status}`
+          error: `Erreur HTTP: ${response.status}`,
         };
       }
 
       // Vérifier le type de contenu
       const contentType = response.headers.get('content-type');
-      if (contentType && !contentType.includes('xml') && !contentType.includes('text')) {
+      if (
+        contentType &&
+        !contentType.includes('xml') &&
+        !contentType.includes('text')
+      ) {
         return {
           success: false,
-          error: 'Le contenu ne semble pas être un fichier XML'
+          error: 'Le contenu ne semble pas être un fichier XML',
         };
       }
 
       console.log(`✅ Source EPG accessible: ${url}`);
       return {
-        success: true
+        success: true,
       };
-
     } catch (error) {
       console.error('❌ Erreur test source EPG:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Erreur inconnue'
+        error: error instanceof Error ? error.message : 'Erreur inconnue',
       };
     }
   }

@@ -15,7 +15,7 @@ import {
   Image,
   Modal,
   Alert,
-}from 'react-native';
+} from 'react-native';
 import SystemNavigationBar from 'react-native-system-navigation-bar';
 // Solution native MainActivity.java pour immersif
 import LinearGradient from 'react-native-linear-gradient';
@@ -28,16 +28,26 @@ import XtreamCodeModal from './src/components/XtreamCodeModal';
 import M3UUrlModal from './src/components/M3UUrlModal';
 import ProfilesModal from './src/components/ProfilesModal';
 import MultiScreenView from './src/components/MultiScreenView';
+import ProfileSelectionScreen from './src/screens/ProfileSelectionScreen';
+import ProfileManagementModal from './src/components/ProfileManagementModal';
+import AddProfileModal from './src/components/AddProfileModal';
+// GlobalVideoPlayer géré par App.tsx (instance principale) - import supprimé pour éviter la duplication
 // import { ServiceTest } from './src/components/ServiceTest'; // Removed for production
 
 // 🔧 DEBUG: Script pour vider le cache EPG (test 1er démarrage TiviMate)
 import './clearEPGCache';
-import type {Channel} from './src/types';
+import type {Channel, Profile} from './src/types';
+
+// 👤 Import ProfileService pour gestion des profils
+import ProfileService from './src/services/ProfileService';
+import SimplePinModal from './src/components/SimplePinModal';
 // import { APP_VERSION } from './src/version'; // Removed for production
 // AppContext removed - using UIStore instead
 import {useUIStore} from './src/stores/UIStore';
+import {usePlayerStore} from './src/stores/PlayerStore';
 import {useGlobalImmersion} from './src/hooks/useGlobalImmersion';
-import { useStatusBar } from './src/hooks/useStatusBar';
+import {useStatusBar} from './src/hooks/useStatusBar';
+import {useTheme} from './src/contexts/ThemeContext';
 
 // Import des nouveaux services migrés
 import IPTVService from './src/services/IPTVService';
@@ -85,7 +95,10 @@ const App: React.FC = () => {
   useGlobalImmersion();
 
   // StatusBar normale pour l'écran d'accueil (sera surchargée par les écrans immersifs)
-  const { setNormal } = useStatusBar();
+  const {setNormal} = useStatusBar();
+
+  // Hook pour gérer le thème par profil
+  const {loadProfileTheme} = useTheme();
 
   useEffect(() => {
     setNormal('App_HomeScreen');
@@ -99,6 +112,9 @@ const App: React.FC = () => {
     showNotification,
     registerModalCloser,
   } = useUIStore();
+
+  // PlayerStore pour contrôler le GlobalVideoPlayer
+  const {actions: playerActions} = usePlayerStore();
 
   const [showVideoPlayer, setShowVideoPlayer] = useState(false);
   const [currentChannel, setCurrentChannel] = useState<Channel | null>(null);
@@ -115,6 +131,11 @@ const App: React.FC = () => {
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<
     string | undefined
   >();
+
+  // États pour le contrôle parental
+  const [activeProfileForPIN, setActiveProfileForPIN] = useState<Profile | null>(null);
+  const [showPinModal, setShowPinModal] = useState(false);
+
   const [playlistInfo, setPlaylistInfo] = useState<{
     name: string;
     expirationDate: string | null;
@@ -122,6 +143,17 @@ const App: React.FC = () => {
   const [showMultiScreen, setShowMultiScreen] = useState(false);
   // 🧪 État pour le test du système DI
   // const [showServiceTest, setShowServiceTest] = useState(false); // Removed for production
+
+  // 👤 États pour le système de profils
+  const [currentProfile, setCurrentProfile] = useState<Profile | null>(null);
+  const [profilesInitialized, setProfilesInitialized] = useState(false);
+  const [showProfileSelection, setShowProfileSelection] = useState(false);
+  const [showProfileManagement, setShowProfileManagement] = useState(false);
+  const [showAddProfile, setShowAddProfile] = useState(false);
+  const [profilesRefreshKey, setProfilesRefreshKey] = useState(0);
+  const [isInitializing, setIsInitializing] = useState(true); // État de chargement initial
+  const [editingProfile, setEditingProfile] = useState<Profile | null>(null);
+
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const cardsScale = useRef(
     [...Array(6)].map(() => new Animated.Value(1)),
@@ -147,6 +179,41 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
+    // 👤 Initialiser les profils en premier
+    const initProfiles = async () => {
+      try {
+        console.log('🔄 Démarrage initialisation des profils...');
+        const profile = await ProfileService.initializeProfiles();
+
+        if (profile) {
+          // Profil chargé automatiquement
+          console.log('✅ Profil existant trouvé:', profile.name);
+          setCurrentProfile(profile);
+          setActiveProfileForPIN(profile); // Pour le contrôle parental
+          // Charger le thème du profil
+          await loadProfileTheme(profile.id);
+          setProfilesInitialized(true);
+          console.log('✅ Profil actif chargé');
+        } else {
+          // Aucun profil trouvé - afficher écran de sélection
+          console.log('📋 Aucun profil - affichage sélection');
+          setShowProfileSelection(true);
+          setProfilesInitialized(true);
+        }
+      } catch (error) {
+        console.error('❌ Erreur initialisation profils:', error);
+        // En cas d'erreur, afficher quand même la sélection
+        setShowProfileSelection(true);
+        setProfilesInitialized(true);
+      } finally {
+        // Toujours marquer l'initialisation comme terminée
+        setIsInitializing(false);
+        console.log('✅ Initialisation terminée');
+      }
+    };
+
+    initProfiles();
+
     // Mode immersif géré par StatusBarManager centralisé
 
     Animated.timing(fadeAnim, {
@@ -205,11 +272,18 @@ const App: React.FC = () => {
         console.log('🔄 Restauration playlist active depuis WatermelonDB...');
 
         // Récupérer l'ID de la dernière playlist sélectionnée
-        const AsyncStorage = await import('@react-native-async-storage/async-storage');
-        const lastSelectedId = await AsyncStorage.default.getItem('last_selected_playlist_id');
+        const AsyncStorage = await import(
+          '@react-native-async-storage/async-storage'
+        );
+        const lastSelectedId = await AsyncStorage.default.getItem(
+          'last_selected_playlist_id',
+        );
 
         if (lastSelectedId) {
-          console.log('🎯 ID playlist précédemment sélectionnée:', lastSelectedId);
+          console.log(
+            '🎯 ID playlist précédemment sélectionnée:',
+            lastSelectedId,
+          );
 
           // 🚀 CHARGER DEPUIS WATERMELONDB (nouveau système - pré-chargé)
           const playlistService = PlaylistService.getInstance();
@@ -218,11 +292,16 @@ const App: React.FC = () => {
           const targetPlaylist = playlists.find(p => p.id === lastSelectedId);
 
           if (targetPlaylist) {
-            console.log('✅ Playlist spécifique trouvée pour restauration:', targetPlaylist.name);
+            console.log(
+              '✅ Playlist spécifique trouvée pour restauration:',
+              targetPlaylist.name,
+            );
             setSelectedPlaylistId(targetPlaylist.id);
             console.log('✅ Active playlist restored successfully');
           } else {
-            console.log('⚠️ Playlist précédente introuvable, prendre la première disponible');
+            console.log(
+              '⚠️ Playlist précédente introuvable, prendre la première disponible',
+            );
             if (playlists.length > 0) {
               const firstPlaylist = playlists[0];
               setSelectedPlaylistId(firstPlaylist.id);
@@ -240,7 +319,10 @@ const App: React.FC = () => {
           if (playlists.length > 0) {
             const firstPlaylist = playlists[0];
             setSelectedPlaylistId(firstPlaylist.id);
-            console.log('✅ First available playlist restored:', firstPlaylist.name);
+            console.log(
+              '✅ First available playlist restored:',
+              firstPlaylist.name,
+            );
           } else {
             console.log('ℹ️ No playlist available to restore');
           }
@@ -328,6 +410,7 @@ const App: React.FC = () => {
           navigation.navigate('ChannelsScreen', {
             playlistId: selectedPlaylistId,
             channelsCount: playlist.channelsCount,
+            playlistType: playlist.type || 'M3U', // 🔧 CORRECTION: Passer le type de playlist
             useWatermelonDB: true, // Flag pour indiquer l'usage de WatermelonDB
           });
           return;
@@ -1006,7 +1089,10 @@ const App: React.FC = () => {
       console.log('🚀 Import DIRECT WatermelonDB (sans ancien système)...');
 
       // Étape 1: Télécharger le contenu M3U
-      updateLoading({progress: 10, subtitle: 'Téléchargement de la playlist...'});
+      updateLoading({
+        progress: 10,
+        subtitle: 'Téléchargement de la playlist...',
+      });
       await new Promise(resolve => setTimeout(resolve, 200));
 
       const playlistUrl = source.source || source.url;
@@ -1021,7 +1107,10 @@ const App: React.FC = () => {
       console.log(`📥 Téléchargé: ${Math.round(m3uContent.length / 1024)}KB`);
 
       // Étape 2: Import DIRECT dans WatermelonDB (un seul système - pré-chargé)
-      updateLoading({progress: 40, subtitle: 'Import dans la base de données...'});
+      updateLoading({
+        progress: 40,
+        subtitle: 'Import dans la base de données...',
+      });
 
       const playlistService = PlaylistService.getInstance();
 
@@ -1041,8 +1130,14 @@ const App: React.FC = () => {
       console.log('✅ Playlist importée dans WatermelonDB:', newPlaylistId);
 
       // Récupérer les infos de la playlist pour affichage
-      const WatermelonM3UService = (await import('./src/services/WatermelonM3UService')).default;
-      const playlistInfo = await WatermelonM3UService.getPlaylistWithChannels(newPlaylistId, 1, 0);
+      const WatermelonM3UService = (
+        await import('./src/services/WatermelonM3UService')
+      ).default;
+      const playlistInfo = await WatermelonM3UService.getPlaylistWithChannels(
+        newPlaylistId,
+        1,
+        0,
+      );
       const channelsCount = playlistInfo.totalChannels || 0;
 
       // Étape 3: Définir comme playlist active
@@ -1051,8 +1146,13 @@ const App: React.FC = () => {
       // Étape 4: Synchroniser avec AsyncStorage (juste l'ID)
       updateLoading({progress: 95, subtitle: 'Finalisation...'});
       try {
-        const AsyncStorage = await import('@react-native-async-storage/async-storage');
-        await AsyncStorage.default.setItem('last_selected_playlist_id', newPlaylistId);
+        const AsyncStorage = await import(
+          '@react-native-async-storage/async-storage'
+        );
+        await AsyncStorage.default.setItem(
+          'last_selected_playlist_id',
+          newPlaylistId,
+        );
         console.log('💾 ID playlist synchronisé:', newPlaylistId);
       } catch (syncError) {
         console.error('❌ Erreur synchronisation AsyncStorage:', syncError);
@@ -1186,10 +1286,51 @@ const App: React.FC = () => {
     // Activer la playlist et sauvegarder l'ID pour persistance
     setSelectedPlaylistId(playlist.id);
 
+    // 🔧 NOUVEAU: Synchroniser avec WatermelonDB - marquer la playlist comme active
+    try {
+      console.log('🔄 Mise à jour flag is_active dans WatermelonDB...');
+      const database = await import('./src/database');
+      const {Playlist} = await import('./src/database/models');
+
+      // Marquer la playlist sélectionnée comme active dans WatermelonDB
+      await database.default.write(async () => {
+        // D'abord, désactiver toutes les playlists
+        const allPlaylists = await database.default
+          .get<Playlist>('playlists')
+          .query()
+          .fetch();
+
+        for (const pl of allPlaylists) {
+          await pl.update(p => {
+            p.isActive = false;
+          });
+        }
+
+        // Puis, activer la playlist sélectionnée
+        const selectedPlaylist = await database.default
+          .get<Playlist>('playlists')
+          .find(playlist.id);
+
+        if (selectedPlaylist) {
+          await selectedPlaylist.update(p => {
+            p.isActive = true;
+          });
+          console.log('✅ Playlist marquée comme active dans WatermelonDB:', selectedPlaylist.name);
+        }
+      });
+    } catch (dbError) {
+      console.error('❌ Erreur mise à jour is_active WatermelonDB:', dbError);
+    }
+
     // Sauvegarder l'ID de playlist active pour restauration au redémarrage
     try {
-      const AsyncStorage = await import('@react-native-async-storage/async-storage');
-      await AsyncStorage.default.setItem('last_selected_playlist_id', playlist.id);
+      const AsyncStorage = await import(
+        '@react-native-async-storage/async-storage'
+      );
+      await AsyncStorage.default.setItem(
+        'last_selected_playlist_id',
+        playlist.id,
+      );
       console.log('💾 ID playlist active sauvegardé:', playlist.id);
     } catch (error) {
       console.error('❌ Erreur sauvegarde ID playlist active:', error);
@@ -1215,7 +1356,16 @@ const App: React.FC = () => {
   };
 
   const handleSettingsPress = () => {
-    console.log('⚙️ Navigation vers paramètres');
+    console.log('⚙️ Clic sur paramètres');
+
+    // 🔒 Contrôle parental pour les profils enfants
+    if (activeProfileForPIN?.isKids) {
+      console.log('🔒 Contrôle parental: Profil enfant détecté - PIN requis');
+      setShowPinModal(true);
+      return;
+    }
+
+    // Accès normal pour les profils adultes
     navigation.navigate('Settings');
   };
 
@@ -1226,7 +1376,7 @@ const App: React.FC = () => {
     if (!selectedPlaylistId) {
       Alert.alert(
         '📺 Aucune playlist',
-        'Veuillez d\'abord importer et sélectionner une playlist.',
+        "Veuillez d'abord importer et sélectionner une playlist.",
         [{text: 'OK'}],
       );
       return;
@@ -1238,7 +1388,9 @@ const App: React.FC = () => {
     // Log du temps d'ouverture
     requestAnimationFrame(() => {
       const endTime = performance.now();
-      console.log(`⏱️ [PERF] Modal ouvert en ${(endTime - startTime).toFixed(2)}ms`);
+      console.log(
+        `⏱️ [PERF] Modal ouvert en ${(endTime - startTime).toFixed(2)}ms`,
+      );
     });
   };
 
@@ -1248,11 +1400,160 @@ const App: React.FC = () => {
   };
 
   const handleMultiScreenFullscreen = (channel: Channel) => {
-    console.log('🎬 Passage en fullscreen depuis multi-écran:', channel.name);
-    setCurrentChannel(channel);
-    setShowVideoPlayer(true);
-    setShowMultiScreen(false);
+    console.log(
+      '🎬 Passage en fullscreen via GlobalVideoPlayer:',
+      channel.name,
+      'seekTime:',
+      channel.seekTime,
+    );
+
+    // ⚡ Utiliser le GlobalVideoPlayer via PlayerStore au lieu de l'ancien VideoPlayer
+    playerActions.playChannel(channel, selectedPlaylistId);
+    playerActions.setFromMultiScreen(true);
+    playerActions.setFullscreen(true);
+
+    // Fermer multi-écran après que le fullscreen soit actif
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        setShowMultiScreen(false);
+      }, 150);
+    });
   };
+
+  // 👤 Handlers pour le système de profils
+  const handleProfileSelect = async (profile: Profile) => {
+    console.log('👤 handleProfileSelect dans App_IPTV_SMARTERS.tsx');
+    console.log('✅ Profil sélectionné:', profile.name);
+    setCurrentProfile(profile);
+    setActiveProfileForPIN(profile); // 🔑 Mettre à jour le profil pour le contrôle parental
+    setShowProfileSelection(false);
+
+    // Charger le thème du profil
+    await loadProfileTheme(profile.id);
+  };
+
+  const handleOpenProfileManagement = () => {
+    setEditingProfile(null); // Assurez-vous qu'aucun profil n'est en cours d'édition
+    setShowProfileManagement(true);
+  };
+
+  const handleStartEditProfile = (profile: Profile) => {
+    setEditingProfile(profile);
+    setShowProfileManagement(true);
+  };
+
+  const handleCloseProfileManagement = () => {
+    setShowProfileManagement(false);
+    setEditingProfile(null); // Nettoyer le profil en cours d'édition
+    // Recharger le profil actif après modification
+    ProfileService.getActiveProfile().then(profile => {
+      if (profile) {
+        setCurrentProfile(profile);
+      }
+    });
+  };
+
+  const handleOpenPlaylistsFromSelection = () => {
+    console.log('👤 Ouverture directe ProfilesModal depuis ProfileSelection');
+    // Ne pas masquer l'écran de sélection, juste ouvrir le modal par-dessus
+    setShowProfilesModal(true);
+  };
+
+  const handleAddProfile = () => {
+    console.log('➕ Ouverture AddProfileModal');
+    setShowAddProfile(true);
+  };
+
+  const handleCloseAddProfile = () => {
+    setShowAddProfile(false);
+  };
+
+  const handleProfileCreated = async () => {
+    console.log('✅ Profil créé, rechargement de la liste');
+    // Recharger la liste des profils
+    const profiles = await ProfileService.getAllProfiles();
+    console.log('📋 Profils rechargés:', profiles.length);
+    // Incrémenter la clé de rafraîchissement pour forcer la mise à jour de ProfileSelectionScreen
+    setProfilesRefreshKey(prev => prev + 1);
+  };
+
+  // 🔄 Afficher écran de chargement pendant l'initialisation
+  if (isInitializing) {
+    return (
+      <View style={[styles.container, {backgroundColor: '#0a0e1a'}]}>
+        <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
+          <Text style={{color: '#FFFFFF', fontSize: 18, marginBottom: 12}}>
+            Chargement...
+          </Text>
+          <Text style={{color: 'rgba(255, 255, 255, 0.6)', fontSize: 14}}>
+            Initialisation de l'application
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  // Afficher écran de sélection si profils non initialisés, affichage demandé, OU aucun profil actif
+  if (!profilesInitialized || showProfileSelection || !currentProfile) {
+    return (
+      <>
+        <ProfileSelectionScreen
+          onProfileSelect={handleProfileSelect}
+          onManageProfiles={handleOpenProfileManagement}
+          onOpenPlaylists={handleOpenPlaylistsFromSelection}
+          onAddProfile={handleAddProfile}
+          onEditProfile={handleStartEditProfile} // Passer la nouvelle fonction
+          refreshKey={profilesRefreshKey}
+        />
+        <AddProfileModal
+          visible={showAddProfile}
+          onClose={handleCloseAddProfile}
+          onProfileCreated={handleProfileCreated}
+        />
+        <ProfileManagementModal
+          visible={showProfileManagement}
+          onClose={handleCloseProfileManagement}
+          onProfilesChanged={() => {
+            // Recharger les profils si nécessaire
+            ProfileService.getActiveProfile().then(profile => {
+              if (profile) {
+                setCurrentProfile(profile);
+              }
+            });
+            // Incrémenter la clé de rafraîchissement
+            setProfilesRefreshKey(prev => prev + 1);
+          }}
+          profileToEdit={editingProfile}
+          refreshKey={profilesRefreshKey}
+        />
+        {/* Modals de connexion déplacés ici pour être accessibles */}
+        <ConnectionModal
+          visible={showConnectionModal}
+          onClose={() => setShowConnectionModal(false)}
+          onXtreamConnect={handleXtreamConnect}
+          onM3UConnect={handleM3UConnect}
+          onUsersList={handleUsersList}
+        />
+        <XtreamCodeModal
+          visible={showXtreamModal}
+          onClose={handleXtreamClose}
+          onConnect={handleXtreamConnection}
+        />
+        <M3UUrlModal
+          visible={showM3UModal}
+          onClose={handleM3UClose}
+          onConnect={handleM3UConnection}
+        />
+        <ProfilesModal
+          visible={showProfilesModal}
+          onClose={handleProfilesClose}
+          onPlaylistSelect={handlePlaylistSelect}
+          onAddPlaylist={handleAddPlaylist}
+          selectedPlaylistId={selectedPlaylistId}
+        />
+      </>
+    );
+  }
 
   return (
     <LinearGradient
@@ -1263,15 +1564,23 @@ const App: React.FC = () => {
       style={styles.container}>
       {/* Effet grain de sable (noise texture) */}
       <View
-        style={[styles.absoluteFill, {
-          backgroundColor: 'transparent',
-          opacity: 0.08
-        }]}
+        style={[
+          styles.absoluteFill,
+          {
+            backgroundColor: 'transparent',
+            opacity: 0.08,
+          },
+        ]}
         pointerEvents="none">
-        <View style={[styles.absoluteFill, {
-          backgroundColor: '#000',
-          opacity: 0.5,
-        }]} />
+        <View
+          style={[
+            styles.absoluteFill,
+            {
+              backgroundColor: '#000',
+              opacity: 0.5,
+            },
+          ]}
+        />
       </View>
 
       {/* Dégradé radial - lumière centrale */}
@@ -1304,7 +1613,7 @@ const App: React.FC = () => {
           'rgba(20, 70, 150, 0.03)',
           'transparent',
         ]}
-        locations={[0, 0.10, 0.20, 0.32, 0.45, 0.60, 0.75, 0.88, 1]}
+        locations={[0, 0.1, 0.2, 0.32, 0.45, 0.6, 0.75, 0.88, 1]}
         start={{x: 0, y: 1}}
         end={{x: 0.65, y: 0.2}}
         style={styles.absoluteFill}
@@ -1314,18 +1623,7 @@ const App: React.FC = () => {
 
       <View style={styles.header}>
         <View style={styles.headerRight}>
-          <Pressable
-            style={({pressed}) => [
-              styles.headerIconButton,
-              pressed && {transform: [{scale: 0.9}]},
-            ]}
-            onPress={() => {
-              console.log('🔥 BOUTON CONNEXION!');
-              setShowConnectionModal(true);
-            }}>
-            <Icon name="person" size={24} color="#FFFFFF" />
-          </Pressable>
-          <Pressable
+            <Pressable
             style={({pressed}) => [
               styles.headerIconButton,
               pressed && {transform: [{scale: 0.9}]},
@@ -1349,11 +1647,7 @@ const App: React.FC = () => {
                 {({pressed}) => (
                   <>
                     <LinearGradient
-                      colors={[
-                        '#153963',
-                        '#334e71',
-                        '#506a7f',
-                      ]}
+                      colors={['#153963', '#334e71', '#506a7f']}
                       locations={[0, 0.5, 1]}
                       start={{x: 1, y: 0}}
                       end={{x: 0, y: 1}}
@@ -1375,7 +1669,10 @@ const App: React.FC = () => {
                         'rgba(50, 85, 125, 0.02)',
                         'transparent',
                       ]}
-                      locations={[0, 0.08, 0.15, 0.22, 0.28, 0.35, 0.42, 0.50, 0.60, 0.70, 0.85, 1]}
+                      locations={[
+                        0, 0.08, 0.15, 0.22, 0.28, 0.35, 0.42, 0.5, 0.6, 0.7,
+                        0.85, 1,
+                      ]}
                       start={{x: 0, y: 1}}
                       end={{x: 1, y: 0}}
                       style={styles.absoluteFill}
@@ -1417,11 +1714,7 @@ const App: React.FC = () => {
                   {({pressed}) => (
                     <>
                       <LinearGradient
-                        colors={[
-                          '#d97d3f',
-                          '#e38d4d',
-                          '#ed9d5b',
-                        ]}
+                        colors={['#d97d3f', '#e38d4d', '#ed9d5b']}
                         locations={[0, 0.5, 1]}
                         start={{x: 1, y: 0}}
                         end={{x: 0, y: 1}}
@@ -1443,7 +1736,10 @@ const App: React.FC = () => {
                           'rgba(205, 130, 70, 0.02)',
                           'transparent',
                         ]}
-                        locations={[0, 0.08, 0.15, 0.22, 0.28, 0.35, 0.42, 0.50, 0.60, 0.70, 0.85, 1]}
+                        locations={[
+                          0, 0.08, 0.15, 0.22, 0.28, 0.35, 0.42, 0.5, 0.6, 0.7,
+                          0.85, 1,
+                        ]}
                         start={{x: 0, y: 1}}
                         end={{x: 1, y: 0}}
                         style={styles.absoluteFill}
@@ -1484,11 +1780,7 @@ const App: React.FC = () => {
                   {({pressed}) => (
                     <>
                       <LinearGradient
-                        colors={[
-                          '#5d6185',
-                          '#4d5178',
-                          '#3d416b',
-                        ]}
+                        colors={['#5d6185', '#4d5178', '#3d416b']}
                         locations={[0, 0.5, 1]}
                         start={{x: 0, y: 0}}
                         end={{x: 1, y: 1}}
@@ -1496,10 +1788,7 @@ const App: React.FC = () => {
                         pointerEvents="none"
                       />
                       <LinearGradient
-                        colors={[
-                          'rgba(140, 160, 200, 0.3)',
-                          'transparent',
-                        ]}
+                        colors={['rgba(140, 160, 200, 0.3)', 'transparent']}
                         locations={[0, 0.5]}
                         start={{x: 0, y: 0}}
                         end={{x: 1, y: 0.5}}
@@ -1507,10 +1796,7 @@ const App: React.FC = () => {
                         pointerEvents="none"
                       />
                       <LinearGradient
-                        colors={[
-                          'rgba(255, 255, 255, 0.2)',
-                          'transparent',
-                        ]}
+                        colors={['rgba(255, 255, 255, 0.2)', 'transparent']}
                         locations={[0, 0.4]}
                         style={styles.premiumReflectionEffect}
                         pointerEvents="none"
@@ -1552,17 +1838,15 @@ const App: React.FC = () => {
                       if (card.key === 'multi') {
                         handleMultiScreenPress();
                       } else {
-                        console.log(`${card.title} CLICKED! - NAVIGATION FUTURE`);
+                        console.log(
+                          `${card.title} CLICKED! - NAVIGATION FUTURE`,
+                        );
                       }
                     }}>
                     {({pressed}) => (
                       <>
                         <LinearGradient
-                          colors={[
-                            '#3a404a',
-                            '#424852',
-                            '#4a525c',
-                          ]}
+                          colors={['#3a404a', '#424852', '#4a525c']}
                           locations={[0, 0.5, 1]}
                           start={{x: 0, y: 0}}
                           end={{x: 1, y: 1}}
@@ -1580,7 +1864,7 @@ const App: React.FC = () => {
                             'rgba(80, 90, 105, 0.02)',
                             'transparent',
                           ]}
-                          locations={[0, 0.15, 0.30, 0.45, 0.60, 0.75, 0.90, 1]}
+                          locations={[0, 0.15, 0.3, 0.45, 0.6, 0.75, 0.9, 1]}
                           start={{x: 0, y: 1}}
                           end={{x: 1, y: 0}}
                           style={styles.absoluteFill}
@@ -1595,7 +1879,9 @@ const App: React.FC = () => {
                             pointerEvents="none"
                           />
                         )}
-                        <View style={styles.cardContent} pointerEvents="box-none">
+                        <View
+                          style={styles.cardContent}
+                          pointerEvents="box-none">
                           <View
                             style={[
                               styles.iconWrapper,
@@ -1603,10 +1889,15 @@ const App: React.FC = () => {
                             ]}>
                             <Image
                               source={iconMap[card.key as keyof typeof iconMap]}
-                              style={[styles.iconImageSm, styles.liquidGlassIcon]}
+                              style={[
+                                styles.iconImageSm,
+                                styles.liquidGlassIcon,
+                              ]}
                             />
                           </View>
-                          <Text style={styles.modernSmallTitle}>{card.title}</Text>
+                          <Text style={styles.modernSmallTitle}>
+                            {card.title}
+                          </Text>
                         </View>
                       </>
                     )}
@@ -1620,33 +1911,72 @@ const App: React.FC = () => {
 
       {/* Footer avec informations playlist et utilisateur */}
       <View style={styles.footerSpace}>
-        {playlistInfo ? (
+        {currentProfile ? (
           <View style={styles.footerContent}>
-            {/* Section gauche: Date d'expiration */}
+            {/* Section gauche: Date d'expiration (conditionnelle) */}
             <View style={styles.footerLeft}>
-              <Text style={styles.footerLabel}>Expiration: </Text>
-              <Text style={styles.footerValue}>{playlistInfo.expirationDate}</Text>
+              {playlistInfo && (
+                <>
+                  <Text style={styles.footerLabel}>Expiration: </Text>
+                  <Text style={styles.footerValue}>
+                    {playlistInfo.expirationDate}
+                  </Text>
+                </>
+              )}
             </View>
 
-            {/* Section centre: Nom utilisateur */}
-            <View style={styles.footerCenter}>
-              <Icon name="person" size={18} color="rgba(255, 255, 255, 0.9)" />
-              <Text style={styles.footerUsername}>joel</Text>
-            </View>
+            {/* Section centre: Profil actif (toujours visible) */}
+            <Pressable
+              style={({pressed}) => [
+                styles.footerCenter,
+                pressed && {transform: [{scale: 0.95}]},
+              ]}
+              onPress={() => setShowProfileSelection(true)}>
+              <View style={styles.avatarWrapper}>
+                <Text style={styles.footerProfileAvatar}>
+                  {currentProfile.avatar || '👤'}
+                </Text>
+              </View>
+              <Text style={styles.footerUsername}>
+                {currentProfile.name || 'Profil'}
+              </Text>
+              <View
+                style={[
+                  styles.arrowButton,
+                  {backgroundColor: 'rgba(255, 255, 255, 0.05)'},
+                ]}>
+                <Icon
+                  name="expand-more"
+                  size={18}
+                  color="rgba(255, 255, 255, 0.7)"
+                />
+              </View>
+            </Pressable>
 
-            {/* Section droite: Nom playlist */}
+            {/* Section droite: Nom playlist (conditionnel) */}
             <View style={styles.footerRight}>
-              <Text style={styles.footerValue} numberOfLines={1} ellipsizeMode="tail">
-                Connecté: {playlistInfo.name}
+              <Text
+                style={styles.footerValue}
+                numberOfLines={1}
+                ellipsizeMode="tail">
+                {playlistInfo
+                  ? `Connecté: ${playlistInfo.name}`
+                  : 'Aucune playlist'}
               </Text>
             </View>
           </View>
         ) : (
-          <Text style={styles.footerPlaceholder}>Aucune playlist sélectionnée</Text>
+          // Fallback si aucun profil n'est sélectionné
+          <Text style={styles.footerPlaceholder}>
+            Aucune playlist sélectionnée
+          </Text>
         )}
       </View>
 
-      {/* Video Player Modal */}
+      {/* 🎬 GlobalVideoPlayer - Géré par App.tsx (instance principale) */}
+      {/* L'instance dupliquée a été supprimée pour corriger le double PIP */}
+
+      {/* Video Player Modal - Ancien système (conservé pour compatibilité) */}
       <Modal
         visible={showVideoPlayer}
         animationType="slide"
@@ -1670,38 +2000,6 @@ const App: React.FC = () => {
         </View>
       </Modal>
 
-      {/* Connection Modal */}
-      <ConnectionModal
-        visible={showConnectionModal}
-        onClose={() => setShowConnectionModal(false)}
-        onXtreamConnect={handleXtreamConnect}
-        onM3UConnect={handleM3UConnect}
-        onUsersList={handleUsersList}
-      />
-
-      {/* Xtream Codes Modal */}
-      <XtreamCodeModal
-        visible={showXtreamModal}
-        onClose={handleXtreamClose}
-        onConnect={handleXtreamConnection}
-      />
-
-      {/* M3U URL Modal */}
-      <M3UUrlModal
-        visible={showM3UModal}
-        onClose={handleM3UClose}
-        onConnect={handleM3UConnection}
-      />
-
-      {/* Profiles Modal */}
-      <ProfilesModal
-        visible={showProfilesModal}
-        onClose={handleProfilesClose}
-        onPlaylistSelect={handlePlaylistSelect}
-        onAddPlaylist={handleAddPlaylist}
-        selectedPlaylistId={selectedPlaylistId}
-      />
-
       {/* Multi-Screen Modal */}
       <MultiScreenView
         visible={showMultiScreen}
@@ -1714,6 +2012,38 @@ const App: React.FC = () => {
       {/* Composants de test DI supprimés pour production */}
 
       {/* VideoPlayerPersistent maintenant intégré directement dans ChannelPlayerScreen */}
+
+      {/* 👤 Profile Management Modal */}
+      <ProfileManagementModal
+        visible={showProfileManagement}
+        onClose={handleCloseProfileManagement}
+        onProfilesChanged={() => {
+          // Recharger les profils si nécessaire
+          ProfileService.getActiveProfile().then(profile => {
+            if (profile) {
+              setCurrentProfile(profile);
+            }
+          });
+          // Incrémenter la clé de rafraîchissement
+          setProfilesRefreshKey(prev => prev + 1);
+        }}
+        refreshKey={profilesRefreshKey}
+      />
+
+      {/* Modal PIN parental pour l'accès aux paramètres */}
+      <SimplePinModal
+        visible={showPinModal}
+        profile={activeProfileForPIN}
+        reason="PIN parental requis pour accéder aux paramètres"
+        onClose={() => {
+          setShowPinModal(false);
+        }}
+        onSuccess={async (verifiedPin) => {
+          setShowPinModal(false);
+          // PIN valide, naviguer vers les paramètres
+          navigation.navigate('Settings');
+        }}
+      />
     </LinearGradient>
   );
 };
@@ -1778,7 +2108,12 @@ const styles = StyleSheet.create({
   },
   headerButtonText: {color: '#FFFFFF', fontSize: 14, marginLeft: 8},
   headerIconButton: {padding: 8, marginLeft: 4},
-  content: {flex: 0.85, paddingHorizontal: 40, paddingTop: 8, paddingBottom: 16},
+  content: {
+    flex: 0.85,
+    paddingHorizontal: 40,
+    paddingTop: 8,
+    paddingBottom: 16,
+  },
   mainCardsSection: {flexDirection: 'row', flex: 1, gap: 20},
   leftColumn: {flex: 1},
   rightColumn: {flex: 1.2, flexDirection: 'column', gap: 16},
@@ -1814,6 +2149,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  avatarWrapper: {
+    marginRight: 4,
+  },
+  arrowButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 4,
   },
   footerRight: {
     flex: 1,
@@ -1834,11 +2181,24 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     maxWidth: 150,
   },
+  footerProfileAvatar: {
+    fontSize: 24,
+    marginRight: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    textAlign: 'center',
+    lineHeight: 40,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
   footerUsername: {
     color: 'rgba(255, 255, 255, 1)',
     fontSize: 16,
     fontWeight: '800',
     marginLeft: 8,
+    marginRight: 6,
   },
   footerPlaceholder: {
     color: 'rgba(255, 255, 255, 0.5)',

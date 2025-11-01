@@ -3,9 +3,9 @@
  * Vérifie que la migration vers SQLite fonctionne correctement
  */
 
-import { EPGCacheManager } from './EPGCacheManager';
-import { SQLiteEPG } from './SQLiteEPGStorage';
-import { FullEPGData } from '../XtreamEPGService';
+import {EPGCacheManager} from './EPGCacheManager';
+import {SQLiteEPG} from './SQLiteEPGStorage';
+import {FullEPGData} from '../XtreamEPGService';
 import epgDatabase from './database';
 
 /**
@@ -29,18 +29,18 @@ const createTestEPGData = (): FullEPGData => {
       {
         id: 'tf1',
         displayName: 'TF1',
-        icon: 'https://example.com/tf1.png'
+        icon: 'https://example.com/tf1.png',
       },
       {
         id: 'france2',
         displayName: 'France 2',
-        icon: 'https://example.com/france2.png'
+        icon: 'https://example.com/france2.png',
       },
       {
         id: 'france3',
         displayName: 'France 3',
-        icon: 'https://example.com/france3.png'
-      }
+        icon: 'https://example.com/france3.png',
+      },
     ],
     programmes: [
       // TF1 - Programme actuel
@@ -49,7 +49,7 @@ const createTestEPGData = (): FullEPGData => {
         stop: formatXMLTVDate(now + 30 * 60 * 1000), // 30 min dans le futur
         channel: 'tf1',
         title: 'Journal de 20h',
-        desc: 'Actualités nationales et internationales'
+        desc: 'Actualités nationales et internationales',
       },
       // TF1 - Programme suivant
       {
@@ -57,7 +57,7 @@ const createTestEPGData = (): FullEPGData => {
         stop: formatXMLTVDate(now + 90 * 60 * 1000), // 90 min dans le futur
         channel: 'tf1',
         title: 'Prime Time',
-        desc: 'Émission de divertissement'
+        desc: 'Émission de divertissement',
       },
       // France 2 - Programme actuel
       {
@@ -65,7 +65,7 @@ const createTestEPGData = (): FullEPGData => {
         stop: formatXMLTVDate(now + 45 * 60 * 1000), // 45 min dans le futur
         channel: 'france2',
         title: 'Télé-réalité',
-        desc: 'Émission de télé-réalité'
+        desc: 'Émission de télé-réalité',
       },
       // France 3 - Programme futur
       {
@@ -73,10 +73,10 @@ const createTestEPGData = (): FullEPGData => {
         stop: formatXMLTVDate(now + 120 * 60 * 1000), // 2h dans le futur
         channel: 'france3',
         title: 'Documentaire',
-        desc: 'Documentaire sur la nature'
-      }
+        desc: 'Documentaire sur la nature',
+      },
     ],
-    source: 'test'
+    source: 'test',
   };
 };
 
@@ -93,7 +93,13 @@ export const testBasicSQLiteMigration = async (): Promise<boolean> => {
 
     // 2. Créer des données de test
     const testData = createTestEPGData();
-    console.log('✅ [Test] Données de test créées:', testData.channels.length, 'chaînes,', testData.programmes.length, 'programmes');
+    console.log(
+      '✅ [Test] Données de test créées:',
+      testData.channels.length,
+      'chaînes,',
+      testData.programmes.length,
+      'programmes',
+    );
 
     // 3. Sauvegarder dans le cache hybride
     await EPGCacheManager.updateCache(testData);
@@ -103,7 +109,7 @@ export const testBasicSQLiteMigration = async (): Promise<boolean> => {
     const stats = await EPGCacheManager.getCacheStats();
     console.log('📊 [Test] Statistiques cache:', {
       mémoire: `${stats.channelsCount} chaînes, ${stats.programmesCount} programmes`,
-      sqlite: `${stats.sqliteStats.channelsCount} chaînes, ${stats.sqliteStats.programmesCount} programmes`
+      sqlite: `${stats.sqliteStats.channelsCount} chaînes, ${stats.sqliteStats.programmesCount} programmes`,
     });
 
     // 5. Tester la récupération de programmes pour une chaîne
@@ -113,16 +119,23 @@ export const testBasicSQLiteMigration = async (): Promise<boolean> => {
     // 6. Vérifier que les programmes contiennent les bonnes données
     const currentProgram = tf1Programs.find(p => p.isLive);
     if (currentProgram) {
-      console.log('✅ [Test] Programme actuel trouvé:', currentProgram.title, `(${Math.round(currentProgram.progress || 0)}%)`);
+      console.log(
+        '✅ [Test] Programme actuel trouvé:',
+        currentProgram.title,
+        `(${Math.round(currentProgram.progress || 0)}%)`,
+      );
     }
 
     // 7. Test de recherche dans SQLite
     const searchResults = await SQLiteEPG.searchProgrammes('Journal');
-    console.log('✅ [Test] Recherche "Journal":', searchResults.length, 'résultats');
+    console.log(
+      '✅ [Test] Recherche "Journal":',
+      searchResults.length,
+      'résultats',
+    );
 
     console.log('🎉 [Test] Migration SQLite testée avec succès!');
     return true;
-
   } catch (error) {
     console.error('❌ [Test] Erreur test migration SQLite:', error);
     return false;
@@ -143,32 +156,46 @@ export const testSQLitePerformance = async (): Promise<boolean> => {
     // Générer plus de programmes
     for (let i = 0; i < 10000; i++) {
       const channelId = `channel_${i % 100}`; // 100 chaînes
-      const startTime = now + (i * 30 * 60 * 1000); // Programme toutes les 30 min
+      const startTime = now + i * 30 * 60 * 1000; // Programme toutes les 30 min
 
       largeTestData.programmes.push({
-        start: new Date(startTime).toISOString().replace(/[-:T]/g, '').slice(0, 14) + ' +0000',
-        stop: new Date(startTime + 30 * 60 * 1000).toISOString().replace(/[-:T]/g, '').slice(0, 14) + ' +0000',
+        start:
+          new Date(startTime).toISOString().replace(/[-:T]/g, '').slice(0, 14) +
+          ' +0000',
+        stop:
+          new Date(startTime + 30 * 60 * 1000)
+            .toISOString()
+            .replace(/[-:T]/g, '')
+            .slice(0, 14) + ' +0000',
         channel: channelId,
         title: `Programme ${i}`,
-        desc: `Description du programme ${i}`
+        desc: `Description du programme ${i}`,
       });
     }
 
-    console.log('📊 [Test] Données volumineuses créées:', largeTestData.programmes.length, 'programmes');
+    console.log(
+      '📊 [Test] Données volumineuses créées:',
+      largeTestData.programmes.length,
+      'programmes',
+    );
 
     // Mesurer le temps de sauvegarde
     const startTime = Date.now();
     await EPGCacheManager.updateCache(largeTestData);
     const saveTime = Date.now() - startTime;
 
-    console.log(`⏱️ [Test] Sauvegarde SQLite: ${saveTime}ms pour ${largeTestData.programmes.length} programmes`);
+    console.log(
+      `⏱️ [Test] Sauvegarde SQLite: ${saveTime}ms pour ${largeTestData.programmes.length} programmes`,
+    );
 
     // Mesurer le temps de récupération
     const queryStart = Date.now();
     const programs = await EPGCacheManager.getProgramsForChannel('channel_1');
     const queryTime = Date.now() - queryStart;
 
-    console.log(`⏱️ [Test] Requête SQLite: ${queryTime}ms pour récupérer ${programs.length} programmes`);
+    console.log(
+      `⏱️ [Test] Requête SQLite: ${queryTime}ms pour récupérer ${programs.length} programmes`,
+    );
 
     // Test des statistiques
     const stats = await EPGCacheManager.getCacheStats();
@@ -176,7 +203,6 @@ export const testSQLitePerformance = async (): Promise<boolean> => {
 
     console.log('🚀 [Test] Test de performance terminé avec succès!');
     return true;
-
   } catch (error) {
     console.error('❌ [Test] Erreur test performance:', error);
     return false;
@@ -194,7 +220,9 @@ export const runAllSQLiteTests = async (): Promise<void> => {
 
   console.log('📋 [TestSuite] Résultats des tests:');
   console.log(`  - Test de base: ${basicTestResult ? '✅ PASS' : '❌ FAIL'}`);
-  console.log(`  - Test performance: ${performanceTestResult ? '✅ PASS' : '❌ FAIL'}`);
+  console.log(
+    `  - Test performance: ${performanceTestResult ? '✅ PASS' : '❌ FAIL'}`,
+  );
 
   if (basicTestResult && performanceTestResult) {
     console.log('🎉 [TestSuite] Tous les tests SQLite ont réussi!');
@@ -207,5 +235,5 @@ export const runAllSQLiteTests = async (): Promise<void> => {
 export default {
   testBasicSQLiteMigration,
   testSQLitePerformance,
-  runAllSQLiteTests
+  runAllSQLiteTests,
 };

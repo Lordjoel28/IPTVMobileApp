@@ -13,16 +13,12 @@ import {
   TextInput,
   useColorScheme,
   Dimensions,
+  Alert,
 } from 'react-native';
 import FastImage from 'react-native-fast-image';
 import {Channel} from '../types';
-// 🚀 OPTIMISATION: Utiliser le store optimisé
-import {
-  usePlaylistCategories,
-  useSelectedCategory,
-  useChannelsByCategory,
-  usePlaylistActions,
-} from '../stores/PlaylistStore';
+import RestrictedBadge from './RestrictedBadge';
+import {useParentalControl} from '../hooks/useParentalControl';
 
 const {height: SCREEN_HEIGHT} = Dimensions.get('window');
 
@@ -49,12 +45,15 @@ const ChannelItem = memo<{
   isFavorite: boolean;
   isDarkMode: boolean;
   onSelect: (channel: Channel) => void;
-  onToggleFavorite: (channelId: string) => void;
-}>(({item, isSelected, isFavorite, isDarkMode, onSelect, onToggleFavorite}) => {
+  onLongPress: (channel: Channel) => void;
+}>(({item, isSelected, isFavorite, isDarkMode, onSelect, onLongPress}) => {
+  const {getRestrictionBadgeProps} = useParentalControl();
+  const restrictionProps = getRestrictionBadgeProps(item);
+
   const handlePress = useCallback(() => onSelect(item), [item, onSelect]);
-  const handleFavoritePress = useCallback(
-    () => onToggleFavorite(item.id),
-    [item.id, onToggleFavorite],
+  const handleLongPress = useCallback(
+    () => onLongPress(item),
+    [item, onLongPress],
   );
 
   return (
@@ -65,6 +64,7 @@ const ChannelItem = memo<{
         isSelected && styles.channelItemSelected,
       ]}
       onPress={handlePress}
+      onLongPress={handleLongPress}
       activeOpacity={0.7}>
       <View style={styles.channelContent}>
         {/* Logo optimisé avec FastImage et cache agressif */}
@@ -110,13 +110,25 @@ const ChannelItem = memo<{
           )}
         </View>
 
-        {/* Bouton favoris optimisé */}
-        <TouchableOpacity
-          style={styles.favoriteButton}
-          onPress={handleFavoritePress}
-          hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}>
-          <Text style={styles.favoriteIcon}>{isFavorite ? '❤️' : '🤍'}</Text>
-        </TouchableOpacity>
+        {/* Indicateurs à droite du logo */}
+        <View style={styles.indicatorsContainer}>
+          {/* Badge de restriction parental */}
+          {restrictionProps.show && (
+            <View style={styles.restrictionIndicator}>
+              <RestrictedBadge
+                size="small"
+                showText={restrictionProps.isAdult}
+              />
+            </View>
+          )}
+
+          {/* Indicateur favori (icône visuelle seulement) */}
+          {isFavorite && (
+            <View style={styles.favoriteIndicator}>
+              <Text style={styles.favoriteIcon}>⭐</Text>
+            </View>
+          )}
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -133,19 +145,51 @@ export const VirtualizedChannelList: React.FC<VirtualizedChannelListProps> = ({
   onToggleFavorite,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('TOUS');
   const isDarkMode = useColorScheme() === 'dark';
 
-  // 🚀 OPTIMISATION: Utiliser le store
-  const categories = usePlaylistCategories();
-  const selectedCategoryFromStore = useSelectedCategory();
-  const {selectCategory} = usePlaylistActions();
+  // 🚀 OPTIMISATION: Créer les catégories à partir des channels
+  const categories = useMemo(() => {
+    const categorySet = new Set<string>();
+    categorySet.add('TOUS');
+    categorySet.add('⭐ Favoris');
 
-  // 🚀 OPTIMISATION: Récupérer channels depuis l'index (O(1))
-  const categoryChannels = useChannelsByCategory(selectedCategoryFromStore || 'TOUS');
+    channels.forEach(channel => {
+      if (channel.category) {
+        categorySet.add(channel.category);
+      } else if (channel.group) {
+        categorySet.add(channel.group);
+      }
+    });
 
-  // 🚀 OPTIMISATION: Filtrage recherche seulement (catégorie déjà filtrée par le store)
+    return Array.from(categorySet).map(name => ({
+      name,
+      count: channels.filter(ch => {
+        if (name === 'TOUS') {
+          return true;
+        }
+        if (name === '⭐ Favoris') {
+          return favorites.includes(ch.id);
+        }
+        return ch.category === name || ch.group === name;
+      }).length,
+    }));
+  }, [channels, favorites]);
+
+  // 🚀 OPTIMISATION: Filtrage par catégorie et recherche
   const filteredChannels = useMemo(() => {
-    let filtered = categoryChannels;
+    let filtered = channels;
+
+    // Filtrage par catégorie
+    if (selectedCategory === '⭐ Favoris') {
+      // Afficher uniquement les favoris
+      filtered = filtered.filter(ch => favorites.includes(ch.id));
+    } else if (selectedCategory !== 'TOUS') {
+      // Filtrage par catégorie standard
+      filtered = filtered.filter(
+        ch => ch.category === selectedCategory || ch.group === selectedCategory,
+      );
+    }
 
     // Recherche par nom (case insensitive)
     if (searchQuery.trim()) {
@@ -158,7 +202,7 @@ export const VirtualizedChannelList: React.FC<VirtualizedChannelListProps> = ({
     }
 
     return filtered;
-  }, [categoryChannels, searchQuery]);
+  }, [channels, selectedCategory, searchQuery, favorites]);
 
   // 🎯 CALLBACKS OPTIMISÉS : useCallback pour éviter re-renders
   const handleChannelSelect = useCallback(
@@ -168,11 +212,28 @@ export const VirtualizedChannelList: React.FC<VirtualizedChannelListProps> = ({
     [onChannelSelect],
   );
 
-  const handleToggleFavorite = useCallback(
-    (channelId: string) => {
-      onToggleFavorite(channelId);
+  const handleChannelLongPress = useCallback(
+    (channel: Channel) => {
+      const isFavorite = favorites.includes(channel.id);
+      const action = isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris';
+
+      Alert.alert(
+        channel.name,
+        'Que souhaitez-vous faire ?',
+        [
+          {
+            text: action,
+            onPress: () => onToggleFavorite(channel.id),
+          },
+          {
+            text: 'Annuler',
+            style: 'cancel',
+          },
+        ],
+        {cancelable: true},
+      );
     },
-    [onToggleFavorite],
+    [favorites, onToggleFavorite],
   );
 
   // 🚀 VIRTUALIZEDLIST : Fonctions de rendu optimisées
@@ -196,7 +257,7 @@ export const VirtualizedChannelList: React.FC<VirtualizedChannelListProps> = ({
           isFavorite={isFavorite}
           isDarkMode={isDarkMode}
           onSelect={handleChannelSelect}
-          onToggleFavorite={handleToggleFavorite}
+          onLongPress={handleChannelLongPress}
         />
       );
     },
@@ -205,7 +266,7 @@ export const VirtualizedChannelList: React.FC<VirtualizedChannelListProps> = ({
       favorites,
       isDarkMode,
       handleChannelSelect,
-      handleToggleFavorite,
+      handleChannelLongPress,
     ],
   );
 
@@ -223,24 +284,20 @@ export const VirtualizedChannelList: React.FC<VirtualizedChannelListProps> = ({
   );
 
   // 🎨 RENDER CATEGORIES BAR
-  const renderCategoryButton = (category: string) => {
-    const isSelected = selectedCategoryFromStore === category;
-    const displayName =
-      category === 'all'
-        ? 'Toutes'
-        : category === 'favorites'
-        ? 'Favoris'
-        : category;
+  const renderCategoryButton = (categoryName: string) => {
+    const isSelected = selectedCategory === categoryName;
+    const categoryData = categories.find(c => c.name === categoryName);
+    const displayName = categoryName === 'TOUS' ? 'Toutes' : categoryName;
 
     return (
       <TouchableOpacity
-        key={category}
+        key={categoryName}
         style={[
           styles.categoryButton,
           isDarkMode && styles.categoryButtonDark,
           isSelected && styles.categoryButtonSelected,
         ]}
-        onPress={() => selectCategory(category)}>
+        onPress={() => setSelectedCategory(categoryName)}>
         <Text
           style={[
             styles.categoryButtonText,
@@ -249,6 +306,7 @@ export const VirtualizedChannelList: React.FC<VirtualizedChannelListProps> = ({
           ]}
           numberOfLines={1}>
           {displayName}
+          {categoryData && ` (${categoryData.count})`}
         </Text>
       </TouchableOpacity>
     );
@@ -491,14 +549,21 @@ const styles = StyleSheet.create({
   channelCategoryDark: {
     color: '#999',
   },
-  favoriteButton: {
-    width: 44,
-    height: 44,
+  indicatorsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  restrictionIndicator: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  favoriteIndicator: {
     justifyContent: 'center',
     alignItems: 'center',
   },
   favoriteIcon: {
-    fontSize: 18,
+    fontSize: 20,
   },
 
   // 📊 EMPTY & FOOTER STYLES

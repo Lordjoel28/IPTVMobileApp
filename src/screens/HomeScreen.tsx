@@ -136,7 +136,9 @@ const HomeScreen: React.FC = () => {
     const {channels, selectedPlaylistId} = usePlaylistStore.getState();
 
     if (channels.length > 0 && selectedPlaylistId) {
-      console.log(`✅ Playlist active trouvée: ${selectedPlaylistId} avec ${channels.length} chaînes`);
+      console.log(
+        `✅ Playlist active trouvée: ${selectedPlaylistId} avec ${channels.length} chaînes`,
+      );
 
       // Navigation vers les vraies chaînes de la playlist active
       try {
@@ -154,7 +156,9 @@ const HomeScreen: React.FC = () => {
     } else {
       // Si aucune playlist n'est active dans le store, on affiche l'alerte.
       // La restauration est maintenant automatique grâce à la persistance du store Zustand.
-      console.log('❌ Aucune playlist active trouvée dans le store. Affichage de l\'alerte.');
+      console.log(
+        "❌ Aucune playlist active trouvée dans le store. Affichage de l'alerte.",
+      );
       Alert.alert(
         '📺 Aucune playlist',
         'Veuillez d\'abord importer et sélectionner une playlist depuis le menu "Profils".',
@@ -239,7 +243,9 @@ const HomeScreen: React.FC = () => {
   };
 
   const handleEPGCardPress = () => {
-    console.log('📺 [HomeScreen] handleEPGCardPress appelée - DÉBUT NAVIGATION EPG!');
+    console.log(
+      '📺 [HomeScreen] handleEPGCardPress appelée - DÉBUT NAVIGATION EPG!',
+    );
     console.log('📺 EPG Card Pressed - NAVIGATION DIRECTE!');
 
     // 🧪 DONNÉES MOCK POUR TEST EPG NAVIGATION
@@ -437,7 +443,7 @@ const HomeScreen: React.FC = () => {
           maxChannels: 2000,
           enableCache: true,
           parserMode: 'ultra',
-        }
+        },
       );
 
       console.log('✅ Import IPTV SUCCESS:', {
@@ -452,12 +458,18 @@ const HomeScreen: React.FC = () => {
       loadPlaylist(
         source.url,
         result.playlist.channels,
-        source.name || 'Test Playlist'
+        source.name || 'Test Playlist',
       );
-      console.log('✅ PlaylistStore synchronisé avec', result.playlist.channels.length, 'chaînes');
+      console.log(
+        '✅ PlaylistStore synchronisé avec',
+        result.playlist.channels.length,
+        'chaînes',
+      );
 
       // 🎯 La nouvelle action `loadPlaylist` dans le store s'occupe de la sélection.
-      console.log('✅ La persistance est maintenant gérée par le store Zustand.');
+      console.log(
+        '✅ La persistance est maintenant gérée par le store Zustand.',
+      );
 
       // Test recherche si on a des chaînes
       if (result.playlist.channels.length > 0) {
@@ -481,7 +493,6 @@ const HomeScreen: React.FC = () => {
         channels: result.playlist.channels,
         totalChannels: result.playlist.channels.length,
       });
-
     } catch (error) {
       console.error('❌ TEST SERVICES IPTV FAILED:', error);
       Alert.alert(
@@ -553,20 +564,11 @@ const HomeScreen: React.FC = () => {
             <Icon name="search" size={24} color="#FFFFFF" />
             <Text style={styles.headerButtonText}>Main Recherche</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.headerIconButton}
-            onPress={() => {
-              console.log('🔥 BOUTON CONNEXION!');
-              setShowConnectionModal(true);
-            }}>
-            <Icon name="person" size={24} color="#FFFFFF" />
-          </TouchableOpacity>
-        </View>
+          </View>
       </View>
 
       <View style={styles.content}>
         <View style={styles.mainCardsSection}>
-
           <View style={styles.leftColumn}>
             <View style={{flex: 1}}>
               <TouchableOpacity
@@ -739,11 +741,19 @@ const HomeScreen: React.FC = () => {
 
                       // Navigation spécifique par type de carte
                       if (card.key === 'epg') {
-                        console.log('🎯 [HomeScreen] Bouton LIVE EPG cliqué - Appel handleEPGCardPress');
+                        console.log(
+                          '🎯 [HomeScreen] Bouton LIVE EPG cliqué - Appel handleEPGCardPress',
+                        );
                         handleEPGCardPress();
                       } else {
-                        console.log('🎯 [HomeScreen] Autre bouton cliqué:', card.key);
-                        Alert.alert('TODO', `${card.title} pas encore implémenté`);
+                        console.log(
+                          '🎯 [HomeScreen] Autre bouton cliqué:',
+                          card.key,
+                        );
+                        Alert.alert(
+                          'TODO',
+                          `${card.title} pas encore implémenté`,
+                        );
                       }
                     }}
                     activeOpacity={0.8}>

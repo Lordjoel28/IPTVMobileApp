@@ -94,16 +94,24 @@ const EPGCategoriesScreen: React.FC<EPGCategoriesScreenProps> = ({route}) => {
         // Déterminer icône basée sur nom catégorie
         const getIcon = (name: string) => {
           const lowerName = name.toLowerCase();
-          if (lowerName.includes('sport')) {return 'sports_soccer';}
-          if (lowerName.includes('news') || lowerName.includes('info'))
-            {return 'article';}
-          if (lowerName.includes('movie') || lowerName.includes('cinema'))
-            {return 'movie';}
-          if (lowerName.includes('music')) {return 'music_note';}
-          if (lowerName.includes('kids') || lowerName.includes('enfant'))
-            {return 'child_care';}
-          if (lowerName.includes('vip') || lowerName.includes('premium'))
-            {return 'star';}
+          if (lowerName.includes('sport')) {
+            return 'sports_soccer';
+          }
+          if (lowerName.includes('news') || lowerName.includes('info')) {
+            return 'article';
+          }
+          if (lowerName.includes('movie') || lowerName.includes('cinema')) {
+            return 'movie';
+          }
+          if (lowerName.includes('music')) {
+            return 'music_note';
+          }
+          if (lowerName.includes('kids') || lowerName.includes('enfant')) {
+            return 'child_care';
+          }
+          if (lowerName.includes('vip') || lowerName.includes('premium')) {
+            return 'star';
+          }
           return 'tv';
         };
 

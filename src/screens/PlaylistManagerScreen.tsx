@@ -146,6 +146,7 @@ const PlaylistManagerScreen = () => {
         await AsyncStorage.setItem(
           `playlist_${selectedPlaylist.id}`,
           JSON.stringify(playlist),
+        );
 
         setRenameModalVisible(false);
         setSelectedPlaylist(null);

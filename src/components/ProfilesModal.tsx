@@ -49,6 +49,7 @@ interface ProfilesModalProps {
   onPlaylistSelect: (playlist: PlaylistItem) => void;
   onAddPlaylist?: () => void;
   selectedPlaylistId?: string;
+  hideCloseButton?: boolean; // 🆕 Pour masquer le bouton fermer dans certains cas (ex: déconnexion)
 }
 
 const ProfilesModal: React.FC<ProfilesModalProps> = ({
@@ -57,6 +58,7 @@ const ProfilesModal: React.FC<ProfilesModalProps> = ({
   onPlaylistSelect,
   onAddPlaylist,
   selectedPlaylistId,
+  hideCloseButton = false, // Valeur par défaut false pour conserver le comportement existant
 }) => {
   // Replaced AppContext with UIStore
   const {showLoading, updateLoading, hideLoading, showNotification} =
@@ -553,14 +555,17 @@ const ProfilesModal: React.FC<ProfilesModalProps> = ({
                   <Icon name="playlist-add" size={24} color="#e2e8f0" />
                 </Pressable>
               )}
-              <Pressable
-                onPress={onClose}
-                style={({pressed}) => [
-                  styles.closeButtonModern,
-                  pressed && {transform: [{scale: 0.9}]},
-                ]}>
-                <Icon name="close" size={26} color="#e2e8f0" />
-              </Pressable>
+              {/* Bouton fermer conditionnellement masqué */}
+              {!hideCloseButton && (
+                <Pressable
+                  onPress={onClose}
+                  style={({pressed}) => [
+                    styles.closeButtonModern,
+                    pressed && {transform: [{scale: 0.9}]},
+                  ]}>
+                  <Icon name="close" size={26} color="#e2e8f0" />
+                </Pressable>
+              )}
             </View>
           </View>
 
@@ -589,7 +594,9 @@ const ProfilesModal: React.FC<ProfilesModalProps> = ({
               contentContainerStyle={styles.gridContentContainer}>
               <View style={styles.gridRow}>
                 {playlists.map((item, index) => (
-                  <View key={`${item.id}_${index}`} style={styles.gridItemContainer}>
+                  <View
+                    key={`${item.id}_${index}`}
+                    style={styles.gridItemContainer}>
                     {renderPlaylist({item, index})}
                   </View>
                 ))}
@@ -640,73 +647,77 @@ const ProfilesModal: React.FC<ProfilesModalProps> = ({
         </TouchableOpacity>
       )}
 
-      {/* Modal de confirmation de suppression */}
+      {/* Modal de confirmation de suppression avec effet flou parfait */}
       {deleteModal.visible && deleteModal.playlist && (
-        <Modal
-          transparent
-          visible={deleteModal.visible}
-          animationType="fade"
-          onRequestClose={() =>
-            setDeleteModal({visible: false, playlist: null})
-          }>
-          <View style={styles.deleteModalOverlay}>
-            <View style={styles.deleteModalContainer}>
-              <LinearGradient
-                colors={[
-                  'rgba(15, 23, 42, 0.98)',
-                  'rgba(30, 41, 59, 0.96)',
-                  'rgba(51, 65, 85, 0.94)',
-                ]}
-                start={{x: 0, y: 0}}
-                end={{x: 1, y: 1}}
-                style={styles.deleteModalContent}>
-                {/* Icône de suppression */}
-                <View style={styles.deleteIconContainer}>
-                  <Icon name="delete-outline" size={48} color="#ef4444" />
-                </View>
+        <View style={styles.deleteModalBlurOverlay}>
+          <BlurView
+            style={StyleSheet.absoluteFill}
+            blurType="dark"
+            blurAmount={5}
+          />
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() =>
+              setDeleteModal({visible: false, playlist: null})
+            }
+          />
+          <View style={styles.deleteModalContainer}>
+            <LinearGradient
+              colors={[
+                'rgba(15, 23, 42, 0.98)',
+                'rgba(30, 41, 59, 0.96)',
+                'rgba(51, 65, 85, 0.94)',
+              ]}
+              start={{x: 0, y: 0}}
+              end={{x: 1, y: 1}}
+              style={styles.deleteModalContent}>
+              {/* Icône de suppression */}
+              <View style={styles.deleteIconContainer}>
+                <Icon name="delete-outline" size={48} color="#ef4444" />
+              </View>
 
-                {/* Titre */}
-                <Text style={styles.deleteModalTitle}>
-                  Supprimer la playlist
-                </Text>
+              {/* Titre */}
+              <Text style={styles.deleteModalTitle}>
+                Supprimer la playlist
+              </Text>
 
-                {/* Message */}
-                <Text style={styles.deleteModalMessage}>
-                  Êtes-vous sûr de vouloir supprimer la playlist{'\n'}
-                  <Text style={styles.playlistNameHighlight}>
-                    "{deleteModal.playlist.name}"
-                  </Text>{' '}
-                  ?
-                </Text>
+              {/* Message */}
+              <Text style={styles.deleteModalMessage}>
+                Êtes-vous sûr de vouloir supprimer la playlist{'\n'}
+                <Text style={styles.playlistNameHighlight}>
+                  "{deleteModal.playlist.name}"
+                </Text>{' '}
+                ?
+              </Text>
 
-                <Text style={styles.deleteModalWarning}>
-                  Cette action est irréversible.
-                </Text>
+              <Text style={styles.deleteModalWarning}>
+                Cette action est irréversible.
+              </Text>
 
-                {/* Boutons */}
-                <View style={styles.deleteModalButtons}>
-                  <TouchableOpacity
-                    style={styles.cancelButton}
-                    onPress={() =>
-                      setDeleteModal({visible: false, playlist: null})
-                    }>
-                    <Text style={styles.cancelButtonText}>Annuler</Text>
-                  </TouchableOpacity>
+              {/* Boutons */}
+              <View style={styles.deleteModalButtons}>
+                <TouchableOpacity
+                  style={styles.cancelButton}
+                  onPress={() =>
+                    setDeleteModal({visible: false, playlist: null})
+                  }>
+                  <Text style={styles.cancelButtonText}>Annuler</Text>
+                </TouchableOpacity>
 
-                  <TouchableOpacity
-                    style={styles.deleteButton}
-                    onPress={confirmDelete}>
-                    <LinearGradient
-                      colors={['#ef4444', '#dc2626']}
-                      style={styles.deleteButtonGradient}>
-                      <Text style={styles.deleteButtonText}>Supprimer</Text>
-                    </LinearGradient>
-                  </TouchableOpacity>
-                </View>
-              </LinearGradient>
-            </View>
+                <TouchableOpacity
+                  style={styles.deleteButton}
+                  onPress={confirmDelete}>
+                  <LinearGradient
+                    colors={['#ef4444', '#dc2626']}
+                    style={styles.deleteButtonGradient}>
+                    <Text style={styles.deleteButtonText}>Supprimer</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+            </LinearGradient>
           </View>
-        </Modal>
+        </View>
       )}
     </Modal>
   );
@@ -952,6 +963,16 @@ const styles = StyleSheet.create({
     elevation: 25,
     transform: [{scale: 1.02}],
   },
+  deleteModalBlurOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1500,
+  },
   deleteModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.85)',
@@ -960,18 +981,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   deleteModalContainer: {
-    width: '100%',
-    maxWidth: 360,
-    borderRadius: 20,
+    width: '90%',
+    maxWidth: 400,
+    borderRadius: 24,
     overflow: 'hidden',
     shadowColor: '#000000',
-    shadowOffset: {width: 0, height: 10},
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
-    elevation: 20,
+    shadowOffset: {width: 0, height: 20},
+    shadowOpacity: 0.25,
+    shadowRadius: 32,
+    elevation: 30,
+    transform: [{translateY: -2}],
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   deleteModalContent: {
-    padding: 28,
+    padding: 24,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',

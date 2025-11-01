@@ -3,7 +3,7 @@
  * Optimisé pour la recherche vocale française avec gestion des accents
  */
 
-import type { Channel } from '../types';
+import type {Channel} from '../types';
 
 /**
  * Normalise un texte pour la recherche
@@ -12,20 +12,24 @@ import type { Channel } from '../types';
  * - Supprime espaces multiples et caractères spéciaux
  */
 export const normalizeText = (text: string): string => {
-  if (!text) return '';
+  if (!text) {
+    return '';
+  }
 
-  return text
-    // Supprimer les accents français
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    // Convertir en minuscules
-    .toLowerCase()
-    // Supprimer caractères spéciaux sauf lettres, chiffres et espaces
-    .replace(/[^a-z0-9\s]/g, ' ')
-    // Supprimer espaces multiples
-    .replace(/\s+/g, ' ')
-    // Trim
-    .trim();
+  return (
+    text
+      // Supprimer les accents français
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      // Convertir en minuscules
+      .toLowerCase()
+      // Supprimer caractères spéciaux sauf lettres, chiffres et espaces
+      .replace(/[^a-z0-9\s]/g, ' ')
+      // Supprimer espaces multiples
+      .replace(/\s+/g, ' ')
+      // Trim
+      .trim()
+  );
 };
 
 /**
@@ -33,29 +37,31 @@ export const normalizeText = (text: string): string => {
  * Gère les spécificités de la reconnaissance vocale française
  */
 export const cleanVoiceInput = (voiceText: string): string => {
-  if (!voiceText) return '';
+  if (!voiceText) {
+    return '';
+  }
 
   let cleaned = voiceText;
 
   // Remplacements spécifiques à la reconnaissance vocale française
   const voiceReplacements: Record<string, string> = {
     // Chiffres en lettres
-    'un': '1',
-    'deux': '2',
-    'trois': '3',
-    'quatre': '4',
-    'cinq': '5',
-    'six': '6',
-    'sept': '7',
-    'huit': '8',
-    'neuf': '9',
-    'dix': '10',
+    un: '1',
+    deux: '2',
+    trois: '3',
+    quatre: '4',
+    cinq: '5',
+    six: '6',
+    sept: '7',
+    huit: '8',
+    neuf: '9',
+    dix: '10',
 
     // Mots communs mal reconnus
-    'chaîne': 'chaine',
-    'télé': 'tele',
-    'télévision': 'television',
-    'émission': 'emission',
+    chaîne: 'chaine',
+    télé: 'tele',
+    télévision: 'television',
+    émission: 'emission',
 
     // Noms de chaînes courantes avec variantes de reconnaissance
     'france deux': 'france 2',
@@ -63,13 +69,13 @@ export const cleanVoiceInput = (voiceText: string): string => {
     'france quatre': 'france 4',
     'france cinq': 'france 5',
     'tf un': 'tf1',
-    'tf1': 'tf1',
+    tf1: 'tf1',
     'canal plus': 'canal+',
     'canal +': 'canal+',
     'm six': 'm6',
-    'bfm': 'bfm',
-    'arte': 'arte',
-    'eurosport': 'eurosport',
+    bfm: 'bfm',
+    arte: 'arte',
+    eurosport: 'eurosport',
   };
 
   // Appliquer les remplacements
@@ -94,26 +100,32 @@ export const filterChannels = (
     fuzzyTolerance?: number;
     searchInGroup?: boolean;
     searchInCategory?: boolean;
-  } = {}
+  } = {},
 ): Channel[] => {
   if (!searchText || !channels.length) {
     return channels.slice(0, options.maxResults || 100);
   }
 
   const normalizedSearch = normalizeText(searchText);
-  const searchWords = normalizedSearch.split(' ').filter(word => word.length > 0);
+  const searchWords = normalizedSearch
+    .split(' ')
+    .filter(word => word.length > 0);
 
   if (searchWords.length === 0) {
     return channels.slice(0, options.maxResults || 100);
   }
 
-  const results: { channel: Channel; score: number }[] = [];
+  const results: {channel: Channel; score: number}[] = [];
 
   channels.forEach(channel => {
     let score = 0;
     const channelName = normalizeText(channel.name);
-    const channelGroup = options.searchInGroup ? normalizeText(channel.group || '') : '';
-    const channelCategory = options.searchInCategory ? normalizeText(channel.category || '') : '';
+    const channelGroup = options.searchInGroup
+      ? normalizeText(channel.group || '')
+      : '';
+    const channelCategory = options.searchInCategory
+      ? normalizeText(channel.category || '')
+      : '';
 
     // Recherche exacte dans le nom (score maximal)
     if (channelName.includes(normalizedSearch)) {
@@ -165,14 +177,18 @@ export const filterChannels = (
 
     // Recherche floue pour la tolérance aux erreurs vocales
     if (options.fuzzyTolerance && score === 0) {
-      const fuzzyScore = calculateFuzzyScore(channelName, normalizedSearch, options.fuzzyTolerance);
+      const fuzzyScore = calculateFuzzyScore(
+        channelName,
+        normalizedSearch,
+        options.fuzzyTolerance,
+      );
       if (fuzzyScore > 0) {
         score = fuzzyScore;
       }
     }
 
     if (score > 0) {
-      results.push({ channel, score });
+      results.push({channel, score});
     }
   });
 
@@ -186,9 +202,17 @@ export const filterChannels = (
 /**
  * Calcule un score de recherche floue (Levenshtein simplifié)
  */
-const calculateFuzzyScore = (text: string, search: string, tolerance: number): number => {
-  if (search.length === 0) return 0;
-  if (text.length === 0) return 0;
+const calculateFuzzyScore = (
+  text: string,
+  search: string,
+  tolerance: number,
+): number => {
+  if (search.length === 0) {
+    return 0;
+  }
+  if (text.length === 0) {
+    return 0;
+  }
 
   // Recherche de sous-chaînes avec tolérance
   for (let i = 0; i <= text.length - search.length; i++) {
@@ -197,7 +221,7 @@ const calculateFuzzyScore = (text: string, search: string, tolerance: number): n
 
     if (distance <= tolerance) {
       // Score inversement proportionnel à la distance
-      return Math.max(1, 20 - (distance * 5));
+      return Math.max(1, 20 - distance * 5);
     }
   }
 
@@ -226,7 +250,7 @@ const levenshteinDistance = (str1: string, str2: string): number => {
         matrix[i][j] = Math.min(
           matrix[i - 1][j - 1] + 1,
           matrix[i][j - 1] + 1,
-          matrix[i - 1][j] + 1
+          matrix[i - 1][j] + 1,
         );
       }
     }
@@ -245,10 +269,40 @@ export const extractKeywords = (text: string): string[] => {
 
   // Supprimer les mots vides français
   const stopWords = [
-    'le', 'la', 'les', 'un', 'une', 'des', 'du', 'de', 'et', 'ou', 'avec',
-    'pour', 'sur', 'dans', 'par', 'sans', 'vers', 'chez', 'entre', 'avant',
-    'apres', 'pendant', 'depuis', 'jusqu', 'chaine', 'chaines', 'television',
-    'tele', 'tv', 'emission', 'programme', 'regarder', 'voir', 'chercher'
+    'le',
+    'la',
+    'les',
+    'un',
+    'une',
+    'des',
+    'du',
+    'de',
+    'et',
+    'ou',
+    'avec',
+    'pour',
+    'sur',
+    'dans',
+    'par',
+    'sans',
+    'vers',
+    'chez',
+    'entre',
+    'avant',
+    'apres',
+    'pendant',
+    'depuis',
+    'jusqu',
+    'chaine',
+    'chaines',
+    'television',
+    'tele',
+    'tv',
+    'emission',
+    'programme',
+    'regarder',
+    'voir',
+    'chercher',
   ];
 
   return words.filter(word => !stopWords.includes(word) && word.length > 2);
@@ -260,9 +314,11 @@ export const extractKeywords = (text: string): string[] => {
 export const generateSearchSuggestions = (
   channels: Channel[],
   partialText: string,
-  maxSuggestions: number = 8
+  maxSuggestions: number = 8,
 ): string[] => {
-  if (!partialText || partialText.length < 2) return [];
+  if (!partialText || partialText.length < 2) {
+    return [];
+  }
 
   const normalized = normalizeText(partialText);
   const suggestions = new Set<string>();

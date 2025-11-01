@@ -64,7 +64,7 @@ const SettingsScreen: React.FC = () => {
     },
     {id: 'tv_guide', title: 'TV Guide', icon: 'event', route: 'TVGuideSettings'},
     {id: 'app', title: 'APP', icon: 'apps', route: '#'},
-    {id: 'account', title: 'Compte', icon: 'account-circle', route: '#'},
+    {id: 'account', title: 'Compte', icon: 'account-circle', route: 'Account'},
     {id: 'player_settings', title: 'Player Settings', icon: 'tune', route: '#'},
     {id: 'player', title: 'Player', icon: 'play-circle-outline', route: '#'},
     {
@@ -74,7 +74,7 @@ const SettingsScreen: React.FC = () => {
       route: '#',
     },
     {id: 'update_content', title: 'Mettre à jour', icon: 'update', route: '#'},
-    {id: 'parental', title: 'Parental', icon: 'lock', route: '#'},
+    {id: 'parental', title: 'Parental', icon: 'lock', route: 'ParentalControl'},
     {id: 'speed_test', title: 'Test de rapidité', icon: 'speed', route: '#'},
     {id: 'backup_restore', title: 'Sauvegarde', icon: 'cloud-upload', route: '#'},
     {

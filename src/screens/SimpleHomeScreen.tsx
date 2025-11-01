@@ -67,7 +67,7 @@ const SimpleHomeScreen: React.FC = () => {
       color: '#FF8800',
       description: "Configuration de l'app",
       screen: 'Settings',
-    }
+    },
   ];
 
   const handleMenuPress = (item: MenuItem) => {

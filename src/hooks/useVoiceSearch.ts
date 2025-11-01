@@ -3,8 +3,8 @@
  * Gestion complète de @react-native-voice/voice avec permissions et normalisation
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { Platform, Alert, Linking } from 'react-native';
+import {useState, useEffect, useCallback, useRef} from 'react';
+import {Platform, Alert, Linking} from 'react-native';
 import Voice, {
   SpeechRecognizedEvent,
   SpeechResultsEvent,
@@ -12,7 +12,7 @@ import Voice, {
   SpeechStartEvent,
   SpeechEndEvent,
 } from '@react-native-voice/voice';
-import { cleanVoiceInput } from '../utils/textUtils';
+import {cleanVoiceInput} from '../utils/textUtils';
 
 export interface VoiceSearchState {
   isListening: boolean;
@@ -50,9 +50,9 @@ const DEFAULT_CONFIG: VoiceSearchConfig = {
 
 export const useVoiceSearch = (
   config: VoiceSearchConfig = {},
-  callbacks: VoiceSearchCallbacks = {}
+  callbacks: VoiceSearchCallbacks = {},
 ) => {
-  const finalConfig = { ...DEFAULT_CONFIG, ...config };
+  const finalConfig = {...DEFAULT_CONFIG, ...config};
 
   const [state, setState] = useState<VoiceSearchState>({
     isListening: false,
@@ -76,7 +76,7 @@ export const useVoiceSearch = (
   // Safe state update (évite les warnings si le composant est démonté)
   const safeSetState = useCallback((updates: Partial<VoiceSearchState>) => {
     if (mountedRef.current) {
-      setState(prev => ({ ...prev, ...updates }));
+      setState(prev => ({...prev, ...updates}));
     }
   }, []);
 
@@ -89,7 +89,7 @@ export const useVoiceSearch = (
       if (!available) {
         safeSetState({
           isAvailable: false,
-          error: 'Service de reconnaissance vocale non disponible'
+          error: 'Service de reconnaissance vocale non disponible',
         });
         return false;
       }
@@ -98,18 +98,18 @@ export const useVoiceSearch = (
       // Ne pas tester en démarrant réellement la reconnaissance
       if (Platform.OS === 'android') {
         // Simplement marquer comme disponible, les permissions seront vérifiées au premier usage
-        safeSetState({ isAvailable: true, hasPermission: true });
+        safeSetState({isAvailable: true, hasPermission: true});
         return true;
       }
 
-      safeSetState({ isAvailable: true, hasPermission: true });
+      safeSetState({isAvailable: true, hasPermission: true});
       return true;
     } catch (error: any) {
       console.error('🎤 [VoiceSearch] Erreur vérification permissions:', error);
       safeSetState({
         isAvailable: false,
         hasPermission: false,
-        error: error.message || 'Erreur inconnue'
+        error: error.message || 'Erreur inconnue',
       });
       return false;
     }
@@ -126,7 +126,7 @@ export const useVoiceSearch = (
       // Event listeners
       Voice.onSpeechStart = (event: SpeechStartEvent) => {
         console.log('🎤 [VoiceSearch] Début reconnaissance');
-        safeSetState({ isListening: true, error: null });
+        safeSetState({isListening: true, error: null});
         callbacksRef.current.onStart?.();
       };
 
@@ -136,7 +136,7 @@ export const useVoiceSearch = (
 
       Voice.onSpeechEnd = (event: SpeechEndEvent) => {
         console.log('🎤 [VoiceSearch] Fin reconnaissance');
-        safeSetState({ isListening: false });
+        safeSetState({isListening: false});
 
         if (timeoutRef.current) {
           clearTimeout(timeoutRef.current);
@@ -147,16 +147,26 @@ export const useVoiceSearch = (
       };
 
       Voice.onSpeechError = (event: SpeechErrorEvent) => {
-        let errorMessage = event.error?.message || 'Erreur de reconnaissance vocale';
+        let errorMessage =
+          event.error?.message || 'Erreur de reconnaissance vocale';
 
         // Gestion spécifique des codes d'erreur courants (sans logs)
         if (event.error?.code === '7' || errorMessage.includes('No match')) {
           errorMessage = 'Aucune parole détectée';
-        } else if (event.error?.code === '11' || errorMessage.includes("Didn't understand")) {
+        } else if (
+          event.error?.code === '11' ||
+          errorMessage.includes("Didn't understand")
+        ) {
           errorMessage = 'Parole non comprise. Répétez plus clairement.';
-        } else if (event.error?.code === '6' || errorMessage.includes('No network')) {
+        } else if (
+          event.error?.code === '6' ||
+          errorMessage.includes('No network')
+        ) {
           errorMessage = 'Erreur réseau. Vérifiez votre connexion internet.';
-        } else if (event.error?.code === '9' || errorMessage.includes('Insufficient permissions')) {
+        } else if (
+          event.error?.code === '9' ||
+          errorMessage.includes('Insufficient permissions')
+        ) {
           errorMessage = 'Permission microphone requise';
         } else {
           // Logs seulement pour les erreurs vraiment critiques/inattendues
@@ -165,7 +175,7 @@ export const useVoiceSearch = (
 
         safeSetState({
           isListening: false,
-          error: errorMessage
+          error: errorMessage,
         });
 
         if (timeoutRef.current) {
@@ -180,12 +190,14 @@ export const useVoiceSearch = (
         console.log('🎤 [VoiceSearch] Résultats finaux:', event.value);
 
         if (event.value && event.value.length > 0) {
-          const cleanedResults = event.value.map(result => cleanVoiceInput(result));
+          const cleanedResults = event.value.map(result =>
+            cleanVoiceInput(result),
+          );
           const bestResult = cleanedResults[0];
 
           safeSetState({
             results: cleanedResults,
-            isListening: false
+            isListening: false,
           });
 
           callbacksRef.current.onResult?.(bestResult, cleanedResults);
@@ -195,11 +207,17 @@ export const useVoiceSearch = (
       Voice.onSpeechPartialResults = (event: SpeechResultsEvent) => {
         console.log('🎤 [VoiceSearch] Résultats partiels:', event.value);
 
-        if (finalConfig.partialResults && event.value && event.value.length > 0) {
-          const cleanedPartials = event.value.map(result => cleanVoiceInput(result));
+        if (
+          finalConfig.partialResults &&
+          event.value &&
+          event.value.length > 0
+        ) {
+          const cleanedPartials = event.value.map(result =>
+            cleanVoiceInput(result),
+          );
           const bestPartial = cleanedPartials[0];
 
-          safeSetState({ partialResults: cleanedPartials });
+          safeSetState({partialResults: cleanedPartials});
           callbacksRef.current.onPartialResult?.(bestPartial);
         }
       };
@@ -209,7 +227,7 @@ export const useVoiceSearch = (
 
       safeSetState({
         isInitialized: true,
-        hasPermission
+        hasPermission,
       });
 
       console.log('🎤 [VoiceSearch] Initialisé avec succès');
@@ -217,7 +235,7 @@ export const useVoiceSearch = (
       console.error('🎤 [VoiceSearch] Erreur initialisation:', error);
       safeSetState({
         error: error.message || 'Erreur initialisation',
-        isInitialized: true
+        isInitialized: true,
       });
     }
   };
@@ -240,9 +258,9 @@ export const useVoiceSearch = (
           // Proposer d'ouvrir les paramètres
           Alert.alert(
             'Permission requise',
-            'L\'accès au microphone est nécessaire pour la recherche vocale.',
+            "L'accès au microphone est nécessaire pour la recherche vocale.",
             [
-              { text: 'Annuler', style: 'cancel' },
+              {text: 'Annuler', style: 'cancel'},
               {
                 text: 'Paramètres',
                 onPress: () => {
@@ -251,9 +269,9 @@ export const useVoiceSearch = (
                   } else {
                     Linking.openSettings();
                   }
-                }
-              }
-            ]
+                },
+              },
+            ],
           );
           return false;
         }
@@ -263,7 +281,7 @@ export const useVoiceSearch = (
       safeSetState({
         error: null,
         results: [],
-        partialResults: []
+        partialResults: [],
       });
 
       // Démarrer avec timeout
@@ -291,13 +309,18 @@ export const useVoiceSearch = (
 
       safeSetState({
         error: errorMessage,
-        isListening: false
+        isListening: false,
       });
 
       callbacksRef.current.onError?.(errorMessage);
       return false;
     }
-  }, [state.isListening, state.hasPermission, finalConfig.locale, finalConfig.timeout]);
+  }, [
+    state.isListening,
+    state.hasPermission,
+    finalConfig.locale,
+    finalConfig.timeout,
+  ]);
 
   // 🛑 Arrêter la reconnaissance
   const stopListening = useCallback(async () => {
@@ -310,10 +333,10 @@ export const useVoiceSearch = (
       }
 
       await Voice.stop();
-      safeSetState({ isListening: false });
+      safeSetState({isListening: false});
     } catch (error: any) {
       console.error('🎤 [VoiceSearch] Erreur arrêt:', error);
-      safeSetState({ isListening: false });
+      safeSetState({isListening: false});
     }
   }, []);
 
@@ -332,7 +355,7 @@ export const useVoiceSearch = (
         isListening: false,
         results: [],
         partialResults: [],
-        error: null
+        error: null,
       });
     } catch (error: any) {
       console.error('🎤 [VoiceSearch] Erreur nettoyage:', error);
@@ -364,7 +387,7 @@ export const useVoiceSearch = (
   useEffect(() => {
     if (state.isListening && finalConfig.timeout) {
       const emergencyCleanup = setTimeout(() => {
-        console.log('🎤 [VoiceSearch] Nettoyage d\'urgence');
+        console.log("🎤 [VoiceSearch] Nettoyage d'urgence");
         stopListening();
       }, finalConfig.timeout + 5000); // 5s de marge
 

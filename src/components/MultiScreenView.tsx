@@ -13,7 +13,10 @@ import {
   AppState,
   BackHandler,
   Animated,
+  InteractionManager,
 } from 'react-native';
+import LZString from 'lz-string';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import Video from 'react-native-video';
 import {Image} from 'react-native';
@@ -21,7 +24,11 @@ import ImmersiveMode from 'react-native-immersive-mode';
 import SystemNavigationBar from 'react-native-system-navigation-bar';
 import database from '../database';
 import {Q} from '@nozbe/watermelondb';
-import {Channel as ChannelModel, Category as CategoryModel} from '../database/models';
+import {
+  Channel as ChannelModel,
+  Category as CategoryModel,
+} from '../database/models';
+import CategoriesService from '../services/CategoriesService'; // ⚡ Service optimisé catégories
 
 const {width: SCREEN_WIDTH, height: SCREEN_HEIGHT} = Dimensions.get('window');
 
@@ -44,10 +51,20 @@ interface MultiScreenViewProps {
   initialLayout?: string | null;
   initialSlots?: (Channel | null)[];
   initialActiveSlot?: number;
-  onStateChange?: (layout: string | null, slots: (Channel | null)[], activeSlot: number) => void;
+  onStateChange?: (
+    layout: string | null,
+    slots: (Channel | null)[],
+    activeSlot: number,
+  ) => void;
 }
 
-type LayoutType = '2x2' | '1+3-right' | '1+3-bottom' | '1+2-right' | '2-horizontal' | '2-vertical';
+type LayoutType =
+  | '2x2'
+  | '1+3-right'
+  | '1+3-bottom'
+  | '1+2-right'
+  | '2-horizontal'
+  | '2-vertical';
 
 interface LayoutConfig {
   id: LayoutType;
@@ -58,9 +75,24 @@ interface LayoutConfig {
 
 const LAYOUTS: LayoutConfig[] = [
   {id: '2x2', name: 'Grille 2x2', icon: 'grid-on', slots: 4},
-  {id: '1+3-right', name: '1 Principal + 3 droite', icon: 'view-quilt', slots: 4},
-  {id: '1+3-bottom', name: '1 Principal + 3 bas', icon: 'view-agenda', slots: 4},
-  {id: '1+2-right', name: '1 Principal + 2 droite', icon: 'view-sidebar', slots: 3},
+  {
+    id: '1+3-right',
+    name: '1 Principal + 3 droite',
+    icon: 'view-quilt',
+    slots: 4,
+  },
+  {
+    id: '1+3-bottom',
+    name: '1 Principal + 3 bas',
+    icon: 'view-agenda',
+    slots: 4,
+  },
+  {
+    id: '1+2-right',
+    name: '1 Principal + 2 droite',
+    icon: 'view-sidebar',
+    slots: 3,
+  },
   {id: '2-horizontal', name: '2 Horizontaux', icon: 'view-stream', slots: 2},
   {id: '2-vertical', name: '2 Verticaux', icon: 'view-column', slots: 2},
 ];
@@ -79,14 +111,21 @@ const MultiScreenView: React.FC<MultiScreenViewProps> = ({
   // ⏱️ Performance tracking
   const renderStartTime = React.useRef<number>(0);
 
+  // 🛡️ Protection contre les appels multiples simultanés
+  const isLoadingCategoriesRef = React.useRef(false);
+
   // ⚡ State pour les chaînes - chargées à la demande
   const [channels, setChannels] = React.useState<Channel[]>([]);
-  const [categories, setCategories] = React.useState<{id: string; name: string; count: number}[]>([]);
+  const [categories, setCategories] = React.useState<
+    {id: string; name: string; count: number}[]
+  >([]);
   const [isLoadingChannels, setIsLoadingChannels] = React.useState(false);
 
   // 🔍 Debug: Logger les changements de categories
   React.useEffect(() => {
-    console.log(`🔍 [DEBUG] Categories state changé: ${categories.length} catégories`);
+    console.log(
+      `🔍 [DEBUG] Categories state changé: ${categories.length} catégories`,
+    );
   }, [categories]);
 
   // State pour forcer re-render des vidéos (utilisé par bouton retry)
@@ -112,28 +151,79 @@ const MultiScreenView: React.FC<MultiScreenViewProps> = ({
   }, [visible, playlistId]);
 
   const loadCategoriesOnly = async () => {
+    // 🛡️ Protection contre les appels multiples simultanés
+    if (isLoadingCategoriesRef.current) {
+      console.log('⚠️ [MultiScreen] Chargement déjà en cours, ignorer cet appel');
+      return;
+    }
+
+    isLoadingCategoriesRef.current = true;
     const loadStartTime = performance.now();
     setIsLoadingChannels(true);
-    try {
-      console.log(`🔍 [DEBUG] Chargement catégories pour playlist: ${playlistId}`);
 
-      const dbCategories = await database
-        .get<typeof CategoryModel>('categories')
-        .query(Q.where('playlist_id', playlistId!))
-        .fetch();
+    try {
+      console.log(
+        `🔍 [MultiScreen] Chargement catégories optimisé pour playlist: ${playlistId}`,
+      );
+
+      if (!playlistId) {
+        console.error('❌ [MultiScreen] playlistId est null ou undefined');
+        setIsLoadingChannels(false);
+        isLoadingCategoriesRef.current = false;
+        return;
+      }
+
+      // ✅ OPTIMISATION: Cache AsyncStorage compressé (INSTANTANÉ au 2ème lancement)
+      try {
+        const cacheKey = `multiscreen_categories_cache_${playlistId}`;
+        const cachedData = await AsyncStorage.getItem(cacheKey);
+
+        if (cachedData) {
+          // ⚡ Décompression et parsing en arrière-plan
+          InteractionManager.runAfterInteractions(() => {
+            try {
+              const decompressed = LZString.decompressFromUTF16(cachedData);
+              const parsed = decompressed ? JSON.parse(decompressed) : JSON.parse(cachedData);
+              const cacheAge = Date.now() - parsed.timestamp;
+
+              // Cache valide pendant 24h
+              if (cacheAge < 24 * 60 * 60 * 1000) {
+                console.log(`💾 [MultiScreen] Cache AsyncStorage trouvé (${Math.round(cacheAge / 1000 / 60)}min)`);
+                setCategories(parsed.categories);
+                setIsLoadingChannels(false);
+                isLoadingCategoriesRef.current = false;
+                console.log(`⚡ [MultiScreen] Affichage instantané: ${parsed.categories.length} catégories`);
+              }
+            } catch (parseError) {
+              console.log('⚠️ [MultiScreen] Erreur parsing cache:', parseError);
+            }
+          });
+          return;
+        }
+      } catch (error) {
+        console.log('⚠️ [MultiScreen] Erreur lecture cache AsyncStorage:', error);
+      }
+
+      // ⚡ OPTIMISATION: Utiliser CategoriesService avec cache 24h + SQL optimisé
+      const categoriesFromService = await CategoriesService.loadCategories(playlistId);
 
       const loadEndTime = performance.now();
-      console.log(`⏱️ [PERF] Catégories chargées: ${(loadEndTime - loadStartTime).toFixed(2)}ms pour ${dbCategories.length} catégories`);
-      console.log(`🔍 [DEBUG] Premières catégories:`, dbCategories.slice(0, 3).map(c => ({id: c.id, name: c.name, count: c.channelsCount})));
+      console.log(
+        `⏱️ [PERF] Catégories chargées: ${(loadEndTime - loadStartTime).toFixed(
+          2,
+        )}ms pour ${categoriesFromService.length} catégories`,
+      );
 
-      // Transformer les catégories avec leur ID et nombre de chaînes
-      const categoriesWithCounts = dbCategories.map(cat => ({
-        id: cat.id, // ⚡ IMPORTANT: garder l'ID pour Xtream Codes
+      // Transformer au format attendu par le composant
+      const categoriesWithCounts = categoriesFromService.map(cat => ({
+        id: cat.name, // Utiliser le nom comme ID pour M3U
         name: cat.name,
-        count: cat.channelsCount || 0,
+        count: cat.count,
       }));
 
-      console.log(`🔍 [DEBUG] Catégories transformées: ${categoriesWithCounts.length}`);
+      console.log(
+        `🔍 [MultiScreen] Catégories transformées: ${categoriesWithCounts.length}`,
+      );
 
       // Ajouter "Tout" en premier
       categoriesWithCounts.unshift({
@@ -142,52 +232,109 @@ const MultiScreenView: React.FC<MultiScreenViewProps> = ({
         count: categoriesWithCounts.reduce((sum, cat) => sum + cat.count, 0),
       });
 
-      console.log(`🔍 [DEBUG] Catégories finales avec "Tout": ${categoriesWithCounts.length}`);
-      console.log(`🔍 [DEBUG] Premières catégories finales:`, categoriesWithCounts.slice(0, 5));
+      console.log(
+        `✅ [MultiScreen] ${categoriesWithCounts.length} catégories chargées (avec cache)`,
+      );
 
       setCategories(categoriesWithCounts);
-      console.log(`✅ [DEBUG] State categories mis à jour avec ${categoriesWithCounts.length} catégories`);
-
       setChannels([]); // Les chaînes seront chargées par catégorie
+
+      // 💾 OPTIMISATION: Sauvegarder dans AsyncStorage avec compression
+      try {
+        const cacheKey = `multiscreen_categories_cache_${playlistId}`;
+        const dataToCache = {
+          categories: categoriesWithCounts,
+          timestamp: Date.now(),
+        };
+
+        const jsonString = JSON.stringify(dataToCache);
+        const compressed = LZString.compressToUTF16(jsonString);
+        const compressionRatio = Math.round((1 - compressed.length / jsonString.length) * 100);
+
+        await AsyncStorage.setItem(cacheKey, compressed);
+        console.log(`💾 [MultiScreen] Cache sauvegardé (compression: ${compressionRatio}%)`);
+      } catch (cacheError) {
+        console.log('⚠️ [MultiScreen] Erreur sauvegarde cache:', cacheError);
+      }
     } catch (error) {
-      console.error('❌ Erreur chargement catégories:', error);
+      console.error('❌ [MultiScreen] Erreur chargement catégories:', error);
+      // En cas d'erreur, initialiser avec un tableau vide pour éviter le chargement infini
+      setCategories([]);
+      setChannels([]);
     } finally {
       setIsLoadingChannels(false);
+      isLoadingCategoriesRef.current = false;
     }
   };
 
   // ⚡ CHARGER LES CHAÎNES D'UNE CATÉGORIE UNIQUEMENT QUAND NÉCESSAIRE
-  const loadChannelsForCategory = async (categoryId: string, categoryName: string) => {
+  const loadChannelsForCategory = async (
+    categoryId: string,
+    categoryName: string,
+  ) => {
     const loadStartTime = performance.now();
     try {
-      console.log(`🔍 [DEBUG] Chargement chaînes - categoryId: ${categoryId}, categoryName: ${categoryName}`);
+      console.log(
+        `🔍 [MultiScreen] Chargement chaînes optimisé - catégorie: ${categoryName}`,
+      );
 
-      let query;
+      let dbChannels;
+
       if (categoryId === 'all') {
-        // Charger toutes les chaînes
-        query = database
+        // ⚡ OPTIMISATION: Requête SQL directe avec index COLLATE NOCASE pour tri ultra-rapide
+        const sqlQuery = `
+          SELECT id, name, stream_url, logo_url, group_title
+          FROM channels
+          WHERE playlist_id = ?
+          ORDER BY name COLLATE NOCASE
+        `;
+
+        const rawResults = await database
           .get<typeof ChannelModel>('channels')
-          .query(Q.where('playlist_id', playlistId!));
+          .query(Q.unsafeSqlQuery(sqlQuery, [playlistId!]))
+          .unsafeFetchRaw();
+
+        // Transformer les résultats raw SQL
+        dbChannels = rawResults.map((row: any) => ({
+          id: row.id,
+          name: row.name,
+          streamUrl: row.stream_url,
+          logoUrl: row.logo_url,
+          groupTitle: row.group_title,
+        }));
       } else {
-        // ⚡ Charger par category_id (Xtream Codes) OU par group_title (M3U)
-        query = database
+        // ⚡ OPTIMISATION: Requête SQL avec index composite (playlist_id, group_title)
+        const sqlQuery = `
+          SELECT id, name, stream_url, logo_url, group_title
+          FROM channels
+          WHERE playlist_id = ? AND group_title = ?
+          ORDER BY name COLLATE NOCASE
+        `;
+
+        const rawResults = await database
           .get<typeof ChannelModel>('channels')
-          .query(
-            Q.where('playlist_id', playlistId!),
-            Q.or(
-              Q.where('category_id', categoryId),
-              Q.where('group_title', categoryName)
-            )
-          );
+          .query(Q.unsafeSqlQuery(sqlQuery, [playlistId!, categoryName]))
+          .unsafeFetchRaw();
+
+        // Transformer les résultats raw SQL
+        dbChannels = rawResults.map((row: any) => ({
+          id: row.id,
+          name: row.name,
+          streamUrl: row.stream_url,
+          logoUrl: row.logo_url,
+          groupTitle: row.group_title,
+        }));
       }
 
-      const dbChannels = await query.fetch();
-
       const loadEndTime = performance.now();
-      console.log(`⏱️ [PERF] Chaînes de "${categoryName}" chargées: ${(loadEndTime - loadStartTime).toFixed(2)}ms pour ${dbChannels.length} chaînes`);
+      console.log(
+        `⏱️ [PERF] Chaînes de "${categoryName}" chargées: ${(
+          loadEndTime - loadStartTime
+        ).toFixed(2)}ms pour ${dbChannels.length} chaînes`,
+      );
 
-      // Transformer uniquement les chaînes de cette catégorie
-      const formatted = dbChannels.map((ch) => ({
+      // Transformer au format attendu par le composant
+      const formatted = dbChannels.map((ch: any) => ({
         id: ch.id,
         name: ch.name,
         url: ch.streamUrl,
@@ -198,42 +345,76 @@ const MultiScreenView: React.FC<MultiScreenViewProps> = ({
 
       setChannels(formatted);
     } catch (error) {
-      console.error('❌ Erreur chargement chaînes catégorie:', error);
+      console.error('❌ [MultiScreen] Erreur chargement chaînes catégorie:', error);
+      setChannels([]);
     }
   };
 
-  // 🎯 LIFECYCLE: Gérer pause/resume quand l'app passe en arrière-plan
+  // 🎯 LIFECYCLE: Gérer pause/resume avec respect du paramètre utilisateur
   React.useEffect(() => {
-    const subscription = AppState.addEventListener('change', nextAppState => {
+    const subscription = AppState.addEventListener('change', async nextAppState => {
       if (nextAppState === 'background' || nextAppState === 'inactive') {
-        console.log('🔇 [MultiScreen] App en arrière-plan - PAUSE vidéos');
-        setIsPausedByAppState(true);
+        console.log('🔇 [MultiScreen] App en arrière-plan');
+
+        // Vérifier le paramètre de lecture en arrière-plan
+        try {
+          const { videoSettingsService } = await import('../services/VideoSettingsService');
+          const backgroundPlay = await videoSettingsService.getSetting('backgroundPlay');
+          console.log(`🔍 [MultiScreen] Paramètre backgroundPlay: ${backgroundPlay}`);
+
+          if (backgroundPlay) {
+            console.log('🎵 [MultiScreen] Lecture en arrière-plan activée - PAS DE PAUSE');
+            // Ne pas mettre en pause - permettre la lecture continue
+          } else {
+            console.log('🔇 [MultiScreen] Lecture en arrière-plan désactivée - PAUSE vidéos');
+            setIsPausedByAppState(true);
+          }
+        } catch (error) {
+          console.error('❌ [MultiScreen] Erreur lecture paramètre:', error);
+          // Par défaut, mettre en pause si erreur
+          setIsPausedByAppState(true);
+        }
       } else if (nextAppState === 'active') {
-        console.log('🔊 [MultiScreen] App active - RESUME vidéos');
-        setIsPausedByAppState(false);
+        console.log('🔊 [MultiScreen] App active - VÉRIFICATION RESUME');
+
+        try {
+          const { videoSettingsService } = await import('../services/VideoSettingsService');
+          const backgroundPlay = await videoSettingsService.getSetting('backgroundPlay');
+
+          if (backgroundPlay && isPausedByAppState) {
+            console.log('🔊 [MultiScreen] App active - RESUME vidéos depuis arrière-plan');
+            setIsPausedByAppState(false);
+          } else if (!backgroundPlay && isPausedByAppState) {
+            console.log('🔊 [MultiScreen] App active - RESUME vidéos après pause normale');
+            setIsPausedByAppState(false);
+          }
+        } catch (error) {
+          console.error('❌ [MultiScreen] Erreur lecture paramètre:', error);
+          setIsPausedByAppState(false);
+        }
       }
     });
 
     return () => {
       subscription.remove();
     };
-  }, []);
+  }, [isPausedByAppState]);
 
   // Animation de rotation pour le loading
   React.useEffect(() => {
-    if (channels.length === 0 && step === 'selector') {
-      // Démarrer l'animation de rotation
+    if ((categories.length === 0 || channels.length === 0) && step === 'selector' && !isLoadingChannels) {
+      // Démarrer l'animation de rotation seulement si en cours de chargement
       Animated.loop(
         Animated.timing(loadingRotation, {
           toValue: 1,
           duration: 1000,
           useNativeDriver: true,
-        })
+        }),
       ).start();
     } else {
       loadingRotation.setValue(0);
     }
-  }, [channels.length, step, loadingRotation]);
+  }, [categories.length, channels.length, step, isLoadingChannels, loadingRotation]);
 
   // Force immersive mode dans Modal (contourner StatusBarManager car priorité bloquée)
   React.useEffect(() => {
@@ -257,9 +438,9 @@ const MultiScreenView: React.FC<MultiScreenViewProps> = ({
     }
   }, [visible]);
 
-  const [step, setStep] = React.useState<'layout' | 'grid' | 'selector' | 'channels'>(
-    initialLayout && initialSlots.length > 0 ? 'grid' : 'layout',
-  );
+  const [step, setStep] = React.useState<
+    'layout' | 'grid' | 'selector' | 'channels'
+  >(initialLayout && initialSlots.length > 0 ? 'grid' : 'layout');
 
   // 🔍 Debug: Logger les changements de step
   React.useEffect(() => {
@@ -274,12 +455,18 @@ const MultiScreenView: React.FC<MultiScreenViewProps> = ({
   const [slotChannels, setSlotChannels] = React.useState<(Channel | null)[]>(
     initialSlots.length > 0 ? initialSlots : [],
   );
-  const [selectedCategoryForChannels, setSelectedCategoryForChannels] = React.useState<string | null>(null);
-  const [activeSlotIndex, setActiveSlotIndex] = React.useState<number>(initialActiveSlot); // Slot actif avec le son
+  const [selectedCategoryForChannels, setSelectedCategoryForChannels] =
+    React.useState<string | null>(null);
+  const [activeSlotIndex, setActiveSlotIndex] =
+    React.useState<number>(initialActiveSlot); // Slot actif avec le son
   // Tracker les positions de lecture pour chaque slot
-  const [slotPositions, setSlotPositions] = React.useState<{[key: number]: number}>({});
+  const [slotPositions, setSlotPositions] = React.useState<{
+    [key: number]: number;
+  }>({});
   // Tracker les erreurs de stream pour affichage visuel
-  const [slotErrors, setSlotErrors] = React.useState<{[key: number]: boolean}>({});
+  const [slotErrors, setSlotErrors] = React.useState<{[key: number]: boolean}>(
+    {},
+  );
 
   // ⚡ Utiliser directement le state categories (chargé depuis DB)
   // Plus besoin de calculer depuis channels - déjà optimisé !
@@ -287,7 +474,9 @@ const MultiScreenView: React.FC<MultiScreenViewProps> = ({
   // Filtrer les chaînes selon la catégorie sélectionnée (pour step 'channels')
   // ⚡ Les chaînes sont déjà filtrées par loadChannelsForCategory, pas besoin de filtrer à nouveau
   const filteredChannelsForCategory = React.useMemo(() => {
-    console.log(`🔍 [DEBUG] filteredChannelsForCategory - channels.length: ${channels.length}, selectedCategory: ${selectedCategoryForChannels}`);
+    console.log(
+      `🔍 [DEBUG] filteredChannelsForCategory - channels.length: ${channels.length}, selectedCategory: ${selectedCategoryForChannels}`,
+    );
     return channels; // Déjà filtrées par la requête DB
   }, [channels, selectedCategoryForChannels]);
 
@@ -299,9 +488,15 @@ const MultiScreenView: React.FC<MultiScreenViewProps> = ({
     const initialSlotsData = new Array(layoutConfig?.slots || 4).fill(null);
     if (currentChannel) {
       initialSlotsData[0] = currentChannel;
-      console.log('🎬 [MultiScreen] Slot 0 pré-rempli avec:', currentChannel.name);
+      console.log(
+        '🎬 [MultiScreen] Slot 0 pré-rempli avec:',
+        currentChannel.name,
+      );
     }
-    console.log('🎯 [MultiScreen] Slots initiaux:', initialSlotsData.map((s, i) => s ? `${i}:${s.name}` : `${i}:vide`));
+    console.log(
+      '🎯 [MultiScreen] Slots initiaux:',
+      initialSlotsData.map((s, i) => (s ? `${i}:${s.name}` : `${i}:vide`)),
+    );
     setSlotChannels(initialSlotsData);
     setStep('grid');
     // Persister l'état dans le parent
@@ -320,7 +515,12 @@ const MultiScreenView: React.FC<MultiScreenViewProps> = ({
       setSlotChannels(newSlots);
       // Auto-activer le slot qu'on vient de remplir (activer le son)
       setActiveSlotIndex(selectedSlotIndex);
-      console.log('🎯 [MultiScreen] Slot', selectedSlotIndex, 'auto-activé avec:', channel.name);
+      console.log(
+        '🎯 [MultiScreen] Slot',
+        selectedSlotIndex,
+        'auto-activé avec:',
+        channel.name,
+      );
       setStep('grid');
       setSelectedSlotIndex(null);
       // Persister l'état dans le parent
@@ -371,12 +571,17 @@ const MultiScreenView: React.FC<MultiScreenViewProps> = ({
   const handleVideoPress = (channel: Channel | null, slotIndex?: number) => {
     if (channel) {
       // Ajouter la position de lecture au channel pour continuer depuis où on était
-      const position = slotIndex !== undefined ? slotPositions[slotIndex] || 0 : 0;
+      const position =
+        slotIndex !== undefined ? slotPositions[slotIndex] || 0 : 0;
       const channelWithPosition = {
         ...channel,
         seekTime: position, // Position de départ pour le fullscreen
       };
-      console.log('🎬 [MultiScreen] Passage en fullscreen avec position:', position, 's');
+      console.log(
+        '🎬 [MultiScreen] Passage en fullscreen avec position:',
+        position,
+        's',
+      );
       onChannelFullscreen(channelWithPosition);
     }
   };
@@ -488,7 +693,12 @@ const MultiScreenView: React.FC<MultiScreenViewProps> = ({
       } else {
         // Pas actif : sélectionner ce slot (activer le son)
         setActiveSlotIndex(index);
-        console.log('🎯 [MultiScreen] Slot', index, 'sélectionné:', channel.name);
+        console.log(
+          '🎯 [MultiScreen] Slot',
+          index,
+          'sélectionné:',
+          channel.name,
+        );
         // Persister l'état dans le parent
         onStateChange?.(selectedLayout, slotChannels, index);
       }
@@ -535,9 +745,12 @@ const MultiScreenView: React.FC<MultiScreenViewProps> = ({
               useTextureView={false} // Réduit charge GPU
               disableFocus={true} // Fix problème focus ExoPlayer (CRITIQUE pour multi-instance)
               onLoadStart={() => {
-                console.log(`🎬 [MultiScreen] Slot ${index} - LoadStart:`, channel.name);
+                console.log(
+                  `🎬 [MultiScreen] Slot ${index} - LoadStart:`,
+                  channel.name,
+                );
               }}
-              onLoad={(data) => {
+              onLoad={data => {
                 console.log(`✅ [MultiScreen] Slot ${index} - Chargée:`, {
                   channel: channel.name,
                   duration: data.duration,
@@ -547,25 +760,34 @@ const MultiScreenView: React.FC<MultiScreenViewProps> = ({
                 // Réinitialiser l'erreur si le stream charge avec succès
                 setSlotErrors(prev => ({...prev, [index]: false}));
               }}
-              onError={(error) => {
+              onError={error => {
                 // Marquer le slot en erreur pour affichage visuel (sans log console)
                 setSlotErrors(prev => ({...prev, [index]: true}));
               }}
-              onProgress={(data) => {
+              onProgress={data => {
                 // Tracker la position de lecture pour reprise en fullscreen
                 setSlotPositions(prev => ({
                   ...prev,
                   [index]: data.currentTime,
                 }));
                 // Log réduit - seulement toutes les 10 secondes pour slot actif
-                if (isActive && Math.floor(data.currentTime) % 10 === 0 && Math.floor(data.currentTime) > 0) {
-                  console.log(`⏱️ [MultiScreen] Slot ${index} actif - Position:`, Math.floor(data.currentTime) + 's');
+                if (
+                  isActive &&
+                  Math.floor(data.currentTime) % 10 === 0 &&
+                  Math.floor(data.currentTime) > 0
+                ) {
+                  console.log(
+                    `⏱️ [MultiScreen] Slot ${index} actif - Position:`,
+                    Math.floor(data.currentTime) + 's',
+                  );
                 }
               }}
-              onBuffer={(data) => {
+              onBuffer={data => {
                 // Log buffering seulement si c'est le slot actif et en buffering
                 if (isActive && data.isBuffering) {
-                  console.log(`⏳ [MultiScreen] Slot ${index} - Buffering actif`);
+                  console.log(
+                    `⏳ [MultiScreen] Slot ${index} - Buffering actif`,
+                  );
                 }
               }}
               progressUpdateInterval={5000} // Mise à jour toutes les 5 secondes (réduit charge)
@@ -603,7 +825,11 @@ const MultiScreenView: React.FC<MultiScreenViewProps> = ({
           </View>
         ) : (
           <View style={styles.emptySlot}>
-            <Icon name="add-circle-outline" size={40} color="rgba(255,255,255,0.5)" />
+            <Icon
+              name="add-circle-outline"
+              size={40}
+              color="rgba(255,255,255,0.5)"
+            />
             <Text style={styles.emptySlotText}>Ajouter une chaîne</Text>
           </View>
         )}
@@ -613,15 +839,20 @@ const MultiScreenView: React.FC<MultiScreenViewProps> = ({
 
   // 🔙 Gérer le bouton retour Android et les swipes
   React.useEffect(() => {
-    if (!visible) return;
+    if (!visible) {
+      return;
+    }
 
-    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
-      const shouldPreventClose = handleBackPress();
-      if (!shouldPreventClose) {
-        handleDisable(); // Fermer le modal seulement si on est au premier step
-      }
-      return true; // Toujours intercepter le back button
-    });
+    const backHandler = BackHandler.addEventListener(
+      'hardwareBackPress',
+      () => {
+        const shouldPreventClose = handleBackPress();
+        if (!shouldPreventClose) {
+          handleDisable(); // Fermer le modal seulement si on est au premier step
+        }
+        return true; // Toujours intercepter le back button
+      },
+    );
 
     return () => backHandler.remove();
   }, [visible, step]);
@@ -633,7 +864,7 @@ const MultiScreenView: React.FC<MultiScreenViewProps> = ({
         step,
         selectedLayout,
         slotsCount: slotChannels.length,
-        slots: slotChannels.map((s, i) => s ? `${i}:${s.name}` : `${i}:vide`),
+        slots: slotChannels.map((s, i) => (s ? `${i}:${s.name}` : `${i}:vide`)),
         activeSlot: activeSlotIndex,
       });
     }
@@ -661,12 +892,18 @@ const MultiScreenView: React.FC<MultiScreenViewProps> = ({
             onLayout={() => {
               if (renderStartTime.current > 0) {
                 const renderEndTime = performance.now();
-                console.log(`⏱️ [PERF] Layout UI rendu en ${(renderEndTime - renderStartTime.current).toFixed(2)}ms`);
+                console.log(
+                  `⏱️ [PERF] Layout UI rendu en ${(
+                    renderEndTime - renderStartTime.current
+                  ).toFixed(2)}ms`,
+                );
                 renderStartTime.current = 0; // Reset pour éviter les logs multiples
               }
             }}>
             <View style={styles.header}>
-              <TouchableOpacity onPress={handleDisable} style={styles.closeButton}>
+              <TouchableOpacity
+                onPress={handleDisable}
+                style={styles.closeButton}>
                 <Icon name="close" size={28} color="white" />
               </TouchableOpacity>
               <Text style={styles.headerTitle}>
@@ -703,55 +940,89 @@ const MultiScreenView: React.FC<MultiScreenViewProps> = ({
         {/* Step 3: Categories Selector (2 colonnes horizontales) */}
         {step === 'selector' && (
           <View style={styles.selectorContainer}>
-              <View style={styles.header}>
-                <View style={{width: 40}} />
-                <Text style={styles.headerTitle}>CATÉGORIES EN DIRECT</Text>
-                <View style={{width: 40}} />
-              </View>
+            <View style={styles.header}>
+              <View style={{width: 40}} />
+              <Text style={styles.headerTitle}>CATÉGORIES EN DIRECT</Text>
+              <View style={{width: 40}} />
+            </View>
 
-              {/* Animation de chargement si pas de catégories */}
-              {categories.length === 0 ? (
-                <View style={styles.loadingContainer}>
-                  <Animated.View style={{
-                    transform: [{
-                      rotate: loadingRotation.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: ['0deg', '360deg']
-                      })
-                    }]
+            {/* Animation de chargement si pas de catégories et qu'on est en train de charger */}
+            {categories.length === 0 && isLoadingChannels ? (
+              <View style={styles.loadingContainer}>
+                <Animated.View
+                  style={{
+                    transform: [
+                      {
+                        rotate: loadingRotation.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: ['0deg', '360deg'],
+                        }),
+                      },
+                    ],
                   }}>
-                    <Icon name="refresh" size={48} color="#1976d2" />
-                  </Animated.View>
-                </View>
-              ) : (
-                <ScrollView
-                  style={styles.channelsList}
-                  contentContainerStyle={styles.categoriesListContainer}>
-                  {(() => {
-                    console.log(`🔍 [DEBUG] Rendu catégories - Nombre: ${categories.length}`);
-                    console.log(`🔍 [DEBUG] Categories state:`, categories.slice(0, 3));
-                    return null;
-                  })()}
-                  {categories.map((category) => {
+                  <Icon name="refresh" size={48} color="#1976d2" />
+                </Animated.View>
+                <Text style={styles.loadingText}>Chargement des catégories...</Text>
+              </View>
+            ) : categories.length === 0 && !isLoadingChannels ? (
+              <View style={styles.loadingContainer}>
+                <Icon name="error-outline" size={48} color="#ff5252" />
+                <Text style={styles.loadingText}>Aucune catégorie trouvée</Text>
+                <TouchableOpacity
+                  style={styles.retryButton}
+                  onPress={() => {
+                    console.log('🔄 [MultiScreen] Retry chargement catégories');
+                    loadCategoriesOnly();
+                  }}>
+                  <Icon name="refresh" size={20} color="white" />
+                  <Text style={styles.retryButtonText}>Réessayer</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <ScrollView
+                style={styles.channelsList}
+                contentContainerStyle={styles.categoriesListContainer}>
+                {(() => {
+                  console.log(
+                    `🔍 [DEBUG] Rendu catégories - Nombre: ${categories.length}`,
+                  );
+                  console.log(
+                    '🔍 [DEBUG] Categories state:',
+                    categories.slice(0, 3),
+                  );
+                  return null;
+                })()}
+                {categories.map(category => {
                   return (
                     <TouchableOpacity
                       key={category.name}
                       style={styles.categoryItemHorizontal}
                       onPress={async () => {
-                        console.log(`📂 [MultiScreen] Catégorie sélectionnée: ${category.name} (ID: ${category.id})`);
+                        console.log(
+                          `📂 [MultiScreen] Catégorie sélectionnée: ${category.name} (ID: ${category.id})`,
+                        );
                         setSelectedCategoryForChannels(category.name);
                         setStep('channels');
                         // ⚡ Charger les chaînes de cette catégorie SEULEMENT
-                        await loadChannelsForCategory(category.id, category.name);
+                        await loadChannelsForCategory(
+                          category.id,
+                          category.name,
+                        );
                       }}
                       activeOpacity={0.8}>
                       {/* Logo gauche - Placeholder générique pour catégories */}
                       <View style={styles.categoryLogoContainer}>
-                        <Icon name="play-circle-outline" size={32} color="#1976d2" />
+                        <Icon
+                          name="play-circle-outline"
+                          size={32}
+                          color="#1976d2"
+                        />
                       </View>
 
                       {/* Nom catégorie (centre, flex) */}
-                      <Text style={styles.categoryNameHorizontal} numberOfLines={1}>
+                      <Text
+                        style={styles.categoryNameHorizontal}
+                        numberOfLines={1}>
                         {category.name}
                       </Text>
 
@@ -762,68 +1033,71 @@ const MultiScreenView: React.FC<MultiScreenViewProps> = ({
                     </TouchableOpacity>
                   );
                 })}
-                </ScrollView>
-              )}
-            </View>
+              </ScrollView>
+            )}
+          </View>
         )}
 
         {/* Step 4: Channels List (2 colonnes horizontales avec logos) */}
         {step === 'channels' && (
           <View style={styles.selectorContainer}>
-              <View style={styles.header}>
-                <View style={{width: 40}} />
-                <Text style={styles.headerTitle}>
-                  {selectedCategoryForChannels} ({filteredChannelsForCategory.length})
-                </Text>
-                <View style={{width: 40}} />
-              </View>
-
-              {/* Grille chaînes 2 colonnes horizontales (logo gauche + nom) - VIRTUALISÉ */}
-              <FlatList
-                data={filteredChannelsForCategory}
-                keyExtractor={(item, index) => `${item.id}-${index}`}
-                numColumns={2}
-                style={styles.channelsList}
-                contentContainerStyle={styles.channelsGridContainer}
-                removeClippedSubviews={true}
-                maxToRenderPerBatch={20}
-                windowSize={7}
-                initialNumToRender={20}
-                updateCellsBatchingPeriod={50}
-                getItemLayout={(data, index) => ({
-                  length: 56,
-                  offset: 56 * index,
-                  index,
-                })}
-                renderItem={({item: channel}) => (
-                  <TouchableOpacity
-                    style={styles.channelCardHorizontal}
-                    onPress={() => {
-                      console.log(`📺 [MultiScreen] Chaîne sélectionnée: ${channel.name}`);
-                      handleChannelSelect(channel);
-                    }}
-                    activeOpacity={0.8}>
-                    {/* Logo chaîne (gauche) */}
-                    <View style={styles.channelLogoContainerSmall}>
-                      {channel.logo ? (
-                        <Image
-                          source={{uri: channel.logo}}
-                          style={styles.channelLogoImageSmall}
-                          resizeMode="contain"
-                        />
-                      ) : (
-                        <Icon name="tv" size={24} color="#999" />
-                      )}
-                    </View>
-
-                    {/* Nom chaîne (droite) */}
-                    <Text style={styles.channelNameHorizontal} numberOfLines={2}>
-                      {channel.name}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-              />
+            <View style={styles.header}>
+              <View style={{width: 40}} />
+              <Text style={styles.headerTitle}>
+                {selectedCategoryForChannels} (
+                {filteredChannelsForCategory.length})
+              </Text>
+              <View style={{width: 40}} />
             </View>
+
+            {/* Grille chaînes 2 colonnes horizontales (logo gauche + nom) - VIRTUALISÉ */}
+            <FlatList
+              data={filteredChannelsForCategory}
+              keyExtractor={(item, index) => `${item.id}-${index}`}
+              numColumns={2}
+              style={styles.channelsList}
+              contentContainerStyle={styles.channelsGridContainer}
+              removeClippedSubviews={true}
+              maxToRenderPerBatch={20}
+              windowSize={7}
+              initialNumToRender={20}
+              updateCellsBatchingPeriod={50}
+              getItemLayout={(data, index) => ({
+                length: 56,
+                offset: 56 * index,
+                index,
+              })}
+              renderItem={({item: channel}) => (
+                <TouchableOpacity
+                  style={styles.channelCardHorizontal}
+                  onPress={() => {
+                    console.log(
+                      `📺 [MultiScreen] Chaîne sélectionnée: ${channel.name}`,
+                    );
+                    handleChannelSelect(channel);
+                  }}
+                  activeOpacity={0.8}>
+                  {/* Logo chaîne (gauche) */}
+                  <View style={styles.channelLogoContainerSmall}>
+                    {channel.logo ? (
+                      <Image
+                        source={{uri: channel.logo}}
+                        style={styles.channelLogoImageSmall}
+                        resizeMode="contain"
+                      />
+                    ) : (
+                      <Icon name="tv" size={24} color="#999" />
+                    )}
+                  </View>
+
+                  {/* Nom chaîne (droite) */}
+                  <Text style={styles.channelNameHorizontal} numberOfLines={2}>
+                    {channel.name}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            />
+          </View>
         )}
       </View>
     </Modal>
@@ -1155,6 +1429,8 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '500',
+    marginTop: 16,
+    textAlign: 'center',
   },
 });
 

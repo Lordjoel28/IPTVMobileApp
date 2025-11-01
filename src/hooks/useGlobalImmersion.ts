@@ -4,11 +4,11 @@
  * Compatible SafeAreaProvider pour transitions fluides
  */
 
-import { usePlayerStatusBar } from './useStatusBar';
-import { usePlayerStore } from '../stores/PlayerStore';
+import {usePlayerStatusBar} from './useStatusBar';
+import {usePlayerStore} from '../stores/PlayerStore';
 
 export const useGlobalImmersion = () => {
-  const { isVisible: isPipVisible, isFullscreen } = usePlayerStore();
+  const {isVisible: isPipVisible, isFullscreen} = usePlayerStore();
 
   // Déléguer au nouveau hook centralisé
   usePlayerStatusBar(isFullscreen, isPipVisible, 'GlobalImmersion');

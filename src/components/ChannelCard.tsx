@@ -14,7 +14,9 @@ import {
 } from 'react-native';
 import FastImage from 'react-native-fast-image';
 import LinearGradient from 'react-native-linear-gradient';
-import { useThemeColors } from '../contexts/ThemeContext';
+import Icon from 'react-native-vector-icons/MaterialIcons';
+import {useThemeColors} from '../contexts/ThemeContext';
+import LockedChannelBadge from './LockedChannelBadge';
 
 interface Channel {
   id: string;
@@ -30,6 +32,9 @@ interface ChannelCardProps {
   index: number;
   width: number;
   onPress: (channel: Channel) => void;
+  onLongPress?: (channel: Channel) => void;
+  isFavorite?: boolean;
+  isLocked?: boolean;
   serverUrl?: string;
   hideChannelNames?: boolean;
 }
@@ -39,6 +44,9 @@ const ChannelCard: React.FC<ChannelCardProps> = ({
   index,
   width,
   onPress,
+  onLongPress,
+  isFavorite = false,
+  isLocked = false,
   serverUrl = '',
   hideChannelNames = false,
 }) => {
@@ -86,6 +94,7 @@ const ChannelCard: React.FC<ChannelCardProps> = ({
   const getPressableStyle = ({pressed}: PressableStateCallbackType) => [
     styles.channelCard,
     {width},
+    isLocked && styles.channelCardLocked, // Style appliqué si verrouillé
     pressed && styles.channelCardPressed, // Style appliqué quand pressé
   ];
 
@@ -120,10 +129,14 @@ const ChannelCard: React.FC<ChannelCardProps> = ({
       <Pressable
         style={getPressableStyle}
         onPress={() => onPress(channel)}
+        onLongPress={onLongPress ? () => onLongPress(channel) : undefined}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         // android_ripple supprimé pour éviter débordement
       >
+        {/* Badge cadenas si chaîne verrouillée */}
+        {isLocked && <LockedChannelBadge size="medium" />}
+
         {/* Logo principal avec FastImage optimisé */}
         {hasLogo ? (
           <FastImage
@@ -143,6 +156,13 @@ const ChannelCard: React.FC<ChannelCardProps> = ({
         ) : (
           <View style={styles.channelLogoPlaceholderFullscreen}>
             <Text style={styles.channelNameFallback}>📺</Text>
+          </View>
+        )}
+
+        {/* Indicateur favori */}
+        {isFavorite && (
+          <View style={styles.favoriteIndicator}>
+            <Icon name="favorite" size={20} color="#3B82F6" />
           </View>
         )}
 
@@ -170,95 +190,116 @@ const ChannelCard: React.FC<ChannelCardProps> = ({
   );
 };
 
-const createStyles = (colors: any, width: number) => StyleSheet.create({
-  cardContainer: {
-    // Container pour animation - pas de style visuel
-  },
-  channelCard: {
-    backgroundColor: colors.surface.primary,
-    borderRadius: 16,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: colors.ui.border,
-    overflow: 'hidden',
-    height: 140,
-    position: 'relative',
-    // Conservation des ombres avec couleur thématique
-    shadowColor: colors.ui.shadow,
-    shadowOffset: {width: 0, height: 6},
-    shadowOpacity: 0.2,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  channelCardPressed: {
-    // Conservation des effets visuels avec couleurs thématiques
-    backgroundColor: colors.surface.elevated,
-    shadowOpacity: 0.35,
-    elevation: 12,
-    shadowOffset: {width: 0, height: 8},
-    shadowRadius: 20,
-    borderColor: colors.accent.primary + '99', // Transparence 60%
-    borderWidth: 2,
-  },
-  channelLogoFullscreen: {
-    position: 'absolute',
-    top: 8,
-    left: 8,
-    right: 8,
-    bottom: 50,
-    width: undefined,
-    height: undefined,
-    resizeMode: 'contain',
-    borderRadius: 12,
-    opacity: 0.8,
-  },
-  channelLogoPlaceholderFullscreen: {
-    position: 'absolute',
-    top: 8,
-    left: 8,
-    right: 8,
-    bottom: 50,
-    backgroundColor: colors.surface.secondary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 12,
-  },
-  channelNameOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    borderBottomLeftRadius: 16,
-    borderBottomRightRadius: 16,
-    minHeight: 50,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  channelCardName: {
-    color: colors.text.primary,
-    fontSize: 12,
-    fontWeight: '500',
-    lineHeight: 16,
-    textAlign: 'center',
-    width: '100%',
-    textShadowColor: colors.ui.shadow,
-    textShadowOffset: {width: 1, height: 1},
-    textShadowRadius: 4,
-  },
-  channelNameFallback: {
-    color: colors.text.secondary,
-    fontSize: 10,
-    fontWeight: '600',
-    marginTop: 6,
-    textAlign: 'center',
-    paddingHorizontal: 4,
-    lineHeight: 12,
-    textShadowColor: colors.ui.shadow,
-    textShadowOffset: {width: 1, height: 1},
-    textShadowRadius: 2,
-  },
-});
+const createStyles = (colors: any, width: number) =>
+  StyleSheet.create({
+    cardContainer: {
+      // Container pour animation - pas de style visuel
+    },
+    channelCard: {
+      backgroundColor: colors.surface.primary,
+      borderRadius: 16,
+      marginBottom: 8,
+      borderWidth: 1,
+      borderColor: colors.ui.border,
+      overflow: 'hidden',
+      height: 140,
+      position: 'relative',
+      // Conservation des ombres avec couleur thématique
+      shadowColor: colors.ui.shadow,
+      shadowOffset: {width: 0, height: 6},
+      shadowOpacity: 0.2,
+      shadowRadius: 16,
+      elevation: 8,
+    },
+    channelCardLocked: {
+      // Style pour chaînes verrouillées - légèrement grisé
+      opacity: 0.7,
+      backgroundColor: colors.surface.secondary,
+      borderColor: colors.accent.error + '66', // Transparence 40%
+    },
+    channelCardPressed: {
+      // Conservation des effets visuels avec couleurs thématiques
+      backgroundColor: colors.surface.elevated,
+      shadowOpacity: 0.35,
+      elevation: 12,
+      shadowOffset: {width: 0, height: 8},
+      shadowRadius: 20,
+      borderColor: colors.accent.primary + '99', // Transparence 60%
+      borderWidth: 2,
+    },
+    channelLogoFullscreen: {
+      position: 'absolute',
+      top: 8,
+      left: 8,
+      right: 8,
+      bottom: 50,
+      width: undefined,
+      height: undefined,
+      resizeMode: 'contain',
+      borderRadius: 12,
+      opacity: 0.8,
+    },
+    channelLogoPlaceholderFullscreen: {
+      position: 'absolute',
+      top: 8,
+      left: 8,
+      right: 8,
+      bottom: 50,
+      backgroundColor: colors.surface.secondary,
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderRadius: 12,
+    },
+    channelNameOverlay: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      paddingVertical: 10,
+      paddingHorizontal: 8,
+      borderBottomLeftRadius: 16,
+      borderBottomRightRadius: 16,
+      minHeight: 50,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+        channelCardName: {
+      color: colors.text.primary,
+      fontSize: 12,
+      fontWeight: '500',
+      lineHeight: 16,
+      textAlign: 'center',
+      width: '100%',
+      textShadowColor: colors.ui.shadow,
+      textShadowOffset: {width: 1, height: 1},
+      textShadowRadius: 4,
+    },
+    channelNameFallback: {
+      color: colors.text.secondary,
+      fontSize: 10,
+      fontWeight: '600',
+      marginTop: 6,
+      textAlign: 'center',
+      paddingHorizontal: 4,
+      lineHeight: 12,
+      textShadowColor: colors.ui.shadow,
+      textShadowOffset: {width: 1, height: 1},
+      textShadowRadius: 2,
+    },
+    favoriteIndicator: {
+      position: 'absolute',
+      top: 8,
+      right: 8,
+      backgroundColor: 'transparent',
+      padding: 4,
+      zIndex: 10,
+      // Ombre pour contraste sur fond clair
+      shadowColor: '#000',
+      shadowOffset: {width: 0, height: 2},
+      shadowOpacity: 0.3,
+      shadowRadius: 3,
+      elevation: 3,
+    },
+  });
 
 export default ChannelCard;

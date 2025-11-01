@@ -122,9 +122,7 @@ class WatermelonM3UService {
           categoriesCollection.prepareCreate(c => {
             c.playlistId = playlist.id;
             c.name = cat.name;
-            c.categoryId = cat.name
-              .toLowerCase()
-              .replace(/[^a-z0-9]/g, '_');
+            c.categoryId = cat.name.toLowerCase().replace(/[^a-z0-9]/g, '_');
             c.channelsCount = cat.count;
           }),
         ),
@@ -150,7 +148,9 @@ class WatermelonM3UService {
         const progress = 70 + Math.floor((i / channelBatches.length) * 25);
         onProgress?.(
           progress,
-          `💾 Batch ${i + 1}/${channelBatches.length} (${batch.length} chaînes)...`,
+          `💾 Batch ${i + 1}/${channelBatches.length} (${
+            batch.length
+          } chaînes)...`,
         );
 
         const channelRecords = await Promise.all(
@@ -165,7 +165,9 @@ class WatermelonM3UService {
                 (c: any) => c.name === categoryName,
               );
               // CORRECTION: Utiliser categoryId normalisé au lieu de l'ID auto-généré
-              ch.categoryId = catRecord?.categoryId || categoryName.toLowerCase().replace(/[^a-z0-9]/g, '_');
+              ch.categoryId =
+                catRecord?.categoryId ||
+                categoryName.toLowerCase().replace(/[^a-z0-9]/g, '_');
 
               // Champs de base
               ch.name = channel.name;
@@ -216,27 +218,64 @@ class WatermelonM3UService {
 
   /**
    * 🔍 Récupérer une playlist M3U avec lazy loading des chaînes
+   * @param blockedCategories - Catégories à exclure (mode enfant)
    */
   async getPlaylistWithChannels(
     playlistId: string,
-    limit: number = 500,
+    limit: number = 50000, // Augmenté pour supporter les très grosses playlists
     offset: number = 0,
+    blockedCategories?: string[],
   ) {
     try {
       const playlist = await database
         .get<Playlist>('playlists')
         .find(playlistId);
 
-      // Lazy loading: récupérer seulement les chaînes demandées
-      const channels = await database
+      // 🔒 FILTRAGE MODE ENFANT: Si mode enfant, charger plus de chaînes pour compenser le filtrage
+      const fetchLimit =
+        blockedCategories && blockedCategories.length > 0
+          ? limit * 3 // Charger 3x plus pour compenser les chaînes filtrées
+          : limit;
+
+      if (blockedCategories && blockedCategories.length > 0) {
+        console.log(
+          `🔒 [WatermelonM3U] Mode enfant actif - Filtrage JavaScript: ${blockedCategories.join(
+            ', ',
+          )}`,
+        );
+      }
+
+      // Lazy loading: récupérer les chaînes (avant filtrage)
+      let channels = await database
         .get<Channel>('channels')
         .query(
           Q.where('playlist_id', playlistId),
           Q.skip(offset),
-          Q.take(limit),
+          Q.take(fetchLimit),
         )
         .fetch();
 
+      // 🔒 FILTRAGE MODE ENFANT: Filtrer en JavaScript après la requête
+      if (blockedCategories && blockedCategories.length > 0) {
+        const beforeCount = channels.length;
+
+        channels = channels.filter(ch => {
+          const groupTitle = (ch.groupTitle || '').toLowerCase();
+          // Exclure si le groupTitle contient un mot bloqué
+          return !blockedCategories.some(blocked =>
+            groupTitle.includes(blocked.toLowerCase()),
+          );
+        });
+        console.log(
+          `🔒 [WatermelonM3U] Filtrage: ${beforeCount} → ${channels.length} chaînes`,
+        );
+
+        // Limiter au nombre demandé après filtrage
+        channels = channels.slice(0, limit);
+      }
+
+      // Récupérer TOUTES les catégories (même les bloquées)
+      // 🔒 Les catégories bloquées seront affichées avec un cadenas dans l'interface
       const categories = await database
         .get<Category>('categories')
         .query(Q.where('playlist_id', playlistId))
@@ -245,7 +284,7 @@ class WatermelonM3UService {
       return {
         playlist,
         channels,
-        categories,
+        categories: categories, // ✅ Retourner TOUTES les catégories (interface affichera cadenas)
         totalChannels: playlist.channelsCount,
       };
     } catch (error) {
@@ -256,19 +295,43 @@ class WatermelonM3UService {
 
   /**
    * 🔍 Recherche de chaînes M3U avec SQL rapide
+   * @param blockedCategories - Catégories à exclure (mode enfant)
    */
-  async searchChannels(playlistId: string, query: string, limit: number = 500) {
+  async searchChannels(
+    playlistId: string,
+    query: string,
+    limit: number = 500,
+    blockedCategories?: string[],
+  ) {
     try {
       const sanitized = Q.sanitizeLikeString(query);
-      return await database
+
+      // Charger plus si mode enfant
+      const fetchLimit =
+        blockedCategories && blockedCategories.length > 0 ? limit * 3 : limit;
+
+      let channels = await database
         .get<Channel>('channels')
         .query(
           Q.where('playlist_id', playlistId),
           Q.where('name', Q.like(`%${sanitized}%`)),
           Q.sortBy('name', Q.asc),
-          Q.take(limit),
+          Q.take(fetchLimit),
         )
         .fetch();
+
+      // 🔒 FILTRAGE MODE ENFANT: Filtrer en JavaScript
+      if (blockedCategories && blockedCategories.length > 0) {
+        channels = channels.filter(ch => {
+          const groupTitle = (ch.groupTitle || '').toLowerCase();
+          return !blockedCategories.some(blocked =>
+            groupTitle.includes(blocked.toLowerCase()),
+          );
+        });
+        channels = channels.slice(0, limit);
+      }
+
+      return channels;
     } catch (error) {
       console.error('❌ Erreur recherche M3U WatermelonDB:', error);
       throw error;
@@ -276,26 +339,164 @@ class WatermelonM3UService {
   }
 
   /**
+   * 📂 Récupérer toutes les catégories d'une playlist (depuis les chaînes)
+   */
+  async getPlaylistCategories(playlistId: string) {
+    try {
+      // Récupérer toutes les chaînes pour extraire les catégories uniques
+      const allChannels = await database
+        .get<Channel>('channels')
+        .query(
+          Q.where('playlist_id', playlistId),
+          Q.take(50000), // Limite haute pour avoir toutes les chaînes
+        )
+        .fetch();
+
+      // Extraire les catégories uniques depuis les chaînes
+      const categoryMap = new Map<string, { id: string; name: string; count: number; categoryId: string }>();
+
+      allChannels.forEach(channel => {
+        const categoryName = channel.groupTitle || 'Non classé';
+        if (!categoryMap.has(categoryName)) {
+          // Utiliser le même format de categoryId que dans le code original
+          const categoryId = categoryName
+            .toLowerCase()
+            .replace(/[^a-z0-9]/g, '_')
+            .replace(/_+/g, '_')
+            .replace(/^_|_$/g, '');
+
+          categoryMap.set(categoryName, {
+            id: categoryId,
+            name: categoryName,
+            categoryId: categoryId, // Ajout pour compatibilité
+            count: 0,
+          });
+        }
+        categoryMap.get(categoryName)!.count++;
+      });
+
+      const categories = Array.from(categoryMap.values())
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      console.log(`📂 [WatermelonM3U] ${categories.length} catégories extraites de ${allChannels.length} chaînes pour playlist ${playlistId}`);
+      return categories;
+    } catch (error) {
+      console.error('❌ Erreur récupération catégories M3U WatermelonDB:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 🔍 Récupérer le vrai nom de catégorie (group_title) à partir d'un categoryId normalisé
+   * @param playlistId - ID de la playlist
+   * @param categoryId - ID normalisé (ex: "shop") ou nom original (ex: "Shop")
+   */
+  private async getRealCategoryName(
+    playlistId: string,
+    categoryId: string,
+  ): Promise<string | null> {
+    try {
+      // D'abord chercher par categoryId exact dans la table categories
+      const category = await database
+        .get<Category>('categories')
+        .query(
+          Q.where('playlist_id', playlistId),
+          Q.where('category_id', categoryId),
+        )
+        .fetch();
+
+      if (category.length > 0) {
+        console.log(`✅ [WatermelonM3U] Catégorie trouvée par ID: "${categoryId}" → "${category[0].name}"`);
+        return category[0].name; // Retourner le nom original (group_title)
+      }
+
+      // Si pas trouvé, chercher par nom direct (au cas où categoryId est déjà le nom original)
+      const categoryByName = await database
+        .get<Category>('categories')
+        .query(
+          Q.where('playlist_id', playlistId),
+          Q.where('name', categoryId),
+        )
+        .fetch();
+
+      if (categoryByName.length > 0) {
+        console.log(`✅ [WatermelonM3U] Catégorie trouvée par nom: "${categoryId}"`);
+        return categoryByName[0].name;
+      }
+
+      console.log(`❌ [WatermelonM3U] Aucune catégorie trouvée pour: "${categoryId}"`);
+      return null;
+    } catch (error) {
+      console.error('❌ [WatermelonM3U] Erreur recherche catégorie:', error);
+      return null;
+    }
+  }
+
+  /**
    * 📺 Récupérer les chaînes par catégorie avec lazy loading
+   * @param categoryId - Peut être soit un ID normalisé (ex: "canada") soit un nom original (ex: "Canada")
+   * @param blockedCategories - Catégories à exclure (mode enfant)
    */
   async getChannelsByCategory(
     playlistId: string,
     categoryId: string,
-    limit: number = 500,
+    limit: number = 2000, // Augmenté pour les grosses catégories
     offset: number = 0,
+    blockedCategories?: string[],
   ) {
     try {
-      const channels = await database
-        .get<Channel>('channels')
-        .query(
-          Q.where('playlist_id', playlistId),
-          Q.where('category_id', categoryId), // categoryId est maintenant normalisé (ex: "entertainment")
-          Q.skip(offset),
-          Q.take(limit),
-        )
-        .fetch();
+      // Charger plus si mode enfant
+      const fetchLimit =
+        blockedCategories && blockedCategories.length > 0 ? limit * 3 : limit;
 
-      console.log(`📊 [WatermelonM3U] ${channels.length} chaînes trouvées pour catégorie "${categoryId}"`);
+      let channels = [];
+
+      // 🔍 NOUVELLE APPROACHE: Utiliser le mapping direct depuis la table categories
+      console.log(`🔍 [WatermelonM3U] Recherche chaînes pour catégorie: "${categoryId}"`);
+
+      // D'abord essayer de trouver le vrai nom de catégorie (group_title)
+      const realCategoryName = await this.getRealCategoryName(playlistId, categoryId);
+
+      if (realCategoryName) {
+        // Utiliser le vrai nom pour chercher les chaînes
+        console.log(`✅ [WatermelonM3U] Utilisation nom réel: "${realCategoryName}"`);
+        channels = await database
+          .get<Channel>('channels')
+          .query(
+            Q.where('playlist_id', playlistId),
+            Q.where('group_title', realCategoryName),
+            Q.skip(offset),
+            Q.take(fetchLimit),
+          )
+          .fetch();
+      } else {
+        // Fallback: essayer directement avec categoryId (au cas où c'est déjà le nom)
+        console.log(`⚠️ [WatermelonM3U] Pas de mapping trouvé, essai direct avec: "${categoryId}"`);
+        channels = await database
+          .get<Channel>('channels')
+          .query(
+            Q.where('playlist_id', playlistId),
+            Q.where('group_title', categoryId),
+            Q.skip(offset),
+            Q.take(fetchLimit),
+          )
+          .fetch();
+      }
+
+      // 🔒 FILTRAGE MODE ENFANT: Filtrer en JavaScript
+      if (blockedCategories && blockedCategories.length > 0) {
+        channels = channels.filter(ch => {
+          const groupTitle = (ch.groupTitle || '').toLowerCase();
+          return !blockedCategories.some(blocked =>
+            groupTitle.includes(blocked.toLowerCase()),
+          );
+        });
+        channels = channels.slice(0, limit);
+      }
+
+      console.log(
+        `📊 [WatermelonM3U] ${channels.length} chaînes trouvées pour catégorie "${categoryId}"`,
+      );
       return channels;
     } catch (error) {
       console.error('❌ Erreur récupération chaînes M3U par catégorie:', error);
@@ -305,23 +506,42 @@ class WatermelonM3UService {
 
   /**
    * ⭐ Récupérer les chaînes favorites M3U
+   * @param blockedCategories - Catégories à exclure (mode enfant)
    */
   async getFavoriteChannels(
     playlistId: string,
     limit: number = 500,
     offset: number = 0,
+    blockedCategories?: string[],
   ) {
     try {
-      return await database
+      // Charger plus si mode enfant
+      const fetchLimit =
+        blockedCategories && blockedCategories.length > 0 ? limit * 3 : limit;
+
+      let channels = await database
         .get<Channel>('channels')
         .query(
           Q.where('playlist_id', playlistId),
           Q.where('is_favorite', true),
           Q.sortBy('last_watched', Q.desc),
           Q.skip(offset),
-          Q.take(limit),
+          Q.take(fetchLimit),
         )
         .fetch();
+
+      // 🔒 FILTRAGE MODE ENFANT: Filtrer en JavaScript
+      if (blockedCategories && blockedCategories.length > 0) {
+        channels = channels.filter(ch => {
+          const groupTitle = (ch.groupTitle || '').toLowerCase();
+          return !blockedCategories.some(blocked =>
+            groupTitle.includes(blocked.toLowerCase()),
+          );
+        });
+        channels = channels.slice(0, limit);
+      }
+
+      return channels;
     } catch (error) {
       console.error('❌ Erreur récupération favoris M3U WatermelonDB:', error);
       throw error;
@@ -343,7 +563,10 @@ class WatermelonM3UService {
         )
         .fetch();
     } catch (error) {
-      console.error('❌ Erreur récupération historique M3U WatermelonDB:', error);
+      console.error(
+        '❌ Erreur récupération historique M3U WatermelonDB:',
+        error,
+      );
       throw error;
     }
   }
