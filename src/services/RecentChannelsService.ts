@@ -10,7 +10,7 @@ import type {Channel} from '../types';
 const STORAGE_KEY = 'app_recent_channels';
 const MAX_RECENT_CHANNELS = 20;
 
-interface RecentChannel {
+export interface RecentChannel {
   id: string; // ID unique du récent
   channelId: string; // ID de la chaîne
   channelName: string; // Nom de la chaîne
@@ -214,6 +214,40 @@ class RecentChannelsService {
         error,
       );
       throw error;
+    }
+  }
+
+  /**
+   * Obtenir les récents complets (avec métadonnées) pour AutoStartService
+   */
+  async getRecentChannels(
+    profileId: string,
+    limit?: number,
+  ): Promise<RecentChannel[]> {
+    try {
+      const allRecents = await this.getAllRecents();
+
+      // Filtrer par profileId
+      let filtered = allRecents.filter(recent => recent.profileId === profileId);
+
+      // Trier par date de visionnage (plus récent en premier)
+      filtered.sort(
+        (a, b) =>
+          new Date(b.watchedAt).getTime() - new Date(a.watchedAt).getTime(),
+      );
+
+      // Limiter si demandé
+      if (limit && limit > 0) {
+        filtered = filtered.slice(0, limit);
+      }
+
+      return filtered;
+    } catch (error) {
+      console.error(
+        '❌ [RecentChannelsService] Erreur récupération récents complets:',
+        error,
+      );
+      return [];
     }
   }
 

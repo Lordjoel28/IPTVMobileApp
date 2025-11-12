@@ -21,6 +21,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import {useI18n} from '../hooks/useI18n';
 // import { BlurView } from '@react-native-community/blur';
 
 const {width, height} = Dimensions.get('window');
@@ -42,11 +43,11 @@ const XtreamCodeModal: React.FC<XtreamCodeModalProps> = ({
   onClose,
   onConnect,
 }) => {
-  // Si la modale n'est pas visible, ne rien rendre du tout
-  if (!visible) {
-    return null;
-  }
+  // Language hook
+  const {t: tCommon} = useI18n('common');
+  const {t: tPlaylists} = useI18n('playlists');
 
+  // Tous les hooks DOIVENT être appelés avant tout return conditionnel
   const [fadeAnim] = useState(new Animated.Value(0));
   const [scaleAnim] = useState(new Animated.Value(0.8));
 
@@ -57,6 +58,7 @@ const XtreamCodeModal: React.FC<XtreamCodeModalProps> = ({
   const [showPassword, setShowPassword] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
 
+  // useEffect DOIT aussi être avant tout return conditionnel
   React.useEffect(() => {
     if (visible) {
       Animated.parallel([
@@ -86,20 +88,25 @@ const XtreamCodeModal: React.FC<XtreamCodeModalProps> = ({
         }),
       ]).start();
     }
-  }, [visible]);
+  }, [visible, fadeAnim, scaleAnim]);
+
+  // Si la modale n'est pas visible, ne rien rendre du tout
+  if (!visible) {
+    return null;
+  }
 
   const handleConnect = async () => {
     // Validation des champs
     if (!url.trim()) {
-      Alert.alert('Erreur', "Veuillez saisir l'URL du serveur");
+      Alert.alert(tCommon('error'), tPlaylists('pleaseEnterServerUrl'));
       return;
     }
     if (!username.trim()) {
-      Alert.alert('Erreur', "Veuillez saisir votre nom d'utilisateur");
+      Alert.alert(tCommon('error'), tPlaylists('pleaseEnterUsername'));
       return;
     }
     if (!password.trim()) {
-      Alert.alert('Erreur', 'Veuillez saisir votre mot de passe');
+      Alert.alert(tCommon('error'), tPlaylists('pleaseEnterPassword'));
       return;
     }
 
@@ -178,7 +185,7 @@ const XtreamCodeModal: React.FC<XtreamCodeModalProps> = ({
                     style={styles.iconContainer}>
                     <Icon name="person-outline" size={24} color="#FFFFFF" />
                   </LinearGradient>
-                  <Text style={styles.title}>Connexion Xtream Codes</Text>
+                  <Text style={styles.title}>{tCommon('xtreamConnection')}</Text>
                 </View>
                 <TouchableOpacity
                   onPress={handleClose}
@@ -191,7 +198,7 @@ const XtreamCodeModal: React.FC<XtreamCodeModalProps> = ({
               <View style={styles.formContainer}>
                 {/* URL du serveur - Full width */}
                 <View style={styles.inputGroup}>
-                  <Text style={styles.label}>URL du serveur</Text>
+                  <Text style={styles.label}>{tCommon('serverUrl')}</Text>
                   <View style={styles.inputContainer}>
                     <Icon
                       name="language"
@@ -215,7 +222,7 @@ const XtreamCodeModal: React.FC<XtreamCodeModalProps> = ({
                 {/* Username et Password côte à côte */}
                 <View style={styles.horizontalGroup}>
                   <View style={[styles.inputGroup, styles.halfWidth]}>
-                    <Text style={styles.label}>Nom d'utilisateur</Text>
+                    <Text style={styles.label}>{tCommon('username')}</Text>
                     <View style={styles.inputContainer}>
                       <Icon
                         name="person"
@@ -236,7 +243,7 @@ const XtreamCodeModal: React.FC<XtreamCodeModalProps> = ({
                   </View>
 
                   <View style={[styles.inputGroup, styles.halfWidth]}>
-                    <Text style={styles.label}>Mot de passe</Text>
+                    <Text style={styles.label}>{tCommon('password')}</Text>
                     <View style={styles.inputContainer}>
                       <Icon
                         name="lock"
@@ -274,7 +281,7 @@ const XtreamCodeModal: React.FC<XtreamCodeModalProps> = ({
                   style={styles.cancelButton}
                   onPress={handleClose}
                   disabled={isConnecting}>
-                  <Text style={styles.cancelButtonText}>Annuler</Text>
+                  <Text style={styles.cancelButtonText}>{tCommon('cancel')}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -294,14 +301,14 @@ const XtreamCodeModal: React.FC<XtreamCodeModalProps> = ({
                     {isConnecting ? (
                       <View style={styles.loadingContainer}>
                         <Text style={styles.connectButtonText}>
-                          Connexion...
+                          {tPlaylists('connectionInProgress')}
                         </Text>
                       </View>
                     ) : (
                       <>
                         <Icon name="login" size={20} color="#FFFFFF" />
                         <Text style={styles.connectButtonText}>
-                          Se connecter
+                          {tCommon('login')}
                         </Text>
                       </>
                     )}

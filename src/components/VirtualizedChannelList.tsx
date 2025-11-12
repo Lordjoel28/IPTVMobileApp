@@ -19,6 +19,7 @@ import FastImage from 'react-native-fast-image';
 import {Channel} from '../types';
 import RestrictedBadge from './RestrictedBadge';
 import {useParentalControl} from '../hooks/useParentalControl';
+import {useI18n} from '../hooks/useI18n';
 
 const {height: SCREEN_HEIGHT} = Dimensions.get('window');
 
@@ -146,6 +147,7 @@ export const VirtualizedChannelList: React.FC<VirtualizedChannelListProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('TOUS');
+  const {t: tCommon} = useI18n('common');
   const isDarkMode = useColorScheme() === 'dark';
 
   // 🚀 OPTIMISATION: Créer les catégories à partir des channels
@@ -215,11 +217,11 @@ export const VirtualizedChannelList: React.FC<VirtualizedChannelListProps> = ({
   const handleChannelLongPress = useCallback(
     (channel: Channel) => {
       const isFavorite = favorites.includes(channel.id);
-      const action = isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris';
+      const action = isFavorite ? tCommon('removeFromFavorites') : tCommon('addToFavorites');
 
       Alert.alert(
         channel.name,
-        'Que souhaitez-vous faire ?',
+        tCommon('whatWouldYouLikeToDo'),
         [
           {
             text: action,

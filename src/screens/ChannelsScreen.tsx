@@ -28,6 +28,7 @@ import {useImmersiveScreen} from '../hooks/useStatusBar';
 
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import LinearGradient from 'react-native-linear-gradient';
+import {useI18n} from '../hooks/useI18n';
 import FastImage from 'react-native-fast-image'; // ✅ Import pour préchargement
 import ChannelCard from '../components/ChannelCard';
 import type {Category, Channel, Profile} from '../types';
@@ -573,6 +574,9 @@ const createStyles = (colors: any) =>
 const ChannelsScreen: React.FC<ChannelsScreenProps> = ({route, navigation}) => {
   const colors = useThemeColors();
   const styles = createStyles(colors);
+  const {t: tChannels} = useI18n('channels');
+  const {t: tCommon} = useI18n('common');
+  const {t: tProfiles} = useI18n('profiles');
 
   // StatusBar immersif automatique pour cet écran
   useImmersiveScreen('Channels', true);
@@ -1260,7 +1264,7 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({route, navigation}) => {
       // 📂 TOUJOURS AFFICHER "TOUT" (même avec catégories bloquées)
       categoriesWithCounts.push({
         id: 'all',
-        name: 'TOUT',
+        name: tChannels('all'),
         count: result.totalChannels || 0,
         channels: [],
       });
@@ -1269,13 +1273,13 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({route, navigation}) => {
       categoriesWithCounts.push(
         {
           id: 'favorites',
-          name: 'FAVORIS',
+          name: tChannels('favorites'),
           count: favoriteIds.length, // Utiliser le nombre réel de favoris du profil
           channels: [], // Sera chargé depuis WatermelonDB
         },
         {
           id: 'history',
-          name: 'RÉCENTS',
+          name: tChannels('recent'),
           count: historyCount,
           channels: [], // Sera chargé depuis AsyncStorage
         },
@@ -1780,7 +1784,7 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({route, navigation}) => {
       if (!hasBlockedCategories) {
         categoriesList.push({
           id: 'all',
-          name: 'TOUT',
+          name: tChannels('all'),
           count: channels.length,
           channels: channels,
         });
@@ -1793,14 +1797,14 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({route, navigation}) => {
       // NOUVEAU : Catégories spéciales pour système legacy avec icônes modernes
       categoriesList.push({
         id: 'favorites',
-        name: '💙 FAVORIS',
+        name: `💙 ${tChannels('favorites')}`,
         count: 0, // TODO: Compter favoris depuis AsyncStorage
         channels: [], // Sera chargé depuis AsyncStorage
       });
 
       categoriesList.push({
         id: 'history',
-        name: '📺 RÉCENTS',
+        name: `📺 ${tChannels('recent')}`,
         count: 0, // TODO: Compter historique depuis AsyncStorage
         channels: [], // Sera chargé depuis AsyncStorage
       });
@@ -1904,7 +1908,7 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({route, navigation}) => {
         ? undefined
         : normalizeCategoryName(selectedCategory?.name || ''), // 🔧 CORRECTION: Normaliser le nom
       categoryGroupTitle: realGroupTitle, // 🔑 Vrai group_title pour filtrage SQL
-      playlistName: playlistName || 'Recherche',
+      playlistName: playlistName || tChannels('search'),
       playlistType: playlistType || 'M3U',
       blockedCategories: currentlyLockedCategories, // 🔒 Seulement les catégories encore verrouillées
     });
@@ -1915,7 +1919,7 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({route, navigation}) => {
     try {
       if (!activeProfileId) {
         console.log('❌ Aucun profil actif');
-        Alert.alert('Erreur', 'Aucun profil actif');
+        Alert.alert(tCommon('error'), tProfiles('noActiveProfile'));
         return;
       }
 
@@ -1998,7 +2002,7 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({route, navigation}) => {
       setSelectedChannelForFavorite(null);
     } catch (error) {
       console.error('❌ Erreur toggle favori:', error);
-      Alert.alert('Erreur', 'Impossible de modifier les favoris');
+      Alert.alert(tCommon('error'), tProfiles('cannotModifyFavorites'));
       setFavoriteModalVisible(false);
       setSelectedChannelForFavorite(null);
     }
@@ -3158,7 +3162,7 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({route, navigation}) => {
         </TouchableOpacity>
 
         <Text style={styles.headerTitle}>
-          {selectedCategory?.name || 'TOUTES LES CHAÎNES'}{' '}
+          {selectedCategory?.name || tChannels('allChannels')}{' '}
           <Text style={styles.headerTitleCount}>
             (
             {selectedCategory?.id === 'all'
@@ -3224,8 +3228,8 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({route, navigation}) => {
                 />
                 <Text style={[styles.dropdownText, {color: colors.text.primary}]}>
                   {hideChannelNames
-                    ? 'Afficher les noms'
-                    : 'Masquer le nom de la chaîne'}
+                    ? tChannels('showChannelNames')
+                    : tChannels('hideChannelName')}
                 </Text>
               </TouchableOpacity>
 
@@ -3239,7 +3243,7 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({route, navigation}) => {
                   setShowSortModal(true);
                 }}>
                 <Icon name="sort" size={20} color={colors.text.primary} />
-                <Text style={[styles.dropdownText, {color: colors.text.primary}]}>Trier</Text>
+                <Text style={[styles.dropdownText, {color: colors.text.primary}]}>{tCommon('sort')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -3264,16 +3268,16 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({route, navigation}) => {
               {/* Header simplifié */}
               <View style={styles.sortDropdownHeader}>
                 <Icon name="sort" size={20} color={colors.text.primary} />
-                <Text style={[styles.sortDropdownTitle, {color: colors.text.primary}]}>Trier</Text>
+                <Text style={[styles.sortDropdownTitle, {color: colors.text.primary}]}>{tCommon('sort')}</Text>
               </View>
 
               <View style={[styles.sortDropdownSeparator, {backgroundColor: colors.ui.border}]} />
 
               {/* Options de tri simplifiées */}
               {[
-                {key: 'default', label: 'Par défaut'},
-                {key: 'az', label: 'Nom (A-Z)'},
-                {key: 'za', label: 'Nom (Z-A)'},
+                {key: 'default', label: tChannels('sortByDefault')},
+                {key: 'az', label: tChannels('sortByNameAZ')},
+                {key: 'za', label: tChannels('sortByNameZA')},
               ].map(option => (
                 <TouchableOpacity
                   key={option.key}
@@ -3315,7 +3319,7 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({route, navigation}) => {
                 activeOpacity={0.7}
                 onPress={() => setShowSortModal(false)}>
                 <Icon name="close" size={18} color={colors.accent.error} />
-                <Text style={[styles.sortDropdownText, {color: colors.accent.error}]}>Annuler</Text>
+                <Text style={[styles.sortDropdownText, {color: colors.accent.error}]}>{tCommon('cancel')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -3329,7 +3333,7 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({route, navigation}) => {
           <View style={styles.sidebar}>
             {/* Header simplifié - seulement bouton fermer */}
             <View style={styles.sidebarHeader}>
-              <Text style={styles.sidebarTitle}>Catégories</Text>
+              <Text style={styles.sidebarTitle}>{tChannels('categories')}</Text>
               <TouchableOpacity
                 onPress={() => setSidebarVisible(false)}
                 style={styles.sidebarCloseButton}>
@@ -3420,7 +3424,7 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({route, navigation}) => {
                   setSelectedChannelForFavorite(null);
                 }}>
                 <Text style={styles.favoriteModalButtonCancelText}>
-                  Annuler
+                  {tCommon('cancel')}
                 </Text>
               </TouchableOpacity>
 
@@ -3437,8 +3441,8 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({route, navigation}) => {
                 <Text style={styles.favoriteModalButtonConfirmText}>
                   {selectedChannelForFavorite &&
                   favorites.includes(selectedChannelForFavorite.id)
-                    ? 'Retirer des favoris'
-                    : 'Ajouter aux favoris'}
+                    ? tChannels('removeFromFavorites')
+                    : tChannels('addToFavorites')}
                 </Text>
               </TouchableOpacity>
             </View>

@@ -24,6 +24,7 @@ import {testSearchService} from '../utils/TestSearchService';
 import {searchService} from '../services/SearchService';
 import SimpleModernSearchCard from './SimpleModernSearchCard';
 import {useThemeColors} from '../contexts/ThemeContext';
+import {useI18n} from '../hooks/useI18n';
 import {useVoiceSearch} from '../hooks/useVoiceSearch';
 import {cleanVoiceInput} from '../utils/textUtils';
 import {useStatusBar} from '../hooks/useStatusBar';
@@ -47,6 +48,8 @@ export default function FinalSearchScreen({
   onChannelSelect,
 }: FinalSearchScreenProps) {
   const colors = useThemeColors();
+  const {t: tChannels} = useI18n('channels');
+  const {t: tCommon} = useI18n('common');
   const isDark = colors.background.primary === '#000000';
 
   // 🎯 Utiliser le système global de StatusBar pour éviter l'interférence tactile
@@ -496,7 +499,7 @@ export default function FinalSearchScreen({
             <View style={styles.section}>
               <Text
                 style={[styles.sectionTitle, {color: colors.text.primary, paddingLeft: 60, marginBottom: 16}]}>
-                Suggestions
+                {tChannels('suggestions')}
               </Text>
               <ScrollView
                 horizontal
@@ -522,7 +525,7 @@ export default function FinalSearchScreen({
             <View style={styles.section}>
               <Text
                 style={[styles.sectionTitle, {color: colors.text.primary, paddingLeft: 60, marginBottom: 16}]}>
-                Historique des recherches
+                {tChannels('searchHistory')}
               </Text>
               <ScrollView
                 horizontal
@@ -544,8 +547,7 @@ export default function FinalSearchScreen({
               {searchResults.length > 0 && (
                 <Text
                   style={[styles.sectionTitle, {color: colors.text.primary, fontSize: 14, marginBottom: 12, textAlign: 'center'}]}>
-                  {searchResults.length} chaîne
-                  {searchResults.length > 1 ? 's' : ''}
+                  {searchResults.length} {searchResults.length > 1 ? tChannels('channels') : tChannels('channel')}
                 </Text>
               )}
               {searchQuery.length >= 2 &&
@@ -563,14 +565,14 @@ export default function FinalSearchScreen({
                         styles.emptyStateTitle,
                         {color: colors.text.primary},
                       ]}>
-                      Aucun résultat trouvé
+                      {tChannels('noResultsFound')}
                     </Text>
                     <Text
                       style={[
                         styles.emptyStateSubtitle,
                         {color: colors.text.secondary},
                       ]}>
-                      Essayez avec d'autres mots-clés
+                      {tChannels('tryOtherKeywords')}
                     </Text>
                   </View>
                 )}
@@ -606,7 +608,7 @@ export default function FinalSearchScreen({
                 {backgroundColor: colors.surface.primary},
               ]}>
               <Text style={[styles.loadingText, {color: colors.text.primary}]}>
-                Recherche en cours...
+                {tChannels('searchingInProgress')}
               </Text>
             </View>
           </View>

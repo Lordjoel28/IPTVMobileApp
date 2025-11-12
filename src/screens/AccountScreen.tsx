@@ -16,6 +16,7 @@ import {
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
 import { useThemeColors } from '../contexts/ThemeContext';
+import {useI18n} from '../hooks/useI18n';
 import { useUserStore } from '../stores/UserStore';
 import ProfileService from '../services/ProfileService';
 
@@ -24,6 +25,8 @@ const AccountScreen: React.FC = () => {
   const styles = createStyles(colors);
   const navigation = useNavigation();
   const isFocused = useIsFocused();
+  const {t: tCommon} = useI18n('common');
+  const {t: tSettings} = useI18n('settings');
 
   const { currentUser, isAuthenticated } = useUserStore();
   const [currentProfile, setCurrentProfile] = React.useState<any>(null);
@@ -55,59 +58,59 @@ const AccountScreen: React.FC = () => {
   const accountOptions = [
     {
       id: 'profile',
-      title: 'Informations du compte',
+      title: tSettings('accountInfo'),
       icon: 'info',
-      subtitle: currentProfile ? currentProfile.name : 'Non défini',
+      subtitle: currentProfile ? currentProfile.name : tCommon('notDefined'),
       onPress: () => navigation.navigate('AccountInfo' as any),
     },
     {
       id: 'password',
-      title: 'Mot de passe',
+      title: tCommon('password'),
       icon: 'vpn-key',
-      onPress: () => Alert.alert('Mot de passe', 'Fonctionnalité à implémenter'),
+      onPress: () => Alert.alert(tCommon('password'), tCommon('featureNotImplemented')),
     },
     {
       id: 'devices',
-      title: 'Appareils',
+      title: tCommon('devices'),
       icon: 'devices',
-      onPress: () => Alert.alert('Appareils', 'Fonctionnalité à implémenter'),
+      onPress: () => Alert.alert(tCommon('devices'), tCommon('featureNotImplemented')),
     },
     {
       id: 'subscription',
-      title: 'Abonnement',
+      title: tCommon('subscription'),
       icon: 'credit-card',
-      onPress: () => Alert.alert('Abonnement', 'Fonctionnalité à implémenter'),
+      onPress: () => Alert.alert(tCommon('subscription'), tCommon('featureNotImplemented')),
     },
     {
       id: 'notifications',
-      title: 'Notifications',
+      title: tCommon('notifications'),
       icon: 'notifications',
-      onPress: () => Alert.alert('Notifications', 'Fonctionnalité à implémenter'),
+      onPress: () => Alert.alert(tCommon('notifications'), tCommon('featureNotImplemented')),
     },
     {
       id: 'privacy',
-      title: 'Confidentialité',
+      title: tCommon('privacy'),
       icon: 'lock',
-      onPress: () => Alert.alert('Confidentialité', 'Fonctionnalité à implémenter'),
+      onPress: () => Alert.alert(tCommon('privacy'), tCommon('featureNotImplemented')),
     },
     {
       id: 'help',
-      title: 'Aide',
+      title: tCommon('help'),
       icon: 'help',
-      onPress: () => Alert.alert('Aide', 'Fonctionnalité à implémenter'),
+      onPress: () => Alert.alert(tCommon('help'), tCommon('featureNotImplemented')),
     },
     {
       id: 'logout',
-      title: 'Se déconnecter',
+      title: tCommon('logout'),
       icon: 'logout',
       onPress: () => {
         Alert.alert(
-          'Déconnexion',
-          'Êtes-vous sûr de vouloir vous déconnecter ?',
+          tCommon('logoutTitle'),
+          tCommon('logoutMessage'),
           [
-            { text: 'Annuler', style: 'cancel' },
+            { text: tCommon('cancel'), style: 'cancel' },
             {
-              text: 'Déconnexion',
+              text: tCommon('logout'),
               style: 'destructive',
               onPress: async () => {
                 try {
@@ -143,7 +146,7 @@ const AccountScreen: React.FC = () => {
           <Icon name="arrow-back" size={24} color="#FFFFFF" />
         </TouchableOpacity>
 
-        <Text style={styles.headerTitle}>Compte</Text>
+        <Text style={styles.headerTitle}>{tSettings('account')}</Text>
       </View>
 
       {/* Liste des options */}

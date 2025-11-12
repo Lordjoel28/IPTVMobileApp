@@ -22,6 +22,7 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import DocumentPicker from 'react-native-document-picker';
+import {useI18n} from '../hooks/useI18n';
 
 const {width, height} = Dimensions.get('window');
 
@@ -42,6 +43,9 @@ const M3UUrlModal: React.FC<M3UUrlModalProps> = ({
   onClose,
   onConnect,
 }) => {
+  // Language hook
+  const {t: tCommon} = useI18n('common');
+
   // State hooks - toujours en premier
   const [connectionMode, setConnectionMode] = useState<'url' | 'file'>('url');
   const [url, setUrl] = useState('');
@@ -118,7 +122,7 @@ const M3UUrlModal: React.FC<M3UUrlModalProps> = ({
       }
     } catch (err) {
       if (!DocumentPicker.isCancel(err)) {
-        Alert.alert('Erreur', 'Impossible de sélectionner le fichier');
+        Alert.alert(tCommon('error'), tCommon('errorSelectingFile'));
       }
     }
   };
@@ -126,15 +130,15 @@ const M3UUrlModal: React.FC<M3UUrlModalProps> = ({
   const handleConnect = async () => {
     // Validation
     if (connectionMode === 'url' && !url.trim()) {
-      Alert.alert('Erreur', "Veuillez saisir l'URL de la playlist M3U");
+      Alert.alert(tCommon('error'), tCommon('pleaseEnterM3UUrl'));
       return;
     }
     if (connectionMode === 'file' && !selectedFile) {
-      Alert.alert('Erreur', 'Veuillez sélectionner un fichier M3U');
+      Alert.alert(tCommon('error'), tCommon('pleaseSelectM3UFile'));
       return;
     }
     if (!playlistName.trim()) {
-      Alert.alert('Erreur', 'Veuillez donner un nom à votre playlist');
+      Alert.alert(tCommon('error'), tCommon('pleaseEnterPlaylistName'));
       return;
     }
 
@@ -210,7 +214,7 @@ const M3UUrlModal: React.FC<M3UUrlModalProps> = ({
                     style={styles.iconContainer}>
                     <Icon name="folder-open" size={24} color="#FFFFFF" />
                   </LinearGradient>
-                  <Text style={styles.title}>Connexion M3U</Text>
+                  <Text style={styles.title}>{tCommon('m3uConnection')}</Text>
                 </View>
                 <TouchableOpacity
                   onPress={handleClose}
@@ -256,7 +260,7 @@ const M3UUrlModal: React.FC<M3UUrlModalProps> = ({
                         styles.toggleText,
                         connectionMode === 'url' && styles.toggleTextActive,
                       ]}>
-                      URL M3U
+                      {tCommon('urlM3U')}
                     </Text>
                   </TouchableOpacity>
 
@@ -278,7 +282,7 @@ const M3UUrlModal: React.FC<M3UUrlModalProps> = ({
                         styles.toggleText,
                         connectionMode === 'file' && styles.toggleTextActive,
                       ]}>
-                      Fichier local
+                      {tCommon('localFile')}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -288,7 +292,7 @@ const M3UUrlModal: React.FC<M3UUrlModalProps> = ({
               <View style={styles.formContainer}>
                 {connectionMode === 'url' ? (
                   <View style={styles.inputGroup}>
-                    <Text style={styles.label}>URL de la playlist M3U</Text>
+                    <Text style={styles.label}>{tCommon('m3uPlaylistUrl')}</Text>
                     <View style={styles.inputContainer}>
                       <Icon
                         name="link"
@@ -310,7 +314,7 @@ const M3UUrlModal: React.FC<M3UUrlModalProps> = ({
                   </View>
                 ) : (
                   <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Fichier M3U local</Text>
+                    <Text style={styles.label}>{tCommon('m3uLocalFile')}</Text>
                     <TouchableOpacity
                       style={styles.fileContainer}
                       onPress={handleFileSelect}>
@@ -326,8 +330,8 @@ const M3UUrlModal: React.FC<M3UUrlModalProps> = ({
                           !selectedFile && styles.fileTextPlaceholder,
                         ]}>
                         {selectedFile
-                          ? 'Fichier sélectionné'
-                          : 'Sélectionner un fichier M3U'}
+                          ? tCommon('fileSelected')
+                          : tCommon('selectM3UFile')}
                       </Text>
                       <Icon
                         name="folder"
@@ -345,7 +349,7 @@ const M3UUrlModal: React.FC<M3UUrlModalProps> = ({
 
                 {/* Nom de playlist - toujours présent */}
                 <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Nom de la playlist</Text>
+                  <Text style={styles.label}>{tCommon('playlistName')}</Text>
                   <View style={styles.inputContainer}>
                     <Icon
                       name="playlist-play"
@@ -357,7 +361,7 @@ const M3UUrlModal: React.FC<M3UUrlModalProps> = ({
                       style={styles.textInput}
                       value={playlistName}
                       onChangeText={setPlaylistName}
-                      placeholder="Ma playlist IPTV"
+                      placeholder={tCommon('myPlaylistIptv')}
                       placeholderTextColor="rgba(255,255,255,0.4)"
                       autoCapitalize="words"
                       autoCorrect={false}
@@ -372,7 +376,7 @@ const M3UUrlModal: React.FC<M3UUrlModalProps> = ({
                   style={styles.cancelButton}
                   onPress={handleClose}
                   disabled={isConnecting}>
-                  <Text style={styles.cancelButtonText}>Annuler</Text>
+                  <Text style={styles.cancelButtonText}>{tCommon('cancel')}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -390,12 +394,12 @@ const M3UUrlModal: React.FC<M3UUrlModalProps> = ({
                     }
                     style={styles.connectButtonGradient}>
                     {isConnecting ? (
-                      <Text style={styles.connectButtonText}>Connexion...</Text>
+                      <Text style={styles.connectButtonText}>{tCommon('connectionInProgress')}</Text>
                     ) : (
                       <>
                         <Icon name="play-arrow" size={18} color="#FFFFFF" />
                         <Text style={styles.connectButtonText}>
-                          Charger playlist
+                          {tCommon('loadPlaylist')}
                         </Text>
                       </>
                     )}

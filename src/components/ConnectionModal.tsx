@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import {useI18n} from '../hooks/useI18n';
 
 const {width, height} = Dimensions.get('window');
 
@@ -43,6 +44,9 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
   onM3UConnect,
   onUsersList,
 }) => {
+  const {t: tCommon} = useI18n('common');
+  const {t: tPlaylists} = useI18n('playlists');
+  const {t: tProfiles} = useI18n('profiles');
   // Animations - hooks toujours au début
   const [fadeAnim] = useState(new Animated.Value(0));
   const [scaleAnim] = useState(new Animated.Value(0.9));
@@ -138,19 +142,19 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
   const connectionOptions = [
     {
       id: 'xtream',
-      title: 'Xtream Codes',
+      title: tPlaylists('xtreamCodes'),
       icon: iconMap.xtream,
       onPress: onXtreamConnect,
     },
     {
       id: 'm3u',
-      title: 'URL M3U',
+      title: tPlaylists('urlM3U'),
       icon: iconMap.m3u,
       onPress: onM3UConnect,
     },
     {
       id: 'users',
-      title: 'Profils',
+      title: tProfiles('profiles'),
       icon: iconMap.users,
       onPress: onUsersList,
     },
@@ -203,7 +207,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
 
           {/* Titre */}
           <View style={styles.titleContainer}>
-            <Text style={styles.title}>Connexion</Text>
+            <Text style={styles.title}>{tCommon('connection')}</Text>
           </View>
 
           {/* Cartes */}
@@ -254,7 +258,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
           {/* Texte de guidage */}
           <View style={styles.guidanceContainer}>
             <Text style={styles.guidanceText}>
-              Choisissez votre mode de connexion
+              {tPlaylists('chooseConnectionMode')}
             </Text>
           </View>
         </Animated.View>

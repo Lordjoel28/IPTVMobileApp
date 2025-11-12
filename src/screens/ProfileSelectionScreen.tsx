@@ -22,6 +22,7 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import ProfileService from '../services/ProfileService';
 import type {Profile} from '../types';
 import {useThemeColors} from '../contexts/ThemeContext';
+import {useI18n} from '../hooks/useI18n';
 import SimplePinModal from '../components/SimplePinModal';
 
 const {width} = Dimensions.get('window');
@@ -44,6 +45,7 @@ const ProfileSelectionScreen: React.FC<ProfileSelectionScreenProps> = ({
   refreshKey,
 }) => {
   const colors = useThemeColors();
+  const {t: tCommon} = useI18n('common');
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
@@ -122,7 +124,7 @@ const ProfileSelectionScreen: React.FC<ProfileSelectionScreenProps> = ({
           `Entrez le PIN pour accéder au profil ${profile.name}`,
           [
             {
-              text: 'Annuler',
+              text: tCommon('cancel'),
               style: 'cancel',
             },
             {
@@ -270,7 +272,7 @@ const ProfileSelectionScreen: React.FC<ProfileSelectionScreenProps> = ({
           {/* Centre: Titre */}
           <View style={styles.headerCenter}>
             <Text style={[styles.title, {color: colors.text.primary}]}>
-              Qui regarde ?
+              {tCommon('whoIsWatching')}
             </Text>
           </View>
 
@@ -294,7 +296,7 @@ const ProfileSelectionScreen: React.FC<ProfileSelectionScreenProps> = ({
                     styles.headerButtonText,
                     {color: colors.text.primary},
                   ]}>
-                  Changer de liste de lecture
+                  {tCommon('changePlaylist')}
                 </Text>
               </Pressable>
             )}
@@ -445,7 +447,7 @@ const ProfileSelectionScreen: React.FC<ProfileSelectionScreenProps> = ({
                         styles.menuOptionText,
                         {color: colors.text.primary},
                       ]}>
-                      Définir comme profil par défaut
+                      {tCommon('setAsDefaultProfileOption')}
                     </Text>
                   </TouchableOpacity>
                 )}
@@ -463,7 +465,7 @@ const ProfileSelectionScreen: React.FC<ProfileSelectionScreenProps> = ({
                       styles.menuOptionText,
                       {color: colors.text.primary},
                     ]}>
-                    Éditer le profil
+                    {tCommon('editProfileOption')}
                   </Text>
                 </TouchableOpacity>
 
@@ -477,7 +479,7 @@ const ProfileSelectionScreen: React.FC<ProfileSelectionScreenProps> = ({
                       styles.menuOptionText,
                       {color: colors.text.primary},
                     ]}>
-                      Supprimer le profil
+                      {tCommon('deleteProfileOption')}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -490,7 +492,7 @@ const ProfileSelectionScreen: React.FC<ProfileSelectionScreenProps> = ({
       <SimplePinModal
         visible={showPinModal}
         profile={pinModalTargetProfile}
-        reason="PIN parental requis pour changer de profil"
+        reason={tCommon('parentalPinRequired')}
         onClose={() => {
           setShowPinModal(false);
           setPinModalTargetProfile(null);

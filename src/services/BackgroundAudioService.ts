@@ -88,6 +88,11 @@ class BackgroundAudioServiceManager {
           const result = await PermissionsAndroid.request(permission);
           if (result !== PermissionsAndroid.RESULTS.GRANTED) {
             console.warn(`⚠️ [BackgroundAudioService] Permission refusée: ${permission}`);
+            // Pour POST_NOTIFICATIONS, on continue quand même car le service peut fonctionner sans
+            if (permission === 'android.permission.POST_NOTIFICATIONS') {
+              console.warn(`⚠️ [BackgroundAudioService] Continuation sans notification`);
+              continue;
+            }
             return false;
           }
         }

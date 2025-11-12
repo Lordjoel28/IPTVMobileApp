@@ -33,6 +33,12 @@ export interface PlayerState {
   isSearchScreenOpen: boolean; // Pour masquer le player pendant la recherche
   isFromMultiScreen: boolean; // Pour savoir si on vient du multi-écran
   isMultiScreenOpen: boolean; // Pour masquer le player quand MultiScreen est ouvert
+  isFromAutoStart: boolean; // Pour savoir si on vient du démarrage automatique
+
+  // 🔄 État centralisé pour les retries automatiques
+  retryCount: number;
+  isRetrying: boolean;
+  retryState: 'idle' | 'retrying' | 'failed';
 
   actions: {
     playChannel: (channel: Channel, startInFullscreen?: boolean) => void;
@@ -42,6 +48,14 @@ export interface PlayerState {
     stop: () => void;
     setLoading: (loading: boolean) => void;
     setError: (error: string | null) => void;
+    clearError: () => void;
+
+    // 🔄 Actions pour les retries automatiques
+    startRetry: () => void;
+    incrementRetry: () => void;
+    resetRetry: () => void;
+    setRetryState: (state: 'idle' | 'retrying' | 'failed') => void;
+
     setMiniPlayerRect: (rect: {
       x: number;
       y: number;
@@ -55,6 +69,7 @@ export interface PlayerState {
     setSearchScreenOpen: (isOpen: boolean) => void;
     setFromMultiScreen: (fromMultiScreen: boolean) => void;
     setMultiScreenOpen: (isOpen: boolean) => void;
+    setFromAutoStart: (fromAutoStart: boolean) => void;
   };
 }
 
@@ -73,6 +88,12 @@ const initialState = {
   isSearchScreenOpen: false,
   isFromMultiScreen: false,
   isMultiScreenOpen: false,
+  isFromAutoStart: false,
+
+  // 🔄 État initial pour les retries
+  retryCount: 0,
+  isRetrying: false,
+  retryState: 'idle' as const,
 };
 
 export const usePlayerStore = create<PlayerState>((set, get) => ({
@@ -139,6 +160,10 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
         isLoading: true,
         isFullscreen: startInFullscreen,
         error: null,
+        // 🔄 Réinitialiser les retries quand on change de chaîne
+        retryCount: 0,
+        isRetrying: false,
+        retryState: 'idle' as const,
       }));
 
       console.log(
@@ -159,6 +184,10 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
         isLoading: true,
         isFullscreen: startInFullscreen,
         error: null,
+        // 🔄 Réinitialiser les retries quand on change de chaîne
+        retryCount: 0,
+        isRetrying: false,
+        retryState: 'idle' as const,
       }));
     },
 
@@ -251,6 +280,49 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
       set(state => ({...state, error, isLoading: false}));
     },
 
+    clearError: () => {
+      set(state => ({...state, error: null, isLoading: true}));
+    },
+
+    // 🔄 Actions pour les retries automatiques
+    startRetry: () => {
+      console.log('🔄 [PlayerStore] Starting retry cycle');
+      set(state => ({
+        ...state,
+        isRetrying: true,
+        retryState: 'retrying' as const,
+        isLoading: true
+      }));
+    },
+
+    incrementRetry: () => {
+      const currentCount = get().retryCount;
+      console.log(`🔄 [PlayerStore] Incrementing retry: ${currentCount} → ${currentCount + 1}`);
+      set(state => ({
+        ...state,
+        retryCount: currentCount + 1
+      }));
+    },
+
+    resetRetry: () => {
+      console.log('🔄 [PlayerStore] Resetting retry state');
+      set(state => ({
+        ...state,
+        retryCount: 0,
+        isRetrying: false,
+        retryState: 'idle' as const
+      }));
+    },
+
+    setRetryState: (newState: 'idle' | 'retrying' | 'failed') => {
+      console.log(`🔄 [PlayerStore] Retry state: ${get().retryState} → ${newState}`);
+      set(state => ({
+        ...state,
+        retryState: newState,
+        isRetrying: newState === 'retrying'
+      }));
+    },
+
     setMiniPlayerRect: rect => {
       console.log('[PlayerStore] Setting mini-player rect:', rect);
       set(state => ({...state, miniPlayerRect: rect}));
@@ -339,6 +411,10 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     setMultiScreenOpen: (isOpen: boolean) => {
       console.log(`[PlayerStore] Multi-screen open: ${isOpen}`);
       set(state => ({...state, isMultiScreenOpen: isOpen}));
+    },
+    setFromAutoStart: (fromAutoStart: boolean) => {
+      console.log(`[PlayerStore] From autostart: ${fromAutoStart}`);
+      set(state => ({...state, isFromAutoStart: fromAutoStart}));
     },
   },
 }));

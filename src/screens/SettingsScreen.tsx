@@ -16,6 +16,7 @@ import type {StackNavigationProp} from '@react-navigation/stack';
 import SystemNavigationBar from 'react-native-system-navigation-bar';
 import type {RootStackParamList} from '../../App';
 import { useThemeColors } from '../contexts/ThemeContext';
+import { useI18n } from '../hooks/useI18n';
 
 // Types
 type NavigationProp = StackNavigationProp<RootStackParamList>;
@@ -41,6 +42,8 @@ const SettingsScreen: React.FC = () => {
   const colors = useThemeColors();
   const styles = createStyles(colors);
   const navigation = useNavigation<NavigationProp>();
+  const { t: tCommon } = useI18n('common');
+  const { t: tSettings } = useI18n('settings');
 
   useEffect(() => {
     SystemNavigationBar.immersive();
@@ -52,39 +55,39 @@ const SettingsScreen: React.FC = () => {
   const settingsCards: SettingCard[] = [
     {
       id: 'themes',
-      title: 'Thèmes',
+      title: tSettings('themes'),
       icon: 'palette',
       route: 'ThemeSettings',
     },
     {
       id: 'video_player',
-      title: 'Lecteur Vidéo',
+      title: tSettings('videoPlayer'),
       icon: 'video-settings',
       route: 'VideoPlayerSettings',
     },
-    {id: 'tv_guide', title: 'TV Guide', icon: 'event', route: 'TVGuideSettings'},
-    {id: 'app', title: 'APP', icon: 'apps', route: '#'},
-    {id: 'account', title: 'Compte', icon: 'account-circle', route: 'Account'},
-    {id: 'player_settings', title: 'Player Settings', icon: 'tune', route: '#'},
-    {id: 'player', title: 'Player', icon: 'play-circle-outline', route: '#'},
+    {id: 'tv_guide', title: tSettings('tvGuide'), icon: 'event', route: 'TVGuideSettings'},
+    {id: 'performance', title: tCommon('performance'), icon: 'bolt', route: 'PerformanceSettings'},
+    {id: 'account', title: tSettings('account'), icon: 'account-circle', route: 'Account'},
+    {id: 'player_settings', title: tSettings('playerSettings'), icon: 'tune', route: '#'},
+    {id: 'player', title: tSettings('player'), icon: 'play-circle-outline', route: 'PlayerSettings'},
     {
       id: 'stream_format',
-      title: 'Type de flux',
+      title: tSettings('streamFormat'),
       icon: 'settings-ethernet',
       route: '#',
     },
-    {id: 'update_content', title: 'Mettre à jour', icon: 'update', route: '#'},
-    {id: 'parental', title: 'Parental', icon: 'lock', route: 'ParentalControl'},
-    {id: 'speed_test', title: 'Test de rapidité', icon: 'speed', route: '#'},
-    {id: 'backup_restore', title: 'Sauvegarde', icon: 'cloud-upload', route: '#'},
+    {id: 'update_content', title: tSettings('updateContent'), icon: 'update', route: '#'},
+    {id: 'parental', title: tSettings('parental'), icon: 'lock', route: 'ParentalControl'},
+    {id: 'speed_test', title: tSettings('speedTest'), icon: 'speed', route: '#'},
+    {id: 'backup_restore', title: tSettings('backupRestore'), icon: 'cloud-upload', route: '#'},
     {
       id: 'remote_control',
-      title: 'Télécommande',
+      title: tSettings('remoteControl'),
       icon: 'settings-remote',
       route: '#',
     },
-    {id: 'language', title: 'Language', icon: 'language', route: '#'},
-    {id: 'help', title: 'Aidez-moi', icon: 'help-outline', route: '#'},
+    {id: 'language', title: tCommon('language'), icon: 'language', route: 'LanguageSettings'},
+    {id: 'help', title: tCommon('help'), icon: 'help-outline', route: '#'},
   ];
 
   const handleCardPress = (route: keyof RootStackParamList | '#') => {
@@ -138,7 +141,7 @@ const SettingsScreen: React.FC = () => {
           onPress={() => navigation.goBack()}>
           <Icon name="arrow-back" size={24} color={colors.text.primary} />
         </Pressable>
-        <Text style={styles.headerTitle}>SETTINGS</Text>
+        <Text style={styles.headerTitle}>{tCommon('settings')}</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.gridContainer}>

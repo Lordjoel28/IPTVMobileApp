@@ -28,9 +28,11 @@ const NotificationToast: React.FC = () => {
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(-100)).current;
   const scale = useRef(new Animated.Value(0.8)).current;
+  const hasAnimatedOut = useRef(false);
 
   useEffect(() => {
     if (visible) {
+      hasAnimatedOut.current = false;
       // Animation d'entrée
       Animated.parallel([
         Animated.timing(opacity, {
@@ -69,11 +71,13 @@ const NotificationToast: React.FC = () => {
           duration: 300,
           useNativeDriver: true,
         }),
-      ]).start();
+      ]).start(() => {
+        hasAnimatedOut.current = true;
+      });
     }
   }, [visible]);
 
-  if (!visible && opacity._value === 0) {
+  if (!visible && hasAnimatedOut.current) {
     return null;
   }
 

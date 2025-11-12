@@ -28,6 +28,7 @@ import {
 } from 'react-native';
 import {Text, Button} from 'react-native-paper';
 import {useTheme, useThemeColors} from '../contexts/ThemeContext';
+import {useI18n} from '../hooks/useI18n';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import {useNavigation} from '@react-navigation/native';
@@ -46,6 +47,11 @@ type ParentalControlScreenNavigationProp = StackNavigationProp<
 const ParentalControlScreen: React.FC = () => {
   const {currentTheme} = useTheme();
   const colors = useThemeColors();
+  const {t: tCommon} = useI18n('common');
+  const {t: tSettings} = useI18n('settings');
+  const {t: tProfiles} = useI18n('profiles');
+  const {t: tParental} = useI18n('parental');
+  const {t: tChannels} = useI18n('channels');
   const navigation = useNavigation<ParentalControlScreenNavigationProp>();
 
   // Styles pour les modaux avec effet flou parfait
@@ -301,7 +307,7 @@ const ParentalControlScreen: React.FC = () => {
 
     } catch (error) {
       console.error('❌ Error loading parental control data:', error);
-      Alert.alert('Erreur', 'Impossible de charger les données');
+      Alert.alert(tCommon('error'), tCommon('error'));
     } finally {
       setIsLoading(false);
     }
@@ -313,13 +319,13 @@ const ParentalControlScreen: React.FC = () => {
 
   const handleUnlock = async () => {
     if (!unlockPin || unlockPin.length !== 4) {
-      Alert.alert('Erreur', 'Veuillez entrer un PIN à 4 chiffres');
+      Alert.alert(tCommon('error'), tParental('pleaseEnterPin'));
       return;
     }
 
     const isValid = await ParentalControlService.verifyPin(unlockPin);
     if (!isValid) {
-      Alert.alert('Erreur', 'PIN incorrect');
+      Alert.alert(tCommon('error'), tParental('incorrectPin'));
       setUnlockPin('');
       return;
     }
@@ -348,17 +354,17 @@ const ParentalControlScreen: React.FC = () => {
 
   const handleChangePin = async () => {
     if (!oldPin || !newPin || !confirmPin) {
-      Alert.alert('Erreur', 'Veuillez remplir tous les champs');
+      Alert.alert(tCommon('error'), tParental('fillAllFields'));
       return;
     }
 
     if (newPin.length !== 4 || !/^\d{4}$/.test(newPin)) {
-      Alert.alert('Erreur', 'Le nouveau PIN doit contenir exactement 4 chiffres');
+      Alert.alert(tCommon('error'), tParental('pinMustBeFourDigits'));
       return;
     }
 
     if (newPin !== confirmPin) {
-      Alert.alert('Erreur', 'Les nouveaux PINs ne correspondent pas');
+      Alert.alert(tCommon('error'), tParental('pinsDoNotMatch'));
       return;
     }
 
@@ -368,15 +374,15 @@ const ParentalControlScreen: React.FC = () => {
       setOldPin('');
       setNewPin('');
       setConfirmPin('');
-      Alert.alert('Succès', 'PIN parental changé avec succès');
+      Alert.alert(tCommon('success'), tParental('pinChangedSuccessfully'));
     } else {
-      Alert.alert('Erreur', 'Ancien PIN incorrect');
+      Alert.alert(tCommon('error'), tParental('incorrectPin'));
     }
   };
 
   const handleDisableParentalControl = async () => {
     if (!disablePin || disablePin.length !== 4) {
-      Alert.alert('Erreur', 'Veuillez entrer un PIN à 4 chiffres');
+      Alert.alert(tCommon('error'), tParental('pleaseEnterPin'));
       return;
     }
 
@@ -386,25 +392,25 @@ const ParentalControlScreen: React.FC = () => {
       setShowDisablePin(false);
       setDisablePin('');
       setIsUnlocked(false);
-      Alert.alert('Succès', 'Contrôle parental désactivé');
+      Alert.alert(tCommon('success'), tParental('parentalControlDisabled'));
     } else {
-      Alert.alert('Erreur', 'PIN incorrect');
+      Alert.alert(tCommon('error'), tParental('incorrectPin'));
     }
   };
 
   const handleInitialPinSetup = async () => {
     if (!initialPin || !initialPinConfirm) {
-      Alert.alert('Erreur', 'Veuillez remplir tous les champs');
+      Alert.alert(tCommon('error'), tParental('fillAllFields'));
       return;
     }
 
     if (initialPin.length !== 4 || !/^\d{4}$/.test(initialPin)) {
-      Alert.alert('Erreur', 'Le PIN doit contenir exactement 4 chiffres');
+      Alert.alert(tCommon('error'), tParental('pinMustBeFourDigits'));
       return;
     }
 
     if (initialPin !== initialPinConfirm) {
-      Alert.alert('Erreur', 'Les PINs ne correspondent pas');
+      Alert.alert(tCommon('error'), tParental('pinsDoNotMatch'));
       return;
     }
 
@@ -415,10 +421,10 @@ const ParentalControlScreen: React.FC = () => {
       setInitialPinConfirm('');
       setIsConfigured(true);
       setIsUnlocked(true); // Auto-déverrouiller après configuration
-      Alert.alert('Succès', 'PIN parental configuré avec succès');
+      Alert.alert(tCommon('success'), tParental('pinConfiguredSuccessfully'));
       loadData();
     } else {
-      Alert.alert('Erreur', 'Impossible de configurer le PIN');
+      Alert.alert(tCommon('error'), tParental('errorConfiguringPin'));
     }
   };
 
@@ -438,9 +444,9 @@ const ParentalControlScreen: React.FC = () => {
       setShowRevokePin(false);
       setSelectedUnlock(null);
       setRevokePin('');
-      Alert.alert('Succès', 'Déverrouillage révoqué');
+      Alert.alert(tCommon('success'), tParental('unlockRevoked'));
     } else {
-      Alert.alert('Erreur', 'PIN incorrect');
+      Alert.alert(tCommon('error'), tParental('incorrectPin'));
     }
   };
 
@@ -455,19 +461,19 @@ const ParentalControlScreen: React.FC = () => {
 
   const toggleSwitchLock = async (profile: Profile, enabled: boolean) => {
     if (!isUnlocked && isConfigured) {
-      Alert.alert('Déverrouillage requis', 'Entrez le PIN parental pour modifier ce paramètre');
+      Alert.alert(tParental('requiresUnlock'), tParental('requiresUnlock'));
       promptUnlockIfNeeded();
       return;
     }
 
     // Demander confirmation
     Alert.alert(
-      enabled ? 'Bloquer le switch' : 'Débloquer le switch',
-      `${enabled ? 'Activer' : 'Désactiver'} le blocage de changement de profil pour "${profile.name}"?`,
+      enabled ? tParental('blockProfileSwitch') : tParental('unblockProfileSwitch'),
+      `${enabled ? tParental('blockProfileSwitch') : tParental('unblockProfileSwitch')} ${tParental('blockSwitchDescription')} "${profile.name}"?`,
       [
-        {text: 'Annuler', style: 'cancel'},
+        {text: tCommon('cancel'), style: 'cancel'},
         {
-          text: 'Confirmer',
+          text: tCommon('ok'),
           onPress: async () => {
             // Utiliser le PIN déjà vérifié (unlock)
             const ParentalService = (await import('../services/ParentalControlService')).default;
@@ -479,7 +485,7 @@ const ParentalControlScreen: React.FC = () => {
             });
 
             loadData(); // Recharger
-            Alert.alert('Succès', enabled ? 'Blocage activé' : 'Blocage désactivé');
+            Alert.alert(tCommon('success'), enabled ? tParental('blockingActivated') : tParental('blockingDeactivated'));
           }
         }
       ]
@@ -496,7 +502,7 @@ const ParentalControlScreen: React.FC = () => {
         <View style={[themedStyles.card, {backgroundColor: colors.surface.primary}]}>
           <View style={{padding: 16}}>
             <Text style={{color: colors.text.secondary}}>
-              Aucun profil actif
+              {tParental('noActiveProfile')}
             </Text>
           </View>
         </View>
@@ -529,7 +535,7 @@ const ParentalControlScreen: React.FC = () => {
                   {activeProfile.name}
                 </Text>
                 <Text style={{color: colors.text.secondary}}>
-                  {isChild ? '🧒 Profil Enfant' : '👤 Profil Standard'}
+                  {isChild ? `🧒 ${tProfiles('childProfile')}` : `👤 ${tProfiles('standardProfile')}`}
                 </Text>
               </View>
               {canEdit && (
@@ -543,13 +549,13 @@ const ParentalControlScreen: React.FC = () => {
         <View style={[themedStyles.card, {backgroundColor: colors.surface.primary}]}>
           <View style={{padding: 16}}>
             <Text variant="titleMedium" style={[themedStyles.sectionTitle, {color: colors.text.primary}]}>
-              Mes restrictions actuelles
+              {tParental('currentRestrictions')}
             </Text>
 
             <View style={[themedStyles.restrictionItem, {borderBottomColor: colors.ui.border}]}>
               <Icon name="block" size={20} color={colors.accent.error} />
               <Text style={[themedStyles.restrictionLabel, {color: colors.text.primary}]}>
-                Catégories bloquées :
+                {tParental('blockedCategories')} :
               </Text>
               <Text style={[themedStyles.restrictionValue, {color: colors.text.secondary}]}>
                 {activeProfile.blockedCategories?.length || 0}
@@ -561,7 +567,7 @@ const ParentalControlScreen: React.FC = () => {
               <View style={[themedStyles.infoBox, {backgroundColor: colors.surface.primaryVariant, marginTop: 16}]}>
                 <Icon name="info-outline" size={20} color={colors.accent.primary} />
                 <Text style={[themedStyles.infoText, {color: colors.text.secondary}]}>
-                  Les profils enfants ne peuvent pas modifier leurs restrictions.
+                  {tParental('childProfilesCannotModify')}
                 </Text>
               </View>
             )}
@@ -574,7 +580,7 @@ const ParentalControlScreen: React.FC = () => {
                   style={{marginBottom: 8}}
                   icon={({size, color}) => <Icon name="block" size={size} color={color} />}
                 >
-                  Gérer les catégories bloquées
+                  {tParental('manageBlockedCategories')}
                 </Button>
               </View>
             )}
@@ -585,7 +591,7 @@ const ParentalControlScreen: React.FC = () => {
                   mode="outlined"
                   onPress={() => promptUnlockIfNeeded()}
                 >
-                  Déverrouiller pour modifier
+                  {tParental('unlockToModify')}
                 </Button>
               </View>
             )}
@@ -606,14 +612,14 @@ const ParentalControlScreen: React.FC = () => {
           <View style={{alignItems: 'center', padding: 32}}>
             <Icon name="lock" size={48} color={colors.ui.border} />
             <Text style={{color: colors.text.secondary, marginTop: 16, textAlign: 'center'}}>
-              Entrez le PIN parental pour voir tous les profils
+              {tParental('enterPinToViewProfiles')}
             </Text>
             <Button
               mode="contained"
               onPress={() => promptUnlockIfNeeded()}
               style={{marginTop: 16}}
             >
-              Déverrouiller
+              {tParental('unlock')}
             </Button>
           </View>
         </View>
@@ -623,7 +629,7 @@ const ParentalControlScreen: React.FC = () => {
     return (
       <View>
         <Text style={[themedStyles.tabDescription, {color: colors.text.secondary}]}>
-          Vue d'ensemble de tous les profils et configuration du blocage de switch
+          {tParental('profilesOverview')}
         </Text>
 
         {profiles.map((profile) => (
@@ -648,8 +654,8 @@ const ParentalControlScreen: React.FC = () => {
                     {profile.isKids && ' 🧒'}
                   </Text>
                   <Text style={[themedStyles.profileDetails, {color: colors.text.secondary}]}>
-                    {profile.blockedCategories?.length || 0} catégories bloquées
-                    {profile.requiresPinToAccess && ' • 🔒 Switch bloqué'}
+                    {profile.blockedCategories?.length || 0} {tChannels('categories')}
+                    {profile.requiresPinToAccess && ` • 🔒 ${tParental('blockedSwitch')}`}
                   </Text>
                 </View>
                 <TouchableOpacity
@@ -664,9 +670,9 @@ const ParentalControlScreen: React.FC = () => {
               {profile.isKids && (
                 <View style={[themedStyles.switchContainer, {borderTopColor: colors.ui.border}]}>
                   <View style={{flex: 1}}>
-                    <Text style={{color: colors.text.primary}}>Bloquer changement de profil</Text>
+                    <Text style={{color: colors.text.primary}}>{tParental('blockProfileSwitch')}</Text>
                     <Text style={{color: colors.text.secondary, fontSize: 12}}>
-                      PIN requis pour quitter ce profil
+                      {tParental('pinRequiredToLeave')}
                     </Text>
                   </View>
                   <Switch
@@ -695,17 +701,17 @@ const ParentalControlScreen: React.FC = () => {
             <View style={{alignItems: 'center', padding: 16}}>
               <Icon name="lock-open" size={48} color={colors.ui.border} />
               <Text variant="titleLarge" style={{color: colors.text.primary, marginTop: 16}}>
-                Contrôle parental non configuré
+                {tCommon('disabled')}
               </Text>
               <Text style={{color: colors.text.secondary, textAlign: 'center', marginTop: 8}}>
-                Configurez un PIN parental pour sécuriser l'accès aux paramètres
+                {tParental('parentalPinDescription')}
               </Text>
               <Button
                 mode="contained"
                 onPress={() => setShowInitialPinSetup(true)}
                 style={{marginTop: 16}}
               >
-                Configurer le PIN
+                {tSettings('configure')}
               </Button>
             </View>
           </View>
@@ -719,10 +725,10 @@ const ParentalControlScreen: React.FC = () => {
         <View style={[themedStyles.card, {backgroundColor: colors.surface.primary}]}>
           <View style={{padding: 16}}>
             <Text variant="titleMedium" style={[themedStyles.sectionTitle, {color: colors.text.primary}]}>
-              PIN Parental
+              {tParental('parentalPin')}
             </Text>
             <Text style={{color: colors.text.secondary, marginBottom: 16}}>
-              Le PIN parental déverrouille l'accès aux paramètres
+              {tParental('parentalPinDescription')}
             </Text>
 
             <Button
@@ -730,7 +736,7 @@ const ParentalControlScreen: React.FC = () => {
               onPress={() => setShowChangePin(true)}
               style={{marginBottom: 8}}
             >
-              Changer le PIN
+              {tParental('changePin')}
             </Button>
 
             <Button
@@ -739,7 +745,7 @@ const ParentalControlScreen: React.FC = () => {
               textColor={colors.accent.error}
               style={{borderColor: colors.accent.error}}
             >
-              Désactiver le contrôle parental
+              {tParental('disableParentalControl')}
             </Button>
           </View>
         </View>
@@ -749,7 +755,7 @@ const ParentalControlScreen: React.FC = () => {
           <View style={[themedStyles.card, {backgroundColor: colors.surface.primary}]}>
             <View style={{padding: 16}}>
               <Text variant="titleMedium" style={[themedStyles.sectionTitle, {color: colors.text.primary}]}>
-                Déverrouillages temporaires actifs
+                {tParental('activeTemporaryUnlocks')}
               </Text>
 
               {activeUnlocks.map((item, index) => (
@@ -759,10 +765,10 @@ const ParentalControlScreen: React.FC = () => {
                       {item.profile.name}
                     </Text>
                     <Text style={{color: colors.text.secondary, fontSize: 12}}>
-                      Catégories: {item.unlock.unlockedCategories?.join(', ') || 'Toutes'}
+                      {tChannels('categories')}: {item.unlock.unlockedCategories?.join(', ') || tChannels('categories')}
                     </Text>
                     <Text style={{color: colors.accent.secondary, fontSize: 12}}>
-                      Temps restant: {ParentalControlService.getRemainingTime(item.unlock)}
+                      {tParental('remainingTime')}: {ParentalControlService.getRemainingTime(item.unlock)}
                     </Text>
                   </View>
                   <Button
@@ -773,7 +779,7 @@ const ParentalControlScreen: React.FC = () => {
                       setShowRevokePin(true);
                     }}
                   >
-                    Révoquer
+                    {tParental('revoke')}
                   </Button>
                 </View>
               ))}
@@ -792,7 +798,7 @@ const ParentalControlScreen: React.FC = () => {
     return (
       <SafeAreaView style={[themedStyles.container, {backgroundColor: colors.background.primary}]}>
         <View style={themedStyles.loadingContainer}>
-          <Text style={{color: colors.text.primary}}>Chargement...</Text>
+          <Text style={{color: colors.text.primary}}>{tCommon('loading')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -817,11 +823,11 @@ const ParentalControlScreen: React.FC = () => {
       >
         <Icon name="security" size={40} color={isConfigured ? colors.accent.primary : colors.accent.error} />
         <Text variant="headlineMedium" style={[themedStyles.title, {color: colors.text.primary}]}>
-          Contrôle Parental
+          {tParental('parentalControl')}
         </Text>
         <View style={[themedStyles.statusBadge, {backgroundColor: isConfigured ? colors.accent.primary : colors.accent.error}]}>
           <Text style={themedStyles.statusText}>
-            {isConfigured ? (isUnlocked ? '🔓 Déverrouillé' : '🔒 Verrouillé') : 'Désactivé'}
+            {isConfigured ? (isUnlocked ? `🔓 ${tParental('unlocked')}` : `🔒 ${tParental('locked')}`) : tCommon('disabled')}
           </Text>
         </View>
       </Animated.View>
@@ -834,7 +840,7 @@ const ParentalControlScreen: React.FC = () => {
         >
           <Icon name="tune" size={24} color={currentTab === 'restrictions' ? colors.accent.primary : colors.text.secondary} />
           <Text style={{color: currentTab === 'restrictions' ? colors.accent.primary : colors.text.secondary, marginTop: 4}}>
-            Mes Restrictions
+            {tParental('myRestrictions')}
           </Text>
         </TouchableOpacity>
 
@@ -844,7 +850,7 @@ const ParentalControlScreen: React.FC = () => {
         >
           <Icon name="people" size={24} color={currentTab === 'profiles' ? colors.accent.primary : colors.text.secondary} />
           <Text style={{color: currentTab === 'profiles' ? colors.accent.primary : colors.text.secondary, marginTop: 4}}>
-            Tous les Profils
+            {tProfiles('allProfiles')}
           </Text>
         </TouchableOpacity>
 
@@ -854,7 +860,7 @@ const ParentalControlScreen: React.FC = () => {
         >
           <Icon name="build" size={24} color={currentTab === 'settings' ? colors.accent.primary : colors.text.secondary} />
           <Text style={{color: currentTab === 'settings' ? colors.accent.primary : colors.text.secondary, marginTop: 4}}>
-            Paramètres
+            {tCommon('settings')}
           </Text>
         </TouchableOpacity>
       </View>
@@ -895,7 +901,7 @@ const ParentalControlScreen: React.FC = () => {
             <View style={modalStyles.modalHeader}>
               <Icon name="lock-open" size={20} color={colors.accent.primary} />
               <Text style={modalStyles.modalTitle}>
-                Déverrouillage PIN
+                {tParental('unlockPinTitle')}
               </Text>
               <TouchableOpacity onPress={() => setShowUnlockModal(false)}>
                 <Icon name="close" size={18} color="#F44336" />
@@ -912,7 +918,7 @@ const ParentalControlScreen: React.FC = () => {
               }]}
               value={unlockPin}
               onChangeText={setUnlockPin}
-              placeholder="Entrez le PIN"
+              placeholder={tParental('enterPin')}
               placeholderTextColor={colors.text.secondary}
               keyboardType="numeric"
               secureTextEntry
@@ -927,7 +933,7 @@ const ParentalControlScreen: React.FC = () => {
                 style={{flex: 1, borderColor: colors.ui.border}}
                 textColor={colors.text.primary}
               >
-                Annuler
+                {tCommon('cancel')}
               </Button>
               <Button
                 mode="contained"
@@ -935,7 +941,7 @@ const ParentalControlScreen: React.FC = () => {
                 style={{flex: 1, marginLeft: 8, backgroundColor: colors.accent.primary}}
                 buttonColor={colors.accent.primary}
               >
-                Déverrouiller
+                {tParental('unlock')}
               </Button>
             </View>
           </View>
@@ -958,21 +964,21 @@ const ParentalControlScreen: React.FC = () => {
           <View style={modalStyles.modalPinContent}>
             <View style={modalStyles.modalHeader}>
               <Icon name="lock" size={20} color={colors.accent.primary} />
-              <Text style={modalStyles.modalTitle}>Configurer le PIN</Text>
+              <Text style={modalStyles.modalTitle}>{tParental('configurePinTitle')}</Text>
               <TouchableOpacity onPress={() => setShowInitialPinSetup(false)}>
                 <Icon name="close" size={18} color="#F44336" />
               </TouchableOpacity>
             </View>
 
             <Text style={{color: colors.text.secondary, marginBottom: 8, textAlign: 'center', fontSize: 12}}>
-              Créez un code PIN à 4 chiffres pour sécuriser l'accès
+              {tParental('createFourDigitPin')}
             </Text>
 
             <TextInput
               style={[modalStyles.pinInput, {borderColor: colors.accent.primary, color: colors.text.primary, backgroundColor: colors.background.primary}]}
               value={initialPin}
               onChangeText={setInitialPin}
-              placeholder="Nouveau PIN (4 chiffres)"
+              placeholder={tParental('newPin')}
               placeholderTextColor={colors.text.secondary}
               keyboardType="numeric"
               secureTextEntry
@@ -983,7 +989,7 @@ const ParentalControlScreen: React.FC = () => {
               style={[modalStyles.pinInput, {borderColor: colors.accent.primary, color: colors.text.primary, backgroundColor: colors.background.primary}]}
               value={initialPinConfirm}
               onChangeText={setInitialPinConfirm}
-              placeholder="Confirmer PIN"
+              placeholder={tParental('confirmPin')}
               placeholderTextColor={colors.text.secondary}
               keyboardType="numeric"
               secureTextEntry
@@ -997,7 +1003,7 @@ const ParentalControlScreen: React.FC = () => {
                 style={{flex: 1, borderColor: colors.ui.border}}
                 textColor={colors.text.primary}
               >
-                Annuler
+                {tCommon('cancel')}
               </Button>
               <Button
                 mode="contained"
@@ -1005,7 +1011,7 @@ const ParentalControlScreen: React.FC = () => {
                 style={{flex: 1, marginLeft: 8, backgroundColor: colors.accent.primary}}
                 buttonColor={colors.accent.primary}
               >
-                Configurer
+                {tSettings('configure')}
               </Button>
             </View>
           </View>
@@ -1028,7 +1034,7 @@ const ParentalControlScreen: React.FC = () => {
           <View style={modalStyles.modalPinContent}>
             <View style={modalStyles.modalHeader}>
               <Icon name="vpn-key" size={20} color={colors.accent.primary} />
-              <Text style={modalStyles.modalTitle}>Changer le PIN</Text>
+              <Text style={modalStyles.modalTitle}>{tParental('changePinTitle')}</Text>
               <TouchableOpacity onPress={() => setShowChangePin(false)}>
                 <Icon name="close" size={18} color="#F44336" />
               </TouchableOpacity>
@@ -1044,7 +1050,7 @@ const ParentalControlScreen: React.FC = () => {
               }]}
               value={oldPin}
               onChangeText={setOldPin}
-              placeholder="Ancien PIN"
+              placeholder={tParental('oldPin')}
               placeholderTextColor={colors.text.secondary}
               keyboardType="numeric"
               secureTextEntry
@@ -1059,7 +1065,7 @@ const ParentalControlScreen: React.FC = () => {
               }]}
               value={newPin}
               onChangeText={setNewPin}
-              placeholder="Nouveau PIN"
+              placeholder={tParental('newPin')}
               placeholderTextColor={colors.text.secondary}
               keyboardType="numeric"
               secureTextEntry
@@ -1073,7 +1079,7 @@ const ParentalControlScreen: React.FC = () => {
               }]}
               value={confirmPin}
               onChangeText={setConfirmPin}
-              placeholder="Confirmer PIN"
+              placeholder={tParental('confirmPin')}
               placeholderTextColor={colors.text.secondary}
               keyboardType="numeric"
               secureTextEntry
@@ -1087,7 +1093,7 @@ const ParentalControlScreen: React.FC = () => {
                 style={{flex: 1, borderColor: colors.ui.border}}
                 textColor={colors.text.primary}
               >
-                Annuler
+                {tCommon('cancel')}
               </Button>
               <Button
                 mode="contained"
@@ -1099,7 +1105,7 @@ const ParentalControlScreen: React.FC = () => {
                 }}
                 buttonColor={colors.accent.primary}
               >
-                Changer
+                {tParental('changePin')}
               </Button>
             </View>
           </View>
@@ -1122,7 +1128,7 @@ const ParentalControlScreen: React.FC = () => {
           <View style={modalStyles.modalPinContent}>
             <View style={modalStyles.modalHeader}>
               <Icon name="warning" size={20} color={colors.accent.error} />
-              <Text style={modalStyles.modalTitle}>Désactiver</Text>
+              <Text style={modalStyles.modalTitle}>{tParental('disableTitle')}</Text>
               <TouchableOpacity onPress={() => setShowDisablePin(false)}>
                 <Icon name="close" size={18} color="#F44336" />
               </TouchableOpacity>
@@ -1131,7 +1137,7 @@ const ParentalControlScreen: React.FC = () => {
             <View style={{height: 12}} />
 
             <Text style={{color: colors.text.secondary, marginBottom: 12, textAlign: 'center', fontSize: 12}}>
-              Cette action désactivera toutes les restrictions
+              {tParental('disableMessage')}
             </Text>
             <TextInput
               style={[modalStyles.pinInput, {
@@ -1141,7 +1147,7 @@ const ParentalControlScreen: React.FC = () => {
               }]}
               value={disablePin}
               onChangeText={setDisablePin}
-              placeholder="Entrez le PIN"
+              placeholder={tParental('enterPin')}
               placeholderTextColor={colors.text.secondary}
               keyboardType="numeric"
               secureTextEntry
@@ -1155,14 +1161,14 @@ const ParentalControlScreen: React.FC = () => {
                 style={{flex: 1, borderColor: colors.ui.border}}
                 textColor={colors.text.primary}
               >
-                Annuler
+                {tCommon('cancel')}
               </Button>
               <Button
                 mode="contained"
                 onPress={handleDisableParentalControl}
                 style={{flex: 1, marginLeft: 8, backgroundColor: colors.accent.error}}
               >
-                Désactiver
+                {tParental('disableTitle')}
               </Button>
             </View>
           </View>
@@ -1185,13 +1191,13 @@ const ParentalControlScreen: React.FC = () => {
           <View style={modalStyles.modalPinContent}>
             <View style={modalStyles.modalHeader}>
               <Icon name="lock" size={20} color={colors.accent.primary} />
-              <Text style={modalStyles.modalTitle}>Révoquer</Text>
+              <Text style={modalStyles.modalTitle}>{tParental('revokeTitle')}</Text>
               <TouchableOpacity onPress={() => setShowRevokePin(false)}>
                 <Icon name="close" size={18} color="#F44336" />
               </TouchableOpacity>
             </View>
             <Text style={{color: colors.text.secondary, marginBottom: 8, textAlign: 'center', fontSize: 12}}>
-              Révoquer le déverrouillage temporaire pour "{selectedUnlock?.profile.name}"
+              {tParental('revokeMessage')} "{selectedUnlock?.profile.name}"
             </Text>
             <TextInput
               style={[modalStyles.pinInput, {
@@ -1201,7 +1207,7 @@ const ParentalControlScreen: React.FC = () => {
               }]}
               value={revokePin}
               onChangeText={setRevokePin}
-              placeholder="Entrez le PIN"
+              placeholder={tParental('enterPin')}
               placeholderTextColor={colors.text.secondary}
               keyboardType="numeric"
               secureTextEntry
@@ -1215,7 +1221,7 @@ const ParentalControlScreen: React.FC = () => {
                 style={{flex: 1, borderColor: colors.ui.border}}
                 textColor={colors.text.primary}
               >
-                Annuler
+                {tCommon('cancel')}
               </Button>
               <Button
                 mode="contained"
@@ -1223,7 +1229,7 @@ const ParentalControlScreen: React.FC = () => {
                 style={{flex: 1, marginLeft: 8, backgroundColor: colors.accent.primary}}
                 buttonColor={colors.accent.primary}
               >
-                Révoquer
+                {tParental('revoke')}
               </Button>
             </View>
           </View>

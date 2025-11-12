@@ -6,17 +6,25 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface VideoSettings {
-  // Options existantes
+  // Options de comportement
   autoplay: boolean;
   rememberPosition: boolean;
-  quality: 'auto' | '1080p' | '720p' | '480p';
-  volume: number;
-
-  // Nouvelles options
-  playbackSpeed: number;
-  skipDuration: number; // en secondes : 10, 30, 60, 300
   backgroundPlay: boolean;
-  qualityPriority: 'resolution' | 'fluidity';
+
+  // Vitesse de lecture (VOD/Catch-up uniquement)
+  playbackSpeed: number;
+
+  // Performance & Décodage
+  hardwareAcceleration: boolean; // Utilise GPU au lieu CPU pour décoder
+  decoderType: 'auto' | 'hardware' | 'software'; // Type de décodeur vidéo
+  bufferMode?: 'low' | 'normal' | 'high' | 'auto'; // Mode de buffer
+
+  // Réseau
+  networkTimeout: number; // Timeout en secondes (5-30s)
+
+  // Interface Utilisateur
+  timeFormat: '12h' | '24h'; // Format heure
+  appLanguage: 'fr' | 'en' | 'es' | 'ar'; // Langue interface
 }
 
 class VideoSettingsService {
@@ -71,12 +79,14 @@ class VideoSettingsService {
     return {
       autoplay: true,
       rememberPosition: true,
-      quality: 'auto',
-      volume: 75,
-      playbackSpeed: 1.0,
-      skipDuration: 10, // 10 secondes par défaut
       backgroundPlay: false,
-      qualityPriority: 'resolution',
+      playbackSpeed: 1.0,
+      hardwareAcceleration: true, // GPU par défaut (meilleure perf)
+      decoderType: 'auto', // Choix automatique selon device
+      bufferMode: 'auto', // Mode auto par défaut
+      networkTimeout: 10, // 10 secondes par défaut
+      timeFormat: '24h', // Format 24h par défaut
+      appLanguage: 'fr', // Français par défaut
     };
   }
 
@@ -166,8 +176,8 @@ class VideoSettingsService {
     }
 
     const requiredKeys: (keyof VideoSettings)[] = [
-      'autoplay', 'rememberPosition', 'quality', 'volume', 'playbackSpeed',
-      'skipDuration', 'backgroundPlay', 'qualityPriority'
+      'autoplay', 'rememberPosition', 'backgroundPlay', 'playbackSpeed',
+      'hardwareAcceleration', 'decoderType', 'networkTimeout', 'timeFormat', 'appLanguage'
     ];
 
     return requiredKeys.every(key => key in settings);

@@ -4,7 +4,10 @@
  */
 
 import React from 'react';
-import {createStackNavigator} from '@react-navigation/stack';
+import {
+  createStackNavigator,
+  CardStyleInterpolators,
+} from '@react-navigation/stack';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {createDrawerNavigator} from '@react-navigation/drawer';
 import {useTheme} from 'react-native-paper';
@@ -258,6 +261,7 @@ const AppNavigator: React.FC = () => {
         options={{
           headerShown: false,
           gestureEnabled: true,
+          cardStyleInterpolator: CardStyleInterpolators.forFadeFromBottomAndroid,
         }}
       />
 

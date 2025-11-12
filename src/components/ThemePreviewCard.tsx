@@ -14,6 +14,7 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import {Theme} from '../themes/themeConfig';
+import {useI18n} from '../hooks/useI18n';
 
 interface ThemePreviewCardProps {
   theme: Theme;
@@ -31,6 +32,8 @@ const ThemePreviewCard: React.FC<ThemePreviewCardProps> = ({
   onSelect,
   onPreview,
 }) => {
+  const {t: tThemes} = useI18n('themes');
+
   const handlePress = () => {
     onSelect(theme.id);
   };
@@ -47,15 +50,49 @@ const ThemePreviewCard: React.FC<ThemePreviewCardProps> = ({
         return 'dark-mode';
       case 'light':
         return 'light-mode';
-      case 'ocean':
+      case 'ocean-comfort':
         return 'waves';
       case 'sunset':
         return 'wb-sunny';
-      case 'forest':
+      case 'green':
         return 'nature';
       default:
         return 'palette';
     }
+  };
+
+  // Fonction pour obtenir le nom traduit du thème
+  const getTranslatedName = (themeId: string): string => {
+    const themeNameMap: Record<string, string> = {
+      'dark': tThemes('themeDark'),
+      'light': tThemes('themeLight'),
+      'gray': tThemes('themeGray'),
+      'brown': tThemes('themeBrown'),
+      'green': tThemes('themeGreen'),
+      'purple': tThemes('themePurple'),
+      'sunset': tThemes('themeSunset'),
+      'ocean-comfort': tThemes('themeOceanComfort'),
+      'warm-amber': tThemes('themeWarmAmber'),
+      'tivimate-pro': tThemes('themeTivimatePro'),
+    };
+    return themeNameMap[themeId] || theme.name;
+  };
+
+  // Fonction pour obtenir la description traduite du thème
+  const getTranslatedDescription = (themeId: string): string => {
+    const themeDescMap: Record<string, string> = {
+      'dark': tThemes('themeDarkDesc'),
+      'light': tThemes('themeLightDesc'),
+      'gray': tThemes('themeGrayDesc'),
+      'brown': tThemes('themeBrownDesc'),
+      'green': tThemes('themeGreenDesc'),
+      'purple': tThemes('themePurpleDesc'),
+      'sunset': tThemes('themeSunsetDesc'),
+      'ocean-comfort': tThemes('themeOceanComfortDesc'),
+      'warm-amber': tThemes('themeWarmAmberDesc'),
+      'tivimate-pro': tThemes('themeTivimateProDesc'),
+    };
+    return themeDescMap[themeId] || theme.description;
   };
 
   return (
@@ -95,7 +132,7 @@ const ThemePreviewCard: React.FC<ThemePreviewCardProps> = ({
         </View>
 
         <Text style={[styles.themeName, {color: theme.colors.text.primary}]}>
-          {theme.name}
+          {getTranslatedName(theme.id)}
         </Text>
 
         <Text
@@ -104,7 +141,7 @@ const ThemePreviewCard: React.FC<ThemePreviewCardProps> = ({
             {color: theme.colors.text.secondary},
           ]}
           numberOfLines={2}>
-          {theme.description}
+          {getTranslatedDescription(theme.id)}
         </Text>
       </View>
 
@@ -112,7 +149,7 @@ const ThemePreviewCard: React.FC<ThemePreviewCardProps> = ({
       {isSelected && (
         <View style={styles.selectedBadge}>
           <Icon name="check-circle" size={20} color="#4CAF50" />
-          <Text style={styles.selectedText}>Actuel</Text>
+          <Text style={styles.selectedText}>{tThemes('current')}</Text>
         </View>
       )}
 

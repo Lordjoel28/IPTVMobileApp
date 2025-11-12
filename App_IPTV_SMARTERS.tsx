@@ -48,6 +48,9 @@ import {usePlayerStore} from './src/stores/PlayerStore';
 import {useGlobalImmersion} from './src/hooks/useGlobalImmersion';
 import {useStatusBar} from './src/hooks/useStatusBar';
 import {useTheme} from './src/contexts/ThemeContext';
+import {useI18n} from './src/hooks/useI18n';
+import {useAutoStart} from './src/hooks/useAutoStart';
+import { useRecentChannelsStore } from './src/stores/RecentChannelsStore';
 
 // Import des nouveaux services migrés
 import IPTVService from './src/services/IPTVService';
@@ -79,11 +82,7 @@ const cardColors = {
   bottom: ['#4A5D4A', '#3E4E3E', '#2D3A2D', '#1F2A1F'], // Vert-gris moyen → Gris-vert → Vert sombre → Vert très sombre
 };
 
-const bottomRowCards = [
-  {key: 'epg', title: 'LIVE EPG', subtitle: 'Guide TV', index: 3},
-  {key: 'multi', title: 'MULTI-ÉCR', subtitle: 'Écrans', index: 4},
-  {key: 'replay', title: 'RATTRAPER', subtitle: 'Replay', index: 5},
-];
+// Ce sera initialisé dans le composant avec les traductions
 
 // Type pour navigation
 type NavigationProp = StackNavigationProp<RootStackParamList>;
@@ -99,6 +98,9 @@ const App: React.FC = () => {
 
   // Hook pour gérer le thème par profil
   const {loadProfileTheme} = useTheme();
+
+  // Hook pour gérer les traductions
+  const {t: tCommon} = useI18n('common');
 
   useEffect(() => {
     setNormal('App_HomeScreen');
@@ -161,6 +163,21 @@ const App: React.FC = () => {
 
   // Instance IPTV unique pour toute l'app
   const iptvServiceRef = useRef<any>(null);
+
+  // 🎬 Hook pour le démarrage automatique IPTV
+  // Déclenché quand le profil est complètement initialisé
+  const isProfileReady = profilesInitialized && currentProfile !== null;
+  const { isAutoStarting, triggerAutoStart, canAutoStart } = useAutoStart(isProfileReady, {
+    delay: 0, // Démarrage instantané
+    onAutoStart: (result) => {
+      if (result.success) {
+        console.log(`🎬 [App] Démarrage automatique réussi: ${result.channelName}`);
+      } else {
+        console.log(`⏸️ [App] Démarrage automatique annulé: ${result.reason}`);
+      }
+    },
+    disabled: false // Peut être contrôlé par un setting utilisateur
+  });
 
   // Test channel for demo
   const testChannel: Channel = {
@@ -1430,6 +1447,9 @@ const App: React.FC = () => {
 
     // Charger le thème du profil
     await loadProfileTheme(profile.id);
+
+    // Marquer le profil comme initialisé pour déclencher l'auto-start
+    setProfilesInitialized(true);
   };
 
   const handleOpenProfileManagement = () => {
@@ -1476,6 +1496,35 @@ const App: React.FC = () => {
     // Incrémenter la clé de rafraîchissement pour forcer la mise à jour de ProfileSelectionScreen
     setProfilesRefreshKey(prev => prev + 1);
   };
+
+  // 📺 Charger les chaînes récentes pour GlobalVideoPlayer (élimine le Docker vide)
+  useEffect(() => {
+    if (profilesInitialized && currentProfile && selectedPlaylistId) {
+      const loadRecentChannelsForPlayer = async () => {
+        try {
+          // Import dynamique pour éviter les dépendances circulaires
+          const RecentChannelsService = (await import('./src/services/RecentChannelsService')).default;
+
+          const recentChannelsData = await RecentChannelsService.getRecentsByProfile(
+            currentProfile.id,
+            selectedPlaylistId,
+            20 // Limiter à 20 pour le Docker
+          );
+
+          // Mettre à jour le store pour GlobalVideoPlayer
+          const { setRecentChannels } = useRecentChannelsStore.getState();
+          setRecentChannels(recentChannelsData, currentProfile.id);
+
+          console.log(`✅ [App] ${recentChannelsData.length} chaînes récentes chargées pour GlobalVideoPlayer`);
+        } catch (error) {
+          console.error('❌ [App] Erreur chargement récentes:', error);
+        }
+      };
+
+      // Lancer le chargement (non bloquant)
+      loadRecentChannelsForPlayer();
+    }
+  }, [profilesInitialized, currentProfile, selectedPlaylistId]);
 
   // 🔄 Afficher écran de chargement pendant l'initialisation
   if (isInitializing) {
@@ -1826,7 +1875,11 @@ const App: React.FC = () => {
             </View>
 
             <View style={styles.bottomRow}>
-              {bottomRowCards.map(card => (
+              {[
+                {key: 'epg', title: tCommon('liveEPG'), subtitle: tCommon('guideTV'), index: 3},
+                {key: 'multi', title: tCommon('multiScreen'), subtitle: tCommon('screens'), index: 4},
+                {key: 'replay', title: tCommon('catchUp'), subtitle: tCommon('replay'), index: 5},
+              ].map(card => (
                 <View key={card.key} style={{flex: 1}}>
                   <Pressable
                     style={({pressed}) => [

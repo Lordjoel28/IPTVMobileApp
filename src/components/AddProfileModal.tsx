@@ -19,6 +19,7 @@ import {BlurView} from '@react-native-community/blur';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import {useThemeColors} from '../contexts/ThemeContext';
+import {useI18n} from '../hooks/useI18n';
 import {useAlert} from '../contexts/AlertContext';
 import ProfileService, {AVAILABLE_AVATARS} from '../services/ProfileService';
 import AvatarPickerModal from './AvatarPickerModal';
@@ -35,6 +36,8 @@ const AddProfileModal: React.FC<AddProfileModalProps> = ({
   onProfileCreated,
 }) => {
   const colors = useThemeColors();
+  const {t: tCommon} = useI18n('common');
+  const {t: tProfiles} = useI18n('profiles');
   const {showAlert} = useAlert();
 
   const [profileName, setProfileName] = useState('');
@@ -46,7 +49,7 @@ const AddProfileModal: React.FC<AddProfileModalProps> = ({
 
   const handleCreateProfile = async () => {
     if (!profileName.trim()) {
-      showAlert('Erreur', 'Veuillez entrer un nom de profil');
+      showAlert(tCommon('error'), tProfiles('pleaseEnterProfileName'));
       return;
     }
 
@@ -78,7 +81,7 @@ const AddProfileModal: React.FC<AddProfileModalProps> = ({
         await ProfileService.setDefaultProfile(newProfile.id);
       }
 
-      showAlert('Succès', 'Profil créé avec succès', [
+      showAlert(tCommon('success'), tProfiles('profileCreatedSuccess'), [
         {
           text: 'OK',
           onPress: () => {
@@ -96,7 +99,7 @@ const AddProfileModal: React.FC<AddProfileModalProps> = ({
       ]);
     } catch (error: any) {
       console.error('❌ Erreur création profil:', error);
-      showAlert('Erreur', error.message || 'Impossible de créer le profil');
+      showAlert(tCommon('error'), error.message || tProfiles('errorCreatingProfile'));
     } finally {
       setIsCreating(false);
     }
@@ -130,7 +133,7 @@ const AddProfileModal: React.FC<AddProfileModalProps> = ({
             <Icon name="arrow-back" size={24} color={colors.text.primary} />
           </TouchableOpacity>
           <Text style={[styles.headerTitle, {color: colors.text.primary}]}>
-            Ajouter un profil
+            {tProfiles('addProfile')}
           </Text>
           <View style={styles.headerSpacer} />
         </View>
@@ -174,7 +177,7 @@ const AddProfileModal: React.FC<AddProfileModalProps> = ({
                     color: colors.text.primary,
                   },
                 ]}
-                placeholder="Nom du profil"
+                placeholder={tProfiles('profileNamePlaceholder')}
                 placeholderTextColor={colors.text.placeholder}
                 value={profileName}
                 onChangeText={setProfileName}
@@ -204,7 +207,7 @@ const AddProfileModal: React.FC<AddProfileModalProps> = ({
                 </View>
                 <Text
                   style={[styles.defaultText, {color: colors.text.primary}]}>
-                  Définir comme profil par défaut
+                  {tProfiles('setAsDefaultProfile')}
                 </Text>
               </TouchableOpacity>
 
@@ -229,7 +232,7 @@ const AddProfileModal: React.FC<AddProfileModalProps> = ({
                 </View>
                 <Text
                   style={[styles.defaultText, {color: colors.text.primary}]}>
-                  👶 Profil enfant (filtre le contenu sensible)
+                  {tProfiles('kidsProfileDesc')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -256,7 +259,7 @@ const AddProfileModal: React.FC<AddProfileModalProps> = ({
                   color="#ffffff"
                 />
                 <Text style={styles.createButtonText}>
-                  {isCreating ? 'Création...' : 'Créer le profil'}
+                  {isCreating ? tProfiles('creating') : tProfiles('createProfile')}
                 </Text>
               </TouchableOpacity>
 
@@ -274,7 +277,7 @@ const AddProfileModal: React.FC<AddProfileModalProps> = ({
                     styles.cancelButtonText,
                     {color: colors.text.secondary},
                   ]}>
-                  Annuler
+                  {tCommon('cancel')}
                 </Text>
               </TouchableOpacity>
             </View>

@@ -1,6 +1,5 @@
 import React from 'react';
 import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
-import Animated from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import type { Channel } from '../types';
@@ -8,8 +7,6 @@ import type { Channel } from '../types';
 interface TiviMateControlsProps {
   /** État de visibilité des contrôles */
   isVisible: boolean;
-  /** Style animé pour l'opacité */
-  animatedStyle: any;
   /** Chaîne en cours de lecture */
   channel: Channel | null;
   /** Est-ce que la chaîne est en favori */
@@ -48,7 +45,6 @@ interface TiviMateControlsProps {
  */
 export const TiviMateControls: React.FC<TiviMateControlsProps> = ({
   isVisible,
-  animatedStyle,
   channel,
   isChannelFavorite,
   isScreenLocked,
@@ -79,10 +75,9 @@ export const TiviMateControls: React.FC<TiviMateControlsProps> = ({
   }
 
   return (
-    <Animated.View
+    <View
       style={[
         styles.controlsOverlay,
-        animatedStyle,
         {
           pointerEvents: isVisible ? 'box-none' : 'none',
         },
@@ -203,7 +198,7 @@ export const TiviMateControls: React.FC<TiviMateControlsProps> = ({
           />
         </TouchableOpacity>
       </View>
-    </Animated.View>
+    </View>
   );
 };
 
@@ -271,6 +266,7 @@ const styles = StyleSheet.create({
     height: 44,
     justifyContent: 'center',
     alignItems: 'center',
+    marginRight: 12,
   },
   settingsIconContainer: {
     width: 40,

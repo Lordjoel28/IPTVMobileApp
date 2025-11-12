@@ -25,6 +25,7 @@ import type {RootStackParamList} from '../../App';
 import {EPGSourceManager, EPGSource} from '../services/epg/EPGSourceManager';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import SystemNavigationBar from 'react-native-system-navigation-bar';
+import {useI18n} from '../hooks/useI18n';
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -47,6 +48,7 @@ interface PlaylistEPGAssignment {
 
 const EPGPlaylistAssignmentScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
+  const {t: tCommon} = useI18n('common');
   const [loading, setLoading] = useState(true);
   const [playlists, setPlaylists] = useState<PlaylistItem[]>([]);
   const [sources, setSources] = useState<EPGSource[]>([]);
@@ -79,7 +81,7 @@ const EPGPlaylistAssignmentScreen: React.FC = () => {
       await buildAssignments(loadedPlaylists);
     } catch (error) {
       console.error('Erreur chargement données:', error);
-      Alert.alert('Erreur', 'Impossible de charger les données');
+      Alert.alert(tCommon('error'), tCommon('cannotLoadData'));
     } finally {
       setLoading(false);
     }
@@ -211,26 +213,26 @@ const EPGPlaylistAssignmentScreen: React.FC = () => {
       await loadData(); // Recharger les données
     } catch (error) {
       console.error('Erreur assignation source:', error);
-      Alert.alert('Erreur', "Impossible de modifier l'assignation");
+      Alert.alert(tCommon('error'), tCommon('cannotModifyAssignment'));
     }
   };
 
   const getSourcePriorityInfo = (assignment: PlaylistEPGAssignment) => {
     if (assignment.assignedSourceId) {
       return {
-        text: `Manuel: ${assignment.assignedSourceName}`,
+        text: `${tCommon('manual}: ${assignment.assignedSourceName')}`,
         color: '#f59e0b',
         icon: 'settings',
       };
     } else if (assignment.hasIntegratedEPG) {
       return {
-        text: 'EPG intégré (url-tvg)',
+        text: `${tCommon('integrated')} (url-tvg)`,
         color: '#10b981',
         icon: 'check-circle',
       };
     } else {
       return {
-        text: 'EPG global (fallback)',
+        text: `${tCommon('global')} (fallback)`,
         color: '#6b7280',
         icon: 'public',
       };
@@ -269,10 +271,10 @@ const EPGPlaylistAssignmentScreen: React.FC = () => {
                 <Icon name={sourceInfo.icon} size={14} color="#ffffff" />
                 <Text style={styles.sourceStatusText}>
                   {assignment.assignedSourceId
-                    ? 'Manuel'
+                    ? tCommon('manual')
                     : assignment.hasIntegratedEPG
-                    ? 'Intégré'
-                    : 'Global'}
+                    ? tCommon('integrated')
+                    : tCommon('global')}
                 </Text>
               </View>
             </View>
@@ -319,7 +321,7 @@ const EPGPlaylistAssignmentScreen: React.FC = () => {
                   styles.modalTitle,
                   {color: isDarkMode ? '#e2e8f0' : '#1e293b'},
                 ]}>
-                Assigner source EPG
+                {tCommon('assignEPGSource')}
               </Text>
               <TouchableOpacity
                 style={styles.modalCloseButton}
@@ -357,14 +359,14 @@ const EPGPlaylistAssignmentScreen: React.FC = () => {
                         styles.optionTitle,
                         {color: isDarkMode ? '#e2e8f0' : '#1e293b'},
                       ]}>
-                      Automatique
+                      {tCommon('automatic')}
                     </Text>
                     <Text
                       style={[
                         styles.optionDesc,
                         {color: isDarkMode ? '#94a3b8' : '#64748b'},
                       ]}>
-                      EPG intégré ou global selon disponibilité
+                      {tCommon('integratedOrGlobalEPG')}
                     </Text>
                   </View>
                 </View>
@@ -412,8 +414,7 @@ const EPGPlaylistAssignmentScreen: React.FC = () => {
                       styles.emptyText,
                       {color: isDarkMode ? '#64748b' : '#94a3b8'},
                     ]}>
-                    Aucune source EPG manuelle disponible.{'\n'}
-                    Ajoutez-en depuis l'écran "Sources EPG Manuelles".
+                    {tCommon('noManualEPGSourcesAvailable')}
                   </Text>
                 </View>
               )}
@@ -449,15 +450,15 @@ const EPGPlaylistAssignmentScreen: React.FC = () => {
             styles.headerTitle,
             {color: isDarkMode ? '#e2e8f0' : '#1e293b'},
           ]}>
-          Assignation EPG ↔ Playlists
+          {tCommon('epgPlaylistAssignment')}
         </Text>
 
         <TouchableOpacity
           style={styles.helpButton}
           onPress={() =>
             Alert.alert(
-              'Aide',
-              'Assignez des sources EPG spécifiques à vos playlists.\n\nPriorité EPG:\n1. EPG intégré (url-tvg)\n2. Source manuelle assignée\n3. EPG global (fallback)',
+              tCommon('help'),
+              tCommon('epgAssignmentHelp'),
             )
           }>
           <Icon
@@ -478,7 +479,7 @@ const EPGPlaylistAssignmentScreen: React.FC = () => {
                 styles.loadingText,
                 {color: isDarkMode ? '#94a3b8' : '#64748b'},
               ]}>
-              Chargement des assignations...
+              {tCommon('loadingAssignments')}
             </Text>
           </View>
         ) : assignments.length === 0 ? (
@@ -493,14 +494,14 @@ const EPGPlaylistAssignmentScreen: React.FC = () => {
                 styles.emptyTitle,
                 {color: isDarkMode ? '#e2e8f0' : '#1e293b'},
               ]}>
-              Aucune playlist trouvée
+              {tCommon('noPlaylistsFound')}
             </Text>
             <Text
               style={[
                 styles.emptyText,
                 {color: isDarkMode ? '#94a3b8' : '#64748b'},
               ]}>
-              Importez des playlists M3U ou Xtream pour les voir ici
+              {tCommon('importPlaylistsToSee')}
             </Text>
           </View>
         ) : (

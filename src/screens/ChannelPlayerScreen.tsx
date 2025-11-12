@@ -59,6 +59,8 @@ import type {StackNavigationProp} from '@react-navigation/stack';
 import type {RootStackParamList, Channel, Category} from '../types';
 import type {Profile} from '../types/index';
 import {useThemeColors} from '../contexts/ThemeContext';
+import {useI18n} from '../hooks/useI18n';
+import type { VideoSettings } from '../services/VideoSettingsService';
 import {useImmersiveScreen} from '../hooks/useStatusBar';
 import FavoritesService from '../services/FavoritesService';
 import ProfileService from '../services/ProfileService';
@@ -68,6 +70,7 @@ import SimplePinModal from '../components/SimplePinModal';
 import { DeviceEventEmitter } from 'react-native';
 import database from '../database';
 import { Q } from '@nozbe/watermelondb';
+import { videoSettingsService } from '../services/VideoSettingsService';
 
 const {width, height} = Dimensions.get('window');
 
@@ -104,6 +107,9 @@ const cleanChannelName = (name: string) => {
 const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({route}) => {
   const colors = useThemeColors();
   const styles = createStyles(colors);
+  const {t: tChannels} = useI18n('channels');
+  const {t: tCommon} = useI18n('common');
+  const {t: tProfiles} = useI18n('profiles');
   const navigation = useNavigation<NavigationProp>();
 
   // StatusBar immersif automatique pour cet écran
@@ -252,6 +258,9 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({route}) => {
   // 👁️ Tracker de la dernière position de scroll pour détection intelligente
   const lastScrolledIndexRef = useRef<number | null>(null);
 
+  // 🔄 Tracker pour détecter le retour du fullscreen - Initialisé APRÈS le premier render
+  const wasFullscreenRef = useRef<boolean | null>(null); // null = pas encore initialisé
+
   // 👁️ Fonction ultra-simple : scroll seulement si on change significativement d'index
   const needsScrollToChannel = useCallback((channelIndex: number): boolean => {
     if (!channelsListRef.current || channelIndex < 0) {
@@ -388,6 +397,30 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({route}) => {
     }
   }, [playerStore.channel?.id, channels]); // ✅ Suppression de selectedChannel des dépendances
 
+  // 🔄 Détecter le retour du fullscreen et forcer auto-scroll en réinitialisant lastScrolledIndexRef
+  useEffect(() => {
+    console.log('🔍 [ChannelPlayerScreen] useEffect fullscreen - wasFullscreen:', wasFullscreenRef.current, 'isFullscreen:', playerStore.isFullscreen);
+
+    // 🆕 Initialisation au premier render (null → valeur actuelle)
+    if (wasFullscreenRef.current === null) {
+      console.log('🎬 [ChannelPlayerScreen] Initialisation wasFullscreenRef:', playerStore.isFullscreen);
+      wasFullscreenRef.current = playerStore.isFullscreen;
+      return; // Ne pas déclencher auto-scroll lors de l'initialisation
+    }
+
+    // Si on revient du fullscreen (wasFullscreen true → false)
+    if (wasFullscreenRef.current === true && playerStore.isFullscreen === false) {
+      console.log('🔙 [ChannelPlayerScreen] Retour du fullscreen détecté - Reset lastScrolledIndexRef pour forcer auto-scroll');
+
+      // 🎯 Forcer auto-scroll en réinitialisant le tracker de position
+      // Cela fera que needsScrollToChannel() retournera true lors du prochain useEffect
+      lastScrolledIndexRef.current = null;
+    }
+
+    // Mettre à jour le tracker
+    wasFullscreenRef.current = playerStore.isFullscreen;
+  }, [playerStore.isFullscreen]);
+
   // Force la définition de miniPlayerRect au premier render
   useEffect(() => {
     // Calculer les dimensions immédiatement sans attendre onLayout
@@ -440,16 +473,21 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({route}) => {
         return;
       }
 
-      // Sinon, démarrer la chaîne sélectionnée
+      // Sinon, démarrer la chaîne sélectionnée (vérifier les paramètres utilisateur)
       if (selectedChannel) {
+        // 🎬 Toujours lancer la chaîne sélectionnée dans ChannelPlayerScreen
+        // Le paramètre autoplay est uniquement pour l'autostart au démarrage de l'app
         console.log(
-          '🎬 [ChannelPlayerScreen] Auto-démarrage initial:',
+          '🎬 [ChannelPlayerScreen] Lancement automatique de la chaîne sélectionnée:',
           selectedChannel.name,
         );
         playerActions.playChannel(selectedChannel, false);
         lastSyncedChannelIdRef.current = selectedChannel.id;
+      }
 
-        // 📜 Auto-scroll initial intelligent vers la chaîne sélectionnée depuis ChannelsScreen
+      // 📜 Auto-scroll initial intelligent vers la chaîne sélectionnée depuis ChannelsScreen
+      // Seulement s'il y a une chaîne sélectionnée
+      if (selectedChannel) {
         // 🚀 WINDOW LOADING: Utiliser targetChannelLocalIndex si disponible (beaucoup plus rapide)
         const targetLocalIndex = route.params.targetChannelLocalIndex;
         const channelIndex =
@@ -576,6 +614,7 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({route}) => {
         }
       }
 
+      // Marquer l'initialisation comme terminée
       hasInitializedRef.current = true;
     });
   }, []); // Une seule fois au montage
@@ -715,6 +754,7 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({route}) => {
     useState(false); // Flag pour éviter changement auto
   const [currentTime, setCurrentTime] = useState('');
   const [currentDate, setCurrentDate] = useState('');
+  const [timeFormat, setTimeFormat] = useState<'12h' | '24h'>('24h');
   const [favoriteChannels, setFavoriteChannels] = useState<string[]>([]); // IDs des chaînes favorites
   const [activeProfileId, setActiveProfileId] = useState<string | null>(null); // Profil actif pour favoris
   const [isChannelLoading, setIsChannelLoading] = useState(false); // Indicateur de chargement non-bloquant
@@ -825,6 +865,22 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({route}) => {
     };
 
     loadActiveProfileAndBlocked();
+  }, []);
+
+  // Charger le format d'heure depuis les paramètres vidéo
+  useEffect(() => {
+    const loadTimeFormat = async () => {
+      try {
+        const videoSettings = await videoSettingsService.loadSettings();
+        if (videoSettings && videoSettings.timeFormat) {
+          setTimeFormat(videoSettings.timeFormat);
+        }
+      } catch (error) {
+        console.error('❌ [ChannelPlayerScreen] Erreur chargement format d\'heure:', error);
+      }
+    };
+
+    loadTimeFormat();
   }, []);
 
   // 🔄 Écouter les mises à jour de favoris depuis GlobalVideoPlayer
@@ -1133,15 +1189,22 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({route}) => {
   useEffect(() => {
     const updateTimeAndDate = () => {
       const now = new Date();
-      const timeString = now.toLocaleTimeString('fr-FR', {
+
+      // Utiliser le format d'heure sauvegardé
+      const timeOptions: Intl.DateTimeFormatOptions = {
         hour: '2-digit',
         minute: '2-digit',
-      });
+        hour12: timeFormat === '12h',
+      };
+
+      const timeString = now.toLocaleTimeString('fr-FR', timeOptions);
+
       const dateString = now.toLocaleDateString('fr-FR', {
         weekday: 'short', // Dim, Lun, Mar...
         day: '2-digit',
         month: 'short', // Jan, Fév, Mar...
       });
+
       setCurrentTime(timeString);
       setCurrentDate(dateString);
     };
@@ -1150,7 +1213,7 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({route}) => {
     const interval = setInterval(updateTimeAndDate, 1000); // Mise à jour chaque seconde
 
     return () => clearInterval(interval); // Cleanup
-  }, []);
+  }, [timeFormat]); // Dépendance au format d'heure pour se mettre à jour quand il change
 
   // 🎯 Animations pour le menu d'options
   useEffect(() => {
@@ -3073,7 +3136,7 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({route}) => {
               onPress={handleGoHome}
               activeOpacity={0.7}>
               <Icon name="home" size={20} color={colors.text.primary} style={styles.optionMenuIcon} />
-              <Text style={styles.optionMenuText}>Accueil</Text>
+              <Text style={styles.optionMenuText}>{tCommon('home')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -3081,7 +3144,7 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({route}) => {
               onPress={handleSortChannels}
               activeOpacity={0.7}>
               <Icon name="sort" size={20} color={colors.text.primary} style={styles.optionMenuIcon} />
-              <Text style={styles.optionMenuText}>Trier</Text>
+              <Text style={styles.optionMenuText}>{tCommon('sort')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -3089,7 +3152,7 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({route}) => {
               onPress={handleGoToSettings}
               activeOpacity={0.7}>
               <Icon name="settings" size={20} color={colors.text.primary} style={styles.optionMenuIcon} />
-              <Text style={styles.optionMenuText}>Paramètres</Text>
+              <Text style={styles.optionMenuText}>{tCommon('settings')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -3097,7 +3160,7 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({route}) => {
               onPress={handleLogoutOrProfiles}
               activeOpacity={0.7}>
               <Icon name="logout" size={20} color={colors.text.primary} style={styles.optionMenuIcon} />
-              <Text style={styles.optionMenuText}>Déconnexion/Profils</Text>
+              <Text style={styles.optionMenuText}>{tProfiles('logoutProfiles')}</Text>
             </TouchableOpacity>
           </Animated.View>
         </View>
@@ -3148,7 +3211,7 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({route}) => {
                 onPress={() => applySort('name-asc')}
                 activeOpacity={0.7}>
                 <Icon name="sort" size={20} color={colors.text.primary} style={styles.optionMenuIcon} />
-                <Text style={styles.optionMenuText}>Nom (A-Z)</Text>
+                <Text style={styles.optionMenuText}>{tChannels('nameAZ')}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -3156,7 +3219,7 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({route}) => {
                 onPress={() => applySort('name-desc')}
                 activeOpacity={0.7}>
                 <Icon name="sort" size={20} color={colors.text.primary} style={styles.optionMenuIcon} />
-                <Text style={styles.optionMenuText}>Nom (Z-A)</Text>
+                <Text style={styles.optionMenuText}>{tChannels('nameZA')}</Text>
               </TouchableOpacity>
 
 
@@ -3165,7 +3228,7 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({route}) => {
                 onPress={() => applySort('default')}
                 activeOpacity={0.7}>
                 <Icon name="list" size={20} color={colors.text.primary} style={styles.optionMenuIcon} />
-                <Text style={styles.optionMenuText}>Par défaut</Text>
+                <Text style={styles.optionMenuText}>{tCommon('byDefault')}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -3173,7 +3236,7 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({route}) => {
                 onPress={cancelSort}
                 activeOpacity={0.7}>
                 <Icon name="close" size={20} color={colors.accent.error} style={styles.optionMenuIcon} />
-                <Text style={[styles.optionMenuText, {color: colors.accent.error}]}>Annuler</Text>
+                <Text style={[styles.optionMenuText, {color: colors.accent.error}]}>{tCommon('cancel')}</Text>
               </TouchableOpacity>
             </Animated.View>
           </View>
@@ -3221,12 +3284,12 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({route}) => {
 
               {/* Titre */}
               <Text style={styles.logoutDialogTitle}>
-                Déconnexion
+                {tProfiles('logout')}
               </Text>
 
               {/* Message simple */}
               <Text style={styles.logoutDialogMessage}>
-                Voulez-vous vraiment vous déconnecter ?
+                {tProfiles('confirmLogout')}
               </Text>
 
               {/* Boutons d'action */}
@@ -3236,7 +3299,7 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({route}) => {
                   onPress={handleCancelLogout}
                   activeOpacity={0.7}>
                   <Text style={styles.logoutDialogButtonTextCancel}>
-                    Annuler
+                    {tCommon('cancel')}
                   </Text>
                 </TouchableOpacity>
 
@@ -3251,7 +3314,7 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({route}) => {
                     style={styles.logoutDialogButtonIcon}
                   />
                   <Text style={styles.logoutDialogButtonTextConfirm}>
-                    Se déconnecter
+                    {tProfiles('logoutConfirmButton')}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -3300,7 +3363,7 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({route}) => {
                   setSelectedChannelForFavorite(null);
                 }}>
                 <Text style={styles.favoriteModalButtonCancelText}>
-                  Annuler
+                  {tCommon('cancel')}
                 </Text>
               </TouchableOpacity>
 
@@ -3317,8 +3380,8 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({route}) => {
                 <Text style={styles.favoriteModalButtonConfirmText}>
                   {selectedChannelForFavorite &&
                   favoriteChannels.includes(selectedChannelForFavorite.id)
-                    ? 'Retirer des favoris'
-                    : 'Ajouter aux favoris'}
+                    ? tChannels('removeFromFavorites')
+                    : tChannels('addToFavorites')}
                 </Text>
               </TouchableOpacity>
             </View>

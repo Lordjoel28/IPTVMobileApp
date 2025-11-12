@@ -16,6 +16,7 @@ import type {StackNavigationProp} from '@react-navigation/stack';
 import type {RootStackParamList} from '../../App';
 import { videoSettingsService } from '../services/VideoSettingsService';
 import type { VideoSettings } from '../services/VideoSettingsService';
+import {useI18n} from '../hooks/useI18n';
 
 // L'interface est maintenant importée depuis VideoSettingsService
 
@@ -25,6 +26,8 @@ const VideoPlayerSettingsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const colors = useThemeColors();
   const isDark = useIsDark();
+  const {t: tSettings} = useI18n('settings');
+  const {t: tCommon} = useI18n('common');
   const [settings, setSettings] = useState<VideoSettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -208,13 +211,13 @@ const VideoPlayerSettingsScreen: React.FC = () => {
     speedButtonTextActive: {
       color: '#FFFFFF',
     },
-    skipButtons: {
+            volumeButtons: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       marginTop: 12,
       flexWrap: 'wrap',
     },
-    skipButton: {
+    volumeButton: {
       width: '23%',
       backgroundColor: safeColors.surface.secondary,
       paddingVertical: 12,
@@ -225,25 +228,25 @@ const VideoPlayerSettingsScreen: React.FC = () => {
       borderWidth: 1,
       borderColor: safeColors.border.primary,
     },
-    skipButtonActive: {
-      backgroundColor: safeColors.success.main,
-      borderColor: safeColors.success.main,
+    volumeButtonActive: {
+      backgroundColor: safeColors.primary.main,
+      borderColor: safeColors.primary.main,
     },
-    skipButtonText: {
+    volumeButtonText: {
       fontSize: 13,
       fontWeight: '600',
       color: safeColors.text.secondary,
       textAlign: 'center',
     },
-    skipButtonTextActive: {
+    volumeButtonTextActive: {
       color: '#FFFFFF',
     },
-    priorityButtons: {
+    timeFormatButtons: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       marginTop: 12,
     },
-    priorityButton: {
+    timeFormatButton: {
       flex: 1,
       backgroundColor: safeColors.surface.secondary,
       paddingVertical: 16,
@@ -253,20 +256,20 @@ const VideoPlayerSettingsScreen: React.FC = () => {
       borderWidth: 2,
       borderColor: safeColors.border.primary,
     },
-    priorityButtonActive: {
+    timeFormatButtonActive: {
       backgroundColor: safeColors.info.main,
       borderColor: safeColors.info.main,
     },
-    priorityButtonText: {
+    timeFormatButtonText: {
       fontSize: 14,
       fontWeight: '600',
       color: safeColors.text.secondary,
       textAlign: 'center',
     },
-    priorityButtonTextActive: {
+    timeFormatButtonTextActive: {
       color: '#FFFFFF',
     },
-    priorityButtonDescription: {
+    timeFormatButtonDescription: {
       fontSize: 11,
       color: safeColors.text.tertiary,
       marginTop: 4,
@@ -288,7 +291,7 @@ const VideoPlayerSettingsScreen: React.FC = () => {
       console.log('✅ Paramètres vidéo chargés:', loadedSettings);
     } catch (error) {
       console.error('❌ Erreur chargement paramètres:', error);
-      Alert.alert('Erreur', 'Impossible de charger les paramètres');
+      Alert.alert(tCommon('error'), tCommon('cannotLoadSettings'));
     } finally {
       setIsLoading(false);
     }
@@ -305,7 +308,7 @@ const VideoPlayerSettingsScreen: React.FC = () => {
       }
     } catch (error) {
       console.error('❌ Erreur sauvegarde paramètres:', error);
-      Alert.alert('Erreur', 'Impossible de sauvegarder les paramètres');
+      Alert.alert(tCommon('error'), tCommon('cannotSaveSettings'));
     }
   };
 
@@ -321,32 +324,10 @@ const VideoPlayerSettingsScreen: React.FC = () => {
     }
   };
 
-  const handleQualityChange = async (
-    quality: 'auto' | '1080p' | '720p' | '480p',
-  ) => {
-    if (settings) {
-      await saveSettings({...settings, quality});
-    }
-  };
-
-  const handleVolumeChange = async (volume: number) => {
-    if (settings) {
-      await saveSettings({...settings, volume});
-      // TODO: Intégrer avec le nouveau système de player
-    }
-  };
-
   const handlePlaybackSpeedChange = async (speed: number) => {
     if (settings) {
       await saveSettings({...settings, playbackSpeed: speed});
       console.log(`⚡ Vitesse de lecture changée: ${speed}x`);
-    }
-  };
-
-  const handleSkipDurationChange = async (duration: number) => {
-    if (settings) {
-      await saveSettings({...settings, skipDuration: duration});
-      console.log(`⏩ Durée de saut changée: ${duration}s`);
     }
   };
 
@@ -357,25 +338,27 @@ const VideoPlayerSettingsScreen: React.FC = () => {
     }
   };
 
-  const handleQualityPriorityChange = async (priority: 'resolution' | 'fluidity') => {
+  
+  const handleNetworkTimeoutChange = async (timeout: number) => {
     if (settings) {
-      await saveSettings({...settings, qualityPriority: priority});
-      console.log(`🎯 Priorité qualité: ${priority}`);
+      await saveSettings({...settings, networkTimeout: timeout});
+      console.log(`🌐 Timeout réseau: ${timeout}s`);
     }
   };
 
-  // Formater la durée pour l'affichage
-  const formatSkipDuration = (seconds: number): string => {
-    if (seconds < 60) return `${seconds}s`;
-    if (seconds < 3600) return `${Math.floor(seconds / 60)}min`;
-    return `${Math.floor(seconds / 3600)}h${Math.floor((seconds % 3600) / 60)}min`;
+  const handleTimeFormatChange = async (format: '12h' | '24h') => {
+    if (settings) {
+      await saveSettings({...settings, timeFormat: format});
+      console.log(`🕐 Format heure: ${format}`);
+    }
   };
 
+  
   if (isLoading || !settings) {
     return (
       <View style={styles.loadingContainer}>
         <Text style={styles.loadingText}>
-          {isLoading ? '🔄 Chargement des paramètres...' : '❌ Erreur de chargement'}
+          {isLoading ? `🔄 ${tCommon('loadingSettings')}` : `❌ ${tCommon('loadingError')}`}
         </Text>
       </View>
     );
@@ -390,19 +373,19 @@ const VideoPlayerSettingsScreen: React.FC = () => {
           onPress={() => navigation.goBack()}>
           <Icon name="arrow-back" size={24} color={safeColors.text.primary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Lecteur Vidéo</Text>
+        <Text style={styles.headerTitle}>{tSettings('videoPlayerSettings')}</Text>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Section Lecture */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🎬 Paramètres de Lecture</Text>
+          <Text style={styles.sectionTitle}>🎬 {tSettings('playbackSettings')}</Text>
 
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Lecture automatique</Text>
+              <Text style={styles.settingLabel}>{tSettings('autoplayLabel')}</Text>
               <Text style={styles.settingDescription}>
-                Démarrer automatiquement la lecture des chaînes
+                {tSettings('autoplayDesc')}
               </Text>
             </View>
             <Switch
@@ -415,9 +398,9 @@ const VideoPlayerSettingsScreen: React.FC = () => {
 
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Mémoriser la position</Text>
+              <Text style={styles.settingLabel}>{tSettings('rememberPositionLabel')}</Text>
               <Text style={styles.settingDescription}>
-                Reprendre la lecture où vous vous êtes arrêté
+                {tSettings('rememberPositionDesc')}
               </Text>
             </View>
             <Switch
@@ -431,9 +414,9 @@ const VideoPlayerSettingsScreen: React.FC = () => {
           {/* Vitesse de lecture */}
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>⚡ Vitesse de lecture</Text>
+              <Text style={styles.settingLabel}>⚡ {tSettings('playbackSpeedLabel')}</Text>
               <Text style={styles.settingDescription}>
-                Actuellement: {settings.playbackSpeed}x (VOD/Catch-up uniquement)
+                {tCommon('currently')}: {settings.playbackSpeed}x ({tSettings('playbackSpeedDesc')})
               </Text>
             </View>
           </View>
@@ -459,42 +442,13 @@ const VideoPlayerSettingsScreen: React.FC = () => {
             ))}
           </View>
 
-          {/* Saut intelligent */}
-          <View style={styles.settingRow}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>⏩ Saut intelligent</Text>
-              <Text style={styles.settingDescription}>
-                Durée du saut pour double-tap gauche/droite: {formatSkipDuration(settings.skipDuration)}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.skipButtons}>
-            {[10, 30, 60, 300].map(duration => (
-              <TouchableOpacity
-                key={duration}
-                style={[
-                  styles.skipButton,
-                  settings.skipDuration === duration && styles.skipButtonActive,
-                ]}
-                onPress={() => handleSkipDurationChange(duration)}>
-                <Text
-                  style={[
-                    styles.skipButtonText,
-                    settings.skipDuration === duration && styles.skipButtonTextActive,
-                  ]}>
-                  {formatSkipDuration(duration)}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
 
           {/* Lecture en arrière-plan */}
           <View style={[styles.settingRow, { borderBottomWidth: 0 }]}>
             <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>🎵 Lecture en arrière-plan</Text>
+              <Text style={styles.settingLabel}>🎵 {tSettings('backgroundPlayLabel')}</Text>
               <Text style={styles.settingDescription}>
-                Continuer l'audio lorsque l'app est en arrière-plan
+                {tSettings('backgroundPlayDesc')}
               </Text>
             </View>
             <Switch
@@ -506,129 +460,102 @@ const VideoPlayerSettingsScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* Section Qualité */}
+        
+        {/* Section Réseau */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🎯 Qualité Vidéo</Text>
+          <Text style={styles.sectionTitle}>🌐 {tSettings('networkSettings')}</Text>
 
-          <View style={styles.settingRow}>
+          <View style={[styles.settingRow, { borderBottomWidth: 0 }]}>
             <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>Qualité par défaut</Text>
+              <Text style={styles.settingLabel}>{tSettings('networkTimeoutLabel')}</Text>
               <Text style={styles.settingDescription}>
-                Actuellement: {settings.quality}
+                {tSettings('networkTimeoutDesc')}: {settings.networkTimeout}s
               </Text>
             </View>
           </View>
 
-          <View style={styles.qualityButtons}>
-            {['auto', '1080p', '720p', '480p'].map(quality => (
+          <View style={styles.speedButtons}>
+            {[5, 10, 15, 20, 30].map(timeout => (
               <TouchableOpacity
-                key={quality}
+                key={timeout}
                 style={[
-                  styles.qualityButton,
-                  settings.quality === quality && styles.qualityButtonActive,
+                  styles.speedButton,
+                  settings.networkTimeout === timeout && styles.speedButtonActive,
                 ]}
-                onPress={() => handleQualityChange(quality as any)}>
+                onPress={() => handleNetworkTimeoutChange(timeout)}>
                 <Text
                   style={[
-                    styles.qualityButtonText,
-                    settings.quality === quality &&
-                      styles.qualityButtonTextActive,
+                    styles.speedButtonText,
+                    settings.networkTimeout === timeout &&
+                      styles.speedButtonTextActive,
                   ]}>
-                  {quality}
+                  {timeout}s
                 </Text>
               </TouchableOpacity>
             ))}
-          </View>
-
-          {/* Priorité Qualité */}
-          <View style={[styles.settingRow, { marginTop: 16 }]}>
-            <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>🎯 Priorité de qualité</Text>
-              <Text style={styles.settingDescription}>
-                Privilégier la résolution ou la fluidité
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.priorityButtons}>
-            <TouchableOpacity
-              style={[
-                styles.priorityButton,
-                settings.qualityPriority === 'resolution' && styles.priorityButtonActive,
-              ]}
-              onPress={() => handleQualityPriorityChange('resolution')}>
-              <Icon
-                name="high-quality"
-                size={24}
-                color={settings.qualityPriority === 'resolution' ? '#FFFFFF' : safeColors.text.secondary}
-              />
-              <Text
-                style={[
-                  styles.priorityButtonText,
-                  settings.qualityPriority === 'resolution' && styles.priorityButtonTextActive,
-                ]}>
-                Résolution
-              </Text>
-              <Text style={styles.priorityButtonDescription}>
-                Meilleure qualité
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.priorityButton,
-                settings.qualityPriority === 'fluidity' && styles.priorityButtonActive,
-              ]}
-              onPress={() => handleQualityPriorityChange('fluidity')}>
-              <Icon
-                name="speed"
-                size={24}
-                color={settings.qualityPriority === 'fluidity' ? '#FFFFFF' : safeColors.text.secondary}
-              />
-              <Text
-                style={[
-                  styles.priorityButtonText,
-                  settings.qualityPriority === 'fluidity' && styles.priorityButtonTextActive,
-                ]}>
-                Fluidité
-              </Text>
-              <Text style={styles.priorityButtonDescription}>
-                Lecture fluide
-              </Text>
-            </TouchableOpacity>
           </View>
         </View>
 
-        {/* Section Volume */}
+        {/* Section Interface */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🔊 Audio</Text>
+          <Text style={styles.sectionTitle}>🎨 {tSettings('userInterface')}</Text>
 
-          <View style={styles.settingRow}>
+          {/* Format heure */}
+          <View style={[styles.settingRow, { borderBottomWidth: 0 }]}>
             <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>
-                Volume par défaut: {settings.volume}%
+              <Text style={styles.settingLabel}>{tSettings('timeFormatLabel')}</Text>
+              <Text style={styles.settingDescription}>
+                {tSettings('timeFormatDesc')}
               </Text>
             </View>
           </View>
 
-          <View style={styles.volumeButtons}>
-            {[25, 50, 75, 100].map(volume => (
-              <TouchableOpacity
-                key={volume}
+          <View style={styles.timeFormatButtons}>
+            <TouchableOpacity
+              style={[
+                styles.timeFormatButton,
+                settings.timeFormat === '12h' && styles.timeFormatButtonActive,
+              ]}
+              onPress={() => handleTimeFormatChange('12h')}>
+              <Icon
+                name="access-time"
+                size={24}
+                color={settings.timeFormat === '12h' ? '#FFFFFF' : safeColors.text.secondary}
+              />
+              <Text
                 style={[
-                  styles.volumeButton,
-                  settings.volume === volume && styles.volumeButtonActive,
-                ]}
-                onPress={() => handleVolumeChange(volume)}>
-                <Text
-                  style={[
-                    styles.volumeButtonText,
-                    settings.volume === volume && styles.volumeButtonTextActive,
-                  ]}>
-                  {volume}%
-                </Text>
-              </TouchableOpacity>
-            ))}
+                  styles.timeFormatButtonText,
+                  settings.timeFormat === '12h' && styles.timeFormatButtonTextActive,
+                ]}>
+                {tSettings('twelveHours')}
+              </Text>
+              <Text style={styles.timeFormatButtonDescription}>
+                {tSettings('amPm')}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.timeFormatButton,
+                settings.timeFormat === '24h' && styles.timeFormatButtonActive,
+              ]}
+              onPress={() => handleTimeFormatChange('24h')}>
+              <Icon
+                name="schedule"
+                size={24}
+                color={settings.timeFormat === '24h' ? '#FFFFFF' : safeColors.text.secondary}
+              />
+              <Text
+                style={[
+                  styles.timeFormatButtonText,
+                  settings.timeFormat === '24h' && styles.timeFormatButtonTextActive,
+                ]}>
+                {tSettings('twentyFourHours')}
+              </Text>
+              <Text style={styles.timeFormatButtonDescription}>
+                {tCommon('standard')}
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       </ScrollView>

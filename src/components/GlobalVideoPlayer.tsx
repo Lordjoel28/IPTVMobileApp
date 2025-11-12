@@ -1,9 +1,10 @@
-import React, {useRef, useEffect} from 'react';
+import React, {useRef, useEffect, useMemo} from 'react';
 import {
   View,
   StyleSheet,
   Dimensions,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   Text,
   BackHandler,
   ScrollView,
@@ -68,6 +69,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DeviceEventEmitter } from 'react-native';
 import {CastButton} from './CastButton';
 import {castManager} from '../services/CastManager';
+import {playerManager, type PlayerType, setNavigateToSettingsCallback} from '../services/PlayerManager';
+// VLC intégré désactivé - Utilisation de VLC externe via intent
+// import VLCPlayerComponent from './VLCPlayerComponent';
 
 const {width: screenWidth, height: screenHeight} = Dimensions.get('window');
 const {width: deviceWidth, height: deviceHeight} = Dimensions.get('screen'); // Vraies dimensions pour fullscreen
@@ -79,9 +83,36 @@ const SAFE_AREA_MARGIN = 16;
 
 const GlobalVideoPlayer: React.FC = () => {
   const videoRef = useRef<Video>(null);
+  // vlcRef supprimé - VLC intégré désactivé
+  // const vlcRef = useRef<any>(null);
   const navigation = useNavigation();
 
-  
+  // Configurer le callback de navigation vers settings
+  React.useEffect(() => {
+    setNavigateToSettingsCallback(() => {
+      navigation.navigate('PlayerSettings' as any);
+    });
+  }, [navigation]);
+
+  // 🎬 Gestion du type de lecteur (Default / VLC)
+  const [playerType, setPlayerType] = React.useState<PlayerType>(
+    playerManager.getPlayerType()
+  );
+
+  // 🎧 Écouter les changements de lecteur
+  React.useEffect(() => {
+    const handlePlayerTypeChange = (newPlayerType: PlayerType) => {
+      console.log(`🔄 [GlobalVideoPlayer] Changement de lecteur: ${newPlayerType}`);
+      setPlayerType(newPlayerType);
+    };
+
+    playerManager.addListener(handlePlayerTypeChange);
+
+    return () => {
+      playerManager.removeListener(handlePlayerTypeChange);
+    };
+  }, []);
+
   // 🎯 PHASE 2: États pour gestures avancées (fullscreen uniquement)
   const [currentTime, setCurrentTime] = React.useState(0);
   const [duration, setDuration] = React.useState(0);
@@ -118,6 +149,10 @@ const GlobalVideoPlayer: React.FC = () => {
     isSearchScreenOpen,
     isFromMultiScreen,
     isMultiScreenOpen,
+    isFromAutoStart,
+    retryCount,
+    isRetrying,
+    retryState,
     actions,
   } = usePlayerStore();
 
@@ -132,6 +167,230 @@ const GlobalVideoPlayer: React.FC = () => {
   // 🔄 État pour la gestion des favoris (système existant)
   const [isChannelFavorite, setIsChannelFavorite] = React.useState(false);
   const [favoriteProfileId, setFavoriteProfileId] = React.useState<string | null>(null);
+
+  // 🌐 Utiliser l'état centralisé du store pour les retries
+  const maxRetries = 5; // Augmenté comme les apps IPTV professionnelles
+
+  // 🔄 État local pour le retry timing
+  const [retryTimeout, setRetryTimeout] = React.useState<NodeJS.Timeout | null>(null);
+  
+  // 📱 État pour la popup de retry
+  const [showRetryPopup, setShowRetryPopup] = React.useState(false);
+  const [popupTimeout, setPopupTimeout] = React.useState<NodeJS.Timeout | null>(null);
+
+  // 🎭 Animation pour la popup de retry
+  const popupAnimValue = React.useRef(new RNAnimated.Value(0) as RNAnimated.Value).current;
+
+  // 🔄 Animation de rotation pour l'icône de refresh
+  const iconRotationAnim = React.useRef(new RNAnimated.Value(0) as RNAnimated.Value).current;
+
+  // 🔄 Machine à états simplifiée pour les retries automatiques
+  const scheduleNextRetry = React.useCallback(() => {
+    // Utiliser retryCount + 1 car on planifie le PROCHAIN retry
+    const nextRetryCount = retryCount + 1;
+    if (!channel || nextRetryCount > maxRetries || retryState !== 'retrying') {
+      console.log(`🔄 [GlobalVideoPlayer] Retry bloqué - channel: ${!!channel}, nextRetryCount: ${nextRetryCount}, maxRetries: ${maxRetries}, state: ${retryState}`);
+      return;
+    }
+
+    // Délais optimisés : 2s → 4s → 6s → 8s → 10s (total: 30s)
+    const optimizedDelays = [2000, 4000, 6000, 8000, 10000];
+    // Utiliser nextRetryCount - 1 pour indexer correctement le tableau
+    const delay = optimizedDelays[nextRetryCount - 1] || 10000;
+    const delaySeconds = Math.round(delay / 1000);
+    console.log(`🔄 [GlobalVideoPlayer] Prochain retry dans ${delaySeconds}s pour ${channel.name} (prochaine tentative ${nextRetryCount}/${maxRetries})`);
+
+    const timeout = setTimeout(() => {
+      // Vérifier qu'on est toujours en état de retry
+      if (retryState !== 'retrying') {
+        console.log(`🔄 [GlobalVideoPlayer] Retry annulé - état changé à ${retryState}`);
+        return;
+      }
+
+      console.log(`🔄 [GlobalVideoPlayer] Exécution retry ${nextRetryCount}/${maxRetries} pour ${channel.name}`);
+
+      // Incrémenter le compteur
+      actions.incrementRetry();
+
+      // Préparer la relecture vidéo
+      actions.setLoading(true);
+
+      setTimeout(() => {
+        if (isPaused) {
+          actions.togglePlayPause();
+        }
+        console.log(`🔄 [GlobalVideoPlayer] Retry ${nextRetryCount} lancé pour ${channel.name}`);
+
+        // 📱 Afficher la popup de retry pendant 3 secondes
+        showRetryPopupTemporarily();
+      }, 300);
+
+    }, delay);
+
+    setRetryTimeout(timeout);
+  }, [channel, retryCount, retryState, maxRetries, actions, isPaused]);
+
+  // 📱 Fonction pour afficher la popup de retry avec animation fluide
+  const showRetryPopupTemporarily = React.useCallback(() => {
+    // Nettoyer le timeout précédent
+    if (popupTimeout) {
+      clearTimeout(popupTimeout);
+    }
+
+    // Afficher la popup avec animation d'apparition fluide
+    setShowRetryPopup(true);
+
+    // Animation d'apparition (slide up + fade in) + rotation icône
+    RNAnimated.parallel([
+      RNAnimated.timing(popupAnimValue, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true, // Optimisé pour les performances
+      }),
+      // Animation de rotation continue de l'icône
+      RNAnimated.loop(
+        RNAnimated.timing(iconRotationAnim, {
+          toValue: 1,
+          duration: 2000, // Rotation complète en 2 secondes
+          useNativeDriver: true, // Optimisé pour les performances
+        })
+      )
+    ]).start();
+
+    // Masquer après 3 secondes avec animation de disparition fluide
+    const timeout = setTimeout(() => {
+      // Animation de disparition (slide down + fade out)
+      RNAnimated.timing(popupAnimValue, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true, // Optimisé pour les performances
+      }).start(() => {
+        setShowRetryPopup(false); // Masquer après l'animation
+      });
+    }, 3000);
+
+    setPopupTimeout(timeout);
+  }, [popupTimeout, popupAnimValue, iconRotationAnim]);
+
+  
+  // Nettoyer le timeout de la popup si nécessaire
+  React.useEffect(() => {
+    return () => {
+      if (popupTimeout) {
+        clearTimeout(popupTimeout);
+      }
+    };
+  }, [popupTimeout]);
+
+  // 🔄 useEffect principal pour gérer la machine à états des retries
+  React.useEffect(() => {
+    if (retryState === 'retrying') {
+      const maxRetriesReached = retryCount >= maxRetries;
+
+      if (!maxRetriesReached) {
+        // Démarrer ou continuer le cycle retry pour toutes les tentatives
+        console.log(`🔄 [GlobalVideoPlayer] Cycle retry en cours pour ${channel?.name} (tentative ${retryCount + 1}/${maxRetries})`);
+        scheduleNextRetry();
+      } else if (maxRetriesReached) {
+        // Épuisé les retries → état failed
+        console.log(`🔄 [GlobalVideoPlayer] Retry épuisé pour ${channel?.name}`);
+        actions.setRetryState('failed');
+
+        // Afficher l'erreur finale
+        if (error?.includes('Tentative de reconnexion')) {
+          actions.setError(`Impossible de lire cette chaîne. Réessayez plus tard`);
+        }
+
+        // 📱 Afficher la notification finale d'échec pendant 3 secondes
+        showRetryPopupTemporarily();
+      }
+    }
+
+    // ✅ Nettoyage robuste : annuler le retry si l'état change ou si le composant est démonté
+    return () => {
+      if (retryTimeout) {
+        clearTimeout(retryTimeout);
+      }
+    };
+  }, [retryState, retryCount, maxRetries, actions, error, channel?.name, scheduleNextRetry]);
+
+  // 🔄 Le retry est maintenant géré par l'useEffect principal ci-dessus
+
+  // 📱 useEffect pour afficher la notification quand on passe à l'état failed
+  React.useEffect(() => {
+    if (retryState === 'failed') {
+      console.log(`🔄 [GlobalVideoPlayer] Notification finale d'échec pour ${channel?.name}`);
+      showRetryPopupTemporarily();
+    }
+  }, [retryState, channel?.name]);
+
+  // 📺 Initialiser favoriteProfileId depuis ProfileService
+  React.useEffect(() => {
+    const loadProfileId = async () => {
+      if (storePlaylistId) {
+        const ProfileService = (await import('../services/ProfileService')).default;
+        const activeProfile = await ProfileService.getActiveProfile();
+        if (activeProfile) {
+          setFavoriteProfileId(activeProfile.id);
+          console.log(`🔗 [GlobalVideoPlayer] ProfileID initialisé: ${activeProfile.id} pour playlist: ${storePlaylistId}`);
+        }
+      }
+    };
+    loadProfileId();
+  }, [storePlaylistId]);
+
+  // 🎬 Gestion des lecteurs externes (VLC)
+  React.useEffect(() => {
+    const handleExternalPlayer = async () => {
+      if (channel && playerType === 'vlc') {
+        const streamUrl = channel.url;
+        const title = channel.name;
+
+        console.log(`[GlobalVideoPlayer] Ouverture VLC externe pour: ${title}`);
+
+        try {
+          let success = false;
+          if (playerType === 'vlc') {
+            success = await playerManager.openInVLCPlayer(streamUrl, title);
+          }
+
+          if (success) {
+            console.log(`[GlobalVideoPlayer] ${playerType} ouvert avec succès`);
+            // Mettre en pause la lecture interne car le lecteur externe gère
+            actions.setPaused(true);
+          } else {
+            // Si l'ouverture échoue, afficher une erreur
+            actions.setError(`Impossible d'ouvrir ${playerType} pour cette chaîne`);
+          }
+        } catch (error) {
+          console.error(`[GlobalVideoPlayer] Erreur ouverture ${playerType}:`, error);
+          actions.setError(`Erreur lors de l'ouverture de ${playerType}`);
+        }
+      }
+    };
+
+    handleExternalPlayer();
+  }, [channel, playerType]);
+
+  // 🎯 Détection automatique du format et suggestion du meilleur lecteur
+  React.useEffect(() => {
+    const suggestBestPlayer = async () => {
+      if (channel && playerType === 'default') {
+        const streamUrl = channel.url;
+        const format = playerManager.analyzeStreamFormat(streamUrl);
+
+        if (format.requiresExternalPlayer) {
+          console.log(`[GlobalVideoPlayer] Format ${format.container}/${format.protocol} nécessite un lecteur externe`);
+          console.log(`[GlobalVideoPlayer] Lecteur recommandé: ${format.recommendedPlayer}`);
+
+          // On pourrait afficher une suggestion à l'utilisateur ici
+          // Pour l'instant, on log juste la recommandation
+        }
+      }
+    };
+
+    suggestBestPlayer();
+  }, [channel, playerType]);
 
   // 🛡️ Protection contre les clics multiples
   const [isClickProcessing, setIsClickProcessing] = React.useState(false);
@@ -286,6 +545,7 @@ const GlobalVideoPlayer: React.FC = () => {
       console.log('🔙 [On-screen Back] From multi-screen, reopening multi-screen...');
       actions.setFullscreen(false);
       actions.setFromMultiScreen(false);
+      actions.setFromAutoStart(false); // Reset flag autostart
       actions.setMultiScreenOpen(true);
       setMultiScreenVisible(true);
       return;
@@ -295,6 +555,7 @@ const GlobalVideoPlayer: React.FC = () => {
     if (navigationData && channel) {
       console.log('🔙 [On-screen Back] NavigationData found, redirecting with NAVIGATE...');
       actions.setFullscreen(false);
+      actions.setFromAutoStart(false); // Reset flag autostart
       navigation.navigate('ChannelPlayer', {
         ...navigationData,
         selectedChannel: channel,
@@ -303,6 +564,7 @@ const GlobalVideoPlayer: React.FC = () => {
     } else {
       console.log('🔙 [On-screen Back] No NavigationData, default behavior.');
       actions.setFullscreen(false);
+      actions.setFromAutoStart(false); // Reset flag autostart
     }
   }, [localFullscreen, isFromMultiScreen, navigationData, channel, actions, navigation]);
 
@@ -482,29 +744,39 @@ const GlobalVideoPlayer: React.FC = () => {
             return;
           }
 
-          const animDuration = 300;
           console.log('🎬 [Animation] Démarrage animation PiP vers:', {
             positionTarget,
             sizeTarget,
-          duration: animDuration,
           isInChannelPlayerScreen,
           isFullscreen,
                 });
 
+          // 🎯 Animation PiP fluide avec spring (style YouTube)
+          // Utilise spring au lieu de timing pour un mouvement plus naturel
           RNAnimated.parallel([
-          RNAnimated.timing(viewPosition, {
+          RNAnimated.spring(viewPosition, {
             toValue: positionTarget,
-            duration: animDuration,
             useNativeDriver: false,
+            damping: 18,         // Légèrement plus souple pour transitions
+            stiffness: 140,      // Rigidité équilibrée
+            mass: 1,
+            overshootClamping: false,
+            restDisplacementThreshold: 0.01,
+            restSpeedThreshold: 0.01,
           }),
-          RNAnimated.timing(viewSize, {
+          RNAnimated.spring(viewSize, {
             toValue: sizeTarget,
-            duration: animDuration,
             useNativeDriver: false,
+            damping: 18,         // Synchronisé avec position
+            stiffness: 140,
+            mass: 1,
+            overshootClamping: false,
+            restDisplacementThreshold: 0.01,
+            restSpeedThreshold: 0.01,
           }),
           RNAnimated.timing(viewOpacity, {
             toValue: 1,
-            duration: 100,
+            duration: 150,       // Légèrement plus long pour fade-in doux
             useNativeDriver: false,
           }),
         ]).start();
@@ -611,6 +883,7 @@ const GlobalVideoPlayer: React.FC = () => {
             // 2. Sortir du fullscreen (le player sera masqué car isMultiScreenOpen=true)
             actions.setFullscreen(false);
             actions.setFromMultiScreen(false);
+            actions.setFromAutoStart(false); // Reset flag autostart
             return true;
           }
 
@@ -645,6 +918,7 @@ const GlobalVideoPlayer: React.FC = () => {
             );
             // Comportement par défaut: juste sortir du fullscreen
             actions.setFullscreen(false);
+            actions.setFromAutoStart(false); // Reset flag autostart
           }
 
           return true;
@@ -670,7 +944,7 @@ const GlobalVideoPlayer: React.FC = () => {
   // StatusBar gérée par StatusBarManager centralisé
   // La logique complexe est maintenant simplifiée
 
-  // Gestionnaire pour drag PiP avec adoucissement
+  // 🎯 Gestionnaire pour drag PiP ultra-fluide style YouTube
   const onPanGestureEvent = RNAnimated.event(
     [
       {
@@ -683,7 +957,7 @@ const GlobalVideoPlayer: React.FC = () => {
     {
       useNativeDriver: false,
       listener: (event: any) => {
-        // Ajouter une résistance douce aux bords
+        // Résistance douce progressive aux bords (technique YouTube)
         const {translationX, translationY} = event.nativeEvent;
         const currentX = finalPosition.x + translationX;
         const currentY = finalPosition.y + translationY;
@@ -695,18 +969,28 @@ const GlobalVideoPlayer: React.FC = () => {
         let dampedX = translationX;
         let dampedY = translationY;
 
-        // Résistance horizontale
+        // 🎯 Résistance PROGRESSIVE horizontale (non-linéaire, comme YouTube)
+        // Plus on s'éloigne, plus la résistance augmente graduellement
         if (currentX < 0) {
-          dampedX = translationX * 0.3; // Résistance 70%
+          const overflow = Math.abs(currentX);
+          // Formule rubberband: résistance croissante non-linéaire
+          const resistance = Math.max(0.1, 1 - (overflow / 200));
+          dampedX = translationX * resistance;
         } else if (currentX > maxX) {
-          dampedX = translationX * 0.3;
+          const overflow = currentX - maxX;
+          const resistance = Math.max(0.1, 1 - (overflow / 200));
+          dampedX = translationX * resistance;
         }
 
-        // Résistance verticale
+        // 🎯 Résistance PROGRESSIVE verticale (synchronisée)
         if (currentY < 0) {
-          dampedY = translationY * 0.3;
+          const overflow = Math.abs(currentY);
+          const resistance = Math.max(0.1, 1 - (overflow / 200));
+          dampedY = translationY * resistance;
         } else if (currentY > maxY) {
-          dampedY = translationY * 0.3;
+          const overflow = currentY - maxY;
+          const resistance = Math.max(0.1, 1 - (overflow / 200));
+          dampedY = translationY * resistance;
         }
 
         dragPosition.setValue({x: dampedX, y: dampedY});
@@ -766,6 +1050,57 @@ const GlobalVideoPlayer: React.FC = () => {
     React.useState<number | null>(0);
   const [subtitleSize, setSubtitleSize] = React.useState<string>('normal');
   const [subtitleDelay, setSubtitleDelay] = React.useState<number>(0); // en ms
+
+  // 🎯 Optimisation: Mémoriser les objets de sélection de pistes pour éviter re-renders
+  const memoizedAudioTrack = useMemo(() => {
+    if (selectedAudioTrack > 0 && availableAudioTracks.length > 0) {
+      const trackIndex = selectedAudioTrack - 1;
+      const track = availableAudioTracks[trackIndex];
+      if (track) {
+        const realIndex = track.index ?? trackIndex;
+        console.log(`🔊 [Audio] Recalcul piste: ${selectedAudioTrack}, index réel: ${realIndex}`);
+        return {
+          type: SelectedTrackType.INDEX,
+          value: realIndex,
+        };
+      }
+    }
+    return undefined;
+  }, [selectedAudioTrack, availableAudioTracks]);
+
+  const memoizedVideoTrack = useMemo(() => {
+    if (selectedVideoQuality !== 'auto' && availableVideoTracks.length > 0) {
+      const track = availableVideoTracks.find(t => {
+        const trackIndex = t.trackId ?? t.index ?? 0;
+        return `${t.height}p-${trackIndex}` === selectedVideoQuality;
+      });
+      if (track) {
+        const trackIndex = track.trackId ?? track.index ?? 0;
+        console.log(`📹 [Video] Recalcul qualité: ${selectedVideoQuality}, index: ${trackIndex}`);
+        return {
+          type: SelectedVideoTrackType.INDEX,
+          value: trackIndex,
+        };
+      }
+    }
+    return undefined;
+  }, [selectedVideoQuality, availableVideoTracks]);
+
+  const memoizedTextTrack = useMemo(() => {
+    if (subtitlesEnabled && selectedSubtitleTrack > 0 && availableTextTracks.length > 0) {
+      const trackIndex = selectedSubtitleTrack - 1;
+      const track = availableTextTracks[trackIndex];
+      if (track) {
+        const realIndex = track.index ?? trackIndex;
+        console.log(`📝 [Subtitles] Recalcul sous-titre: ${selectedSubtitleTrack}, index réel: ${realIndex}`);
+        return {
+          type: SelectedTrackType.INDEX,
+          value: realIndex,
+        };
+      }
+    }
+    return undefined;
+  }, [subtitlesEnabled, selectedSubtitleTrack, availableTextTracks]);
 
   // 🎯 HOOK: Paramètres vidéo (zoom, buffer, screen lock)
   const videoSettings = useVideoSettings({
@@ -1209,7 +1544,7 @@ const GlobalVideoPlayer: React.FC = () => {
   };
 
   // Fonction pour créer l'effet de vague (ripple)
-  const showRippleEffect = (x: number, y: number) => {
+  const showRippleEffect = React.useCallback((x: number, y: number) => {
     setRipplePosition({x, y});
     setRippleVisible(true);
 
@@ -1222,7 +1557,7 @@ const GlobalVideoPlayer: React.FC = () => {
     rippleOpacity.value = withTiming(0, {duration: 600}, () => {
       runOnJS(setRippleVisible)(false);
     });
-  };
+  }, [rippleScale, rippleOpacity]);
 
   // Fonction pour toggle resize PiP (comme IPTV Smarters Pro)
   const toggleResize = () => {
@@ -1258,20 +1593,30 @@ const GlobalVideoPlayer: React.FC = () => {
       screenLocked: videoSettings.isScreenLocked,
     });
 
-    // Si l'écran est verrouillé, ne rien faire sauf si on veut afficher le bouton de déverrouillage
-    if (videoSettings.isScreenLocked && !tiviMateControls.isVisible) {
-      console.log('🔒 [toggleControls] Écran verrouillé - affichage bouton déverrouillage uniquement');
-      // Afficher seulement le header avec le bouton de déverrouillage
-      tiviMateControls.show();
-      tiviMateControls.opacity.value = withTiming(1, {duration: 300});
+    // Si l'écran est verrouillé
+    if (videoSettings.isScreenLocked) {
+      if (!tiviMateControls.isVisible) {
+        console.log('🔒 [toggleControls] Écran verrouillé - affichage bouton déverrouillage uniquement');
+        // Afficher seulement le header avec le bouton de déverrouillage
+        tiviMateControls.show();
+        tiviMateControls.opacity.value = withTiming(1, {duration: 300});
 
-      // Auto-cacher après 3s
-      setTimeout(() => {
+        // Auto-cacher après 5s (augmenté pour laisser plus de temps)
+        setTimeout(() => {
+          if (videoSettings.isScreenLocked) {
+            tiviMateControls.hide();
+          }
+        }, 5000);
+        return;
+      } else {
+        // Si les contrôles sont déjà visibles et l'écran est verrouillé, on les cache
+        console.log('🔒 [toggleControls] Écran verrouillé - masquage contrôles');
         tiviMateControls.hide();
-      }, 3000);
-      return;
+        return;
+      }
     }
 
+    // Comportement normal si l'écran n'est pas verrouillé
     if (tiviMateControls.isVisible) {
       console.log('👁️ [toggleControls] Contrôles visibles - masquage des deux');
       // Cacher immédiatement
@@ -1336,50 +1681,8 @@ const GlobalVideoPlayer: React.FC = () => {
     }, minutes * 60 * 1000);
   };
 
-  // 🎯 PHASE 2: Handlers pour gestures avancées (fullscreen uniquement)
-  const handleSeekForward = () => {
-    console.log(
-      '📍 [DEBUG] videoRef:',
-      !!videoRef.current,
-      'duration:',
-      duration,
-      'currentTime:',
-      currentTime,
-    );
-
-    if (videoRef.current && duration > 0) {
-      const newTime = Math.min(currentTime + 10, duration);
-      console.log('📍 [DEBUG] Seeking to:', newTime, 'seconds');
-      videoRef.current.seek(newTime);
-      showSeekFeedback('forward', 10);
-    } else {
-      console.warn(
-        '⚠️ [DEBUG] Cannot seek forward - videoRef or duration issue',
-      );
-    }
-  };
-
-  const handleSeekBackward = () => {
-    console.log(
-      '📍 [DEBUG] videoRef:',
-      !!videoRef.current,
-      'duration:',
-      duration,
-      'currentTime:',
-      currentTime,
-    );
-
-    if (videoRef.current) {
-      const newTime = Math.max(currentTime - 10, 0);
-      console.log('📍 [DEBUG] Seeking to:', newTime, 'seconds');
-      videoRef.current.seek(newTime);
-      showSeekFeedback('backward', 10);
-    } else {
-      console.warn('⚠️ [DEBUG] Cannot seek backward - videoRef issue');
-    }
-  };
-
-  const showSeekFeedback = (
+  // Définir showSeekFeedback AVANT handleSeekForward et handleSeekBackward
+  const showSeekFeedback = React.useCallback((
     direction: 'forward' | 'backward',
     seconds: number,
   ) => {
@@ -1409,58 +1712,135 @@ const GlobalVideoPlayer: React.FC = () => {
         });
       }, 200);
     }, 800);
-  };
+  }, [seekFeedbackOpacity, seekFeedbackScale]);
+
+  // 🎯 PHASE 2: Handlers pour gestures avancées (fullscreen uniquement)
+  const handleSeekForward = React.useCallback(() => {
+    console.log(
+      '📍 [DEBUG] videoRef:',
+      !!videoRef.current,
+      'duration:',
+      duration,
+      'currentTime:',
+      currentTime,
+    );
+
+    if (videoRef.current && duration > 0) {
+      const newTime = Math.min(currentTime + 10, duration);
+      console.log('📍 [DEBUG] Seeking to:', newTime, 'seconds');
+      videoRef.current.seek(newTime);
+      showSeekFeedback('forward', 10);
+    } else {
+      console.warn(
+        '⚠️ [DEBUG] Cannot seek forward - videoRef or duration issue',
+      );
+    }
+  }, [currentTime, duration, showSeekFeedback]);
+
+  const handleSeekBackward = React.useCallback(() => {
+    console.log(
+      '📍 [DEBUG] videoRef:',
+      !!videoRef.current,
+      'duration:',
+      duration,
+      'currentTime:',
+      currentTime,
+    );
+
+    if (videoRef.current) {
+      const newTime = Math.max(currentTime - 10, 0);
+      console.log('📍 [DEBUG] Seeking to:', newTime, 'seconds');
+      videoRef.current.seek(newTime);
+      showSeekFeedback('backward', 10);
+    } else {
+      console.warn('⚠️ [DEBUG] Cannot seek backward - videoRef issue');
+    }
+  }, [currentTime, showSeekFeedback]);
 
   // Récupérer les dimensions d'écran une seule fois
   const screenDims = React.useMemo(() => Dimensions.get('screen'), []);
 
-  // 🎯 PHASE 2: Configuration des gestures avancées pour fullscreen
-  const leftDoubleTap = Gesture.Tap()
-    .numberOfTaps(2)
-    .onEnd(event => {
-      // Si écran verrouillé, ne rien faire
+  // 🎯 LOGIQUE SIMPLE TAP + DOUBLE TAP avec setTimeout (comme YouTube)
+  const DOUBLE_TAP_DELAY = 300; // 300ms pour détecter un double tap
+  const lastTapTime = React.useRef(0);
+  const lastTapX = React.useRef(0);
+  const singleTapTimer = React.useRef<NodeJS.Timeout | null>(null);
+
+  const handleScreenPress = React.useCallback(
+    (event: any) => {
+      // Si l'écran est verrouillé, permettre seulement le toggle des contrôles pour afficher le bouton déverrouillage
       if (videoSettings.isScreenLocked) {
+        console.log('🔒 [handleScreenPress] Écran verrouillé - affichage bouton déverrouillage');
+        toggleControls();
         return;
       }
 
-      // Position de la vague : centre de la zone gauche
-      const rippleX = screenDims.width * 0.15; // 15% de la largeur d'écran
-      const rippleY = screenDims.height * 0.5; // Centre vertical
+      const tapX = event.nativeEvent.locationX;
+      const now = Date.now();
+      const delta = now - lastTapTime.current;
+      const screenWidth = screenDims.width;
 
-      runOnJS(showRippleEffect)(rippleX, rippleY);
-      runOnJS(handleSeekBackward)();
-    });
+      // Vérifier si c'est un double tap (même position, <300ms)
+      if (
+        delta < DOUBLE_TAP_DELAY &&
+        Math.abs(tapX - lastTapX.current) < 50
+      ) {
+        // DOUBLE TAP détecté
+        if (singleTapTimer.current) {
+          clearTimeout(singleTapTimer.current);
+          singleTapTimer.current = null;
+        }
 
-  const rightDoubleTap = Gesture.Tap()
-    .numberOfTaps(2)
-    .onEnd(event => {
-      // Si écran verrouillé, ne rien faire
-      if (videoSettings.isScreenLocked) {
-        return;
+        // Déterminer si c'est gauche, droite ou centre
+        const leftZoneEnd = screenWidth * 0.35;
+        const rightZoneStart = screenWidth * 0.65;
+
+        if (tapX < leftZoneEnd) {
+          // Double tap GAUCHE - Seek backward
+          const rippleX = screenWidth * 0.15;
+          const rippleY = screenDims.height * 0.5;
+          showRippleEffect(rippleX, rippleY);
+          handleSeekBackward();
+        } else if (tapX > rightZoneStart) {
+          // Double tap DROITE - Seek forward
+          const rippleX = screenWidth * 0.85;
+          const rippleY = screenDims.height * 0.5;
+          showRippleEffect(rippleX, rippleY);
+          handleSeekForward();
+        } else {
+          // Double tap CENTRE - Toggle contrôles (comme YouTube)
+          toggleControls();
+        }
+      } else {
+        // Premier tap - attendre pour voir si c'est un double tap
+        singleTapTimer.current = setTimeout(() => {
+          // SIMPLE TAP - Toggle contrôles
+          toggleControls();
+          singleTapTimer.current = null;
+        }, DOUBLE_TAP_DELAY);
       }
 
-      // Position de la vague : centre de la zone droite
-      const rippleX = screenDims.width * 0.85; // 85% de la largeur d'écran
-      const rippleY = screenDims.height * 0.5; // Centre vertical
+      lastTapTime.current = now;
+      lastTapX.current = tapX;
+    },
+    [
+      videoSettings.isScreenLocked,
+      screenDims,
+      showRippleEffect,
+      handleSeekBackward,
+      handleSeekForward,
+      toggleControls,
+    ],
+  );
 
-      runOnJS(showRippleEffect)(rippleX, rippleY);
-      runOnJS(handleSeekForward)();
-    });
-
-  // Geste pour zone centrale - afficher contrôles TiviMate
-  const centerTapGesture = Gesture.Tap()
-    .numberOfTaps(1)
-    .onEnd(() => {
-      console.log('🎯 [centerTapGesture] Tap détecté sur zone centrale - contrôles:', {
-        tiviMateVisible: tiviMateControls.isVisible,
-        dockerVisible: dockerControls.isVisible,
-      });
-      runOnJS(toggleControls)();
-    });
-
-  // Gestes simplifiés : seulement double-tap pour seek
-  const leftSideGesture = leftDoubleTap;
-  const rightSideGesture = rightDoubleTap;
+  // Cleanup du timer
+  React.useEffect(() => {
+    return () => {
+      if (singleTapTimer.current) {
+        clearTimeout(singleTapTimer.current);
+      }
+    };
+  }, []);
 
   // 🎯 STYLES ANIMÉS pour le feedback visuel
   const seekFeedbackAnimatedStyle = useAnimatedStyle(() => {
@@ -1555,19 +1935,29 @@ const GlobalVideoPlayer: React.FC = () => {
         snapX = screenWidth - finalSize.width - 16; // Marge droite
       }
 
-      // Animation de snap plus douce
+      // 🎯 Animation ultra-fluide style YouTube/IPTV Smarters Pro
+      // Utilise spring avec damping/stiffness au lieu de bounciness/speed
+      // pour un mouvement plus naturel et moins saccadé
       RNAnimated.parallel([
         RNAnimated.spring(viewPosition.x, {
           toValue: snapX,
           useNativeDriver: false,
-          bounciness: 8,
-          speed: 12,
+          damping: 20,        // Plus élevé = moins de rebond (YouTube: 15-25)
+          stiffness: 150,     // Rigidité modérée pour fluidité (YouTube: 120-180)
+          mass: 1,            // Masse standard pour mouvement naturel
+          overshootClamping: false, // Permet léger dépassement naturel
+          restDisplacementThreshold: 0.01,
+          restSpeedThreshold: 0.01,
         }),
         RNAnimated.spring(viewPosition.y, {
           toValue: snapY,
           useNativeDriver: false,
-          bounciness: 8,
-          speed: 12,
+          damping: 20,        // Synchronisé avec X pour cohérence
+          stiffness: 150,
+          mass: 1,
+          overshootClamping: false,
+          restDisplacementThreshold: 0.01,
+          restSpeedThreshold: 0.01,
         }),
       ]).start();
 
@@ -1579,7 +1969,7 @@ const GlobalVideoPlayer: React.FC = () => {
   // Ne pas faire de return conditionnel avant d'avoir utilisé tous les hooks !
   // On gère la visibilité avec une condition dans le render
 
-  // 🚀 Position et taille avec mémorisation stable
+  // 🚀 Position et taille avec mémorisation stable (sans animation pour éviter l'erreur Reanimated)
   const renderPosition = React.useMemo(() => {
     if (localFullscreen) {
       return {left: 0, top: 0};
@@ -1608,6 +1998,7 @@ const GlobalVideoPlayer: React.FC = () => {
   // 🚀 Synchronisation optimisée avec références stables
   const syncPositionRef = useRef(finalPosition);
   const syncSizeRef = useRef(finalSize);
+  const lastSyncedPositionRef = useRef({x: 0, y: 0}); // Track last synced position
 
   React.useEffect(() => {
     syncPositionRef.current = finalPosition;
@@ -1629,17 +2020,15 @@ const GlobalVideoPlayer: React.FC = () => {
 
         // Sync position seulement si vraiment nécessaire
         if (!isInChannelPlayerScreen) {
-          const currentPos = {
-            x: viewPosition.x._value,
-            y: viewPosition.y._value,
-          };
+          const lastPos = lastSyncedPositionRef.current;
           const shouldSync =
-            (currentPos.x === 0 && currentPos.y === 0) ||
-            Math.abs(currentPos.x - currentPosition.x) > 20 ||
-            Math.abs(currentPos.y - currentPosition.y) > 20;
+            (lastPos.x === 0 && lastPos.y === 0) ||
+            Math.abs(lastPos.x - currentPosition.x) > 20 ||
+            Math.abs(lastPos.y - currentPosition.y) > 20;
 
           if (shouldSync) {
             viewPosition.setValue({x: currentPosition.x, y: currentPosition.y});
+            lastSyncedPositionRef.current = {x: currentPosition.x, y: currentPosition.y};
           }
         }
       }
@@ -1695,23 +2084,31 @@ const GlobalVideoPlayer: React.FC = () => {
       {/* Video persistante - jamais démontée */}
       {channel ? (
         <>
-          <Video
-            ref={videoRef}
+          {playerType === 'vlc' ? (
+            // VLC intégré désactivé - Redirection vers VLC externe
+            <View style={styles.externalPlayerPlaceholder}>
+              <Text style={styles.externalPlayerText}>📱 Ouverture dans VLC externe...</Text>
+              <Text style={styles.externalPlayerSubtext}>{channel.name}</Text>
+            </View>
+          ) : (
+            <Video
+              key={`video-${channel.id}-${retryState}-${retryCount}`} // Key dynamique pour forcer rechargement pendant retry
+              ref={videoRef}
             source={{
               uri: channel.url,
             // 🔧 Headers pour améliorer compatibilité IPTV + Pluto TV
             headers: {
-              'User-Agent': channel.url.includes('vodalys.com')
+              'User-Agent': channel.url?.includes('vodalys.com')
                 ? 'VLC/3.0.16 LibVLC/3.0.16'
                 : 'Mozilla/5.0 (Linux; Android 10; SM-G975F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Mobile Safari/537.36',
-              Referer: channel.url.includes('pluto.tv')
+              Referer: channel.url?.includes('pluto.tv')
                 ? 'https://pluto.tv/'
-                : channel.url.includes('vodalys.com')
+                : channel.url?.includes('vodalys.com')
                 ? 'https://www.assemblee-nationale.fr/'
                 : 'https://www.iptvsmarters.com/',
               Accept: '*/*',
               Connection: 'keep-alive',
-              Origin: channel.url.includes('pluto.tv')
+              Origin: channel.url?.includes('pluto.tv')
                 ? 'https://pluto.tv'
                 : undefined,
             },
@@ -1749,43 +2146,13 @@ const GlobalVideoPlayer: React.FC = () => {
           focusable={false}
           muted={selectedAudioTrack === 0}
           volume={selectedAudioTrack === 0 ? 0 : 1}
-          selectedAudioTrack={
-            selectedAudioTrack > 0 && availableAudioTracks.length > 0
-              ? {
-                  type: SelectedTrackType.INDEX,
-                  value: selectedAudioTrack - 1,
-                }
-              : undefined
-          }
-          selectedVideoTrack={
-            selectedVideoQuality !== 'auto' && availableVideoTracks.length > 0
-              ? (() => {
-                  // Extraire l'index de la piste depuis le trackId (format: "720p-2")
-                  const track = availableVideoTracks.find(
-                    t => `${t.height}p-${t.index}` === selectedVideoQuality,
-                  );
-
-                  if (track) {
-                    return {
-                      type: SelectedVideoTrackType.INDEX,
-                      value: track.index,
-                    };
-                  }
-                  // Si la piste n'est pas trouvée, utiliser AUTO
-                  return undefined;
-                })()
-              : undefined
-          }
-          selectedTextTrack={
-            subtitlesEnabled &&
-            selectedSubtitleTrack > 0 &&
-            availableTextTracks.length > 0
-              ? {
-                  type: SelectedTrackType.INDEX,
-                  value: selectedSubtitleTrack - 1,
-                }
-              : undefined
-          }
+          selectedAudioTrack={memoizedAudioTrack}
+          selectedVideoTrack={memoizedVideoTrack}
+          selectedTextTrack={memoizedTextTrack}
+          // 🆕 Performance & Décodage
+          disableFocus={!videoPlayerSettings.hardwareAcceleration}
+          // 🆕 Timeout réseau (en millisecondes)
+          operationTimeout={videoPlayerSettings.networkTimeout * 1000}
           subtitleStyle={{
             fontSize:
               subtitleSize === 'small'
@@ -1819,6 +2186,120 @@ const GlobalVideoPlayer: React.FC = () => {
                 return; // Ne pas afficher l'erreur à l'utilisateur
             }
 
+            // Détecter les erreurs de réseau
+            const isNetworkError =
+              errorString.includes('ERROR_CODE_IO_NETWORK_CONNECTION_FAILED') ||
+              errorString.includes('NETWORK_CONNECTION_FAILED') ||
+              errorString.includes('Unable to connect to') ||
+              errorString.includes('Connection refused') ||
+              errorString.includes('Network timeout') ||
+              errorString.includes('Host not found') ||
+              errorString.includes('No network connection') ||
+              errorString.includes('Internet connection');
+
+            // Détecter les erreurs HTTP (bad status, 404, 403, etc.)
+            const isHttpError =
+              errorString.includes('ERROR_CODE_IO_BAD_HTTP_STATUS') ||
+              errorString.includes('HTTP 404') ||
+              errorString.includes('HTTP 403') ||
+              errorString.includes('HTTP 500') ||
+              errorString.includes('Bad HTTP status') ||
+              errorString.includes('Not Found') ||
+              errorString.includes('Forbidden') ||
+              errorString.includes('Server Error');
+
+            if (isNetworkError) {
+              console.log(`🌐 [GlobalVideoPlayer] Erreur réseau pour ${channel.name}:`, errorString);
+
+              // 🔄 Machine à états : lancer le retry automatiquement
+              if (retryCount < maxRetries && retryState === 'idle') {
+                console.log(`🔄 [GlobalVideoPlayer] Démarrage machine à états retry pour ${channel.name}`);
+
+                // Afficher un message temporaire PENDANT le retry
+                actions.setError(`${channel.name}: Tentative de reconnexion...`);
+                actions.setLoading(false);
+
+                // Démarrer le cycle de retry dans le store
+                actions.startRetry();
+                return; // IMPORTANT: ne pas continuer, laisser la machine à états gérer
+              }
+
+              // Si on est en échec final, ne rien faire
+              if (retryState === 'failed') {
+                console.log(`🔄 [GlobalVideoPlayer] Erreur ignorée - état final: ${retryState}`);
+                return;
+              }
+
+              // Si on est en retry, ne pas bloquer le cycle avec setError
+              if (retryState === 'retrying') {
+                console.log(`🔄 [GlobalVideoPlayer] Erreur réseau détectée pendant retry - état: ${retryState}, tentative: ${retryCount}`);
+                // NE PAS appeler setError() car ça bloque le cycle de retry
+                // Laisser la machine à états continuer son travail
+                return;
+              }
+
+              // Afficher l'erreur finale (quand tout est épuisé)
+              const errorMsg = `${channel.name}: Erreur de connexion réseau`;
+              actions.setError(errorMsg);
+              actions.setLoading(false);
+              return;
+            }
+
+            if (isHttpError) {
+              console.log(`🌐 [GlobalVideoPlayer] Erreur HTTP pour ${channel.name}:`, errorString);
+
+              // 🔄 Machine à états : même logique pour les erreurs HTTP
+              if (retryCount < maxRetries && retryState === 'idle') {
+                console.log(`🔄 [GlobalVideoPlayer] Démarrage machine à états retry HTTP pour ${channel.name}`);
+
+                actions.setError(`${channel.name}: Tentative de reconnexion au serveur...`);
+                actions.setLoading(false);
+                actions.startRetry();
+                return;
+              }
+
+              // Si on est en échec final, ne rien faire
+              if (retryState === 'failed') {
+                console.log(`🔄 [GlobalVideoPlayer] Erreur HTTP ignorée - état final: ${retryState}`);
+                return;
+              }
+
+              // Si on est en retry, ne pas bloquer le cycle avec setError
+              if (retryState === 'retrying') {
+                console.log(`🔄 [GlobalVideoPlayer] Erreur HTTP détectée pendant retry - état: ${retryState}, tentative: ${retryCount}`);
+                // NE PAS appeler setError() car ça bloque le cycle de retry
+                // Laisser la machine à états continuer son travail
+                return;
+              }
+
+              const errorMsg = `Impossible de lire cette chaîne. Réessayez plus tard`;
+              actions.setError(errorMsg);
+              actions.setLoading(false);
+              return;
+            }
+
+            // Détecter les erreurs de format/codec non supportés
+            const isFormatError =
+              errorString.includes('This video cannot be played') ||
+              errorString.includes('format not supported') ||
+              errorString.includes('codec not supported') ||
+              errorString.includes('Could not open file') ||
+              errorString.includes('failed to open stream') ||
+              errorString.includes('Unable to open stream');
+
+            if (isFormatError && playerManager.getPlayerType() === 'default') {
+              console.log(`❌ [GlobalVideoPlayer] Format non supporté pour ${channel.name}:`, errorString);
+
+              // Afficher le message d'erreur format non supporté
+              playerManager.showFormatNotSupportedError(channel.url);
+
+              // Marquer comme erreur pour arrêter le chargement
+              const errorMsg = `${channel.name}: Format non supporté`;
+              actions.setError(errorMsg);
+              actions.setLoading(false);
+              return;
+            }
+
             const errorMsg = `${channel.name}: ${
               errorString || 'Erreur de lecture'
             }`;
@@ -1840,6 +2321,13 @@ const GlobalVideoPlayer: React.FC = () => {
             console.log('🎬 Video Load Success - Channel:', channel.name);
             setDuration(data.duration || 0);
             actions.setLoading(false);
+
+            // 🔄 Succès ! Si on était en retry, réinitialiser l'état
+            if (retryState === 'retrying' || retryState === 'failed') {
+              console.log(`✅ [GlobalVideoPlayer] Retry réussi pour ${channel.name} - Réinitialisation état`);
+              actions.resetRetry();
+              actions.clearError(); // Effacer le message d'erreur temporaire
+            }
 
             // Si seekTime est défini (venant du multiscreen), reprendre à cette position
             if (
@@ -1903,7 +2391,8 @@ const GlobalVideoPlayer: React.FC = () => {
           preventsDisplaySleepDuringVideoPlayback={true}
           progressUpdateInterval={2000}
           mixWithOthers="duck"
-        />
+            />
+          )}
         </>
       ) : null}
 
@@ -1917,7 +2406,7 @@ const GlobalVideoPlayer: React.FC = () => {
           <View
             style={[
               styles.overlay,
-              {backgroundColor: 'rgba(200, 50, 50, 0.7)'},
+              styles.errorOverlay,
             ]}>
             <Text style={styles.overlayText}>{error}</Text>
           </View>
@@ -1926,24 +2415,12 @@ const GlobalVideoPlayer: React.FC = () => {
         {/* ⚠️ IMPORTANT: Désactivées quand contrôles visibles pour permettre l'interaction */}
         {isFullscreen || localFullscreen ? (
           <>
-            {/* ⚠️ GESTES CONDITIONNELS: Actifs seulement quand les contrôles sont cachés */}
-            {!(tiviMateControls.isVisible || dockerControls.isVisible) && (
-              <>
-                {/* Zone gauche - Seek backward */}
-                <GestureDetector gesture={leftSideGesture}>
-                  <View style={styles.gestureZoneLeft} />
-                </GestureDetector>
-
-                {/* Zone droite - Seek forward */}
-                <GestureDetector gesture={rightSideGesture}>
-                  <View style={styles.gestureZoneRight} />
-                </GestureDetector>
-
-                {/* Zone centrale - Afficher contrôles */}
-                <GestureDetector gesture={centerTapGesture}>
-                  <View style={styles.gestureZoneCenter} />
-                </GestureDetector>
-              </>
+            {/* ⚠️ ZONE TAP UNIQUE: Simple tap = contrôles, Double tap bords = seek */}
+            {/* La zone reste active même quand l'écran est verrouillé pour permettre de réafficher le bouton déverrouillage */}
+            {(!(tiviMateControls.isVisible || dockerControls.isVisible) || videoSettings.isScreenLocked) && (
+              <TouchableWithoutFeedback onPress={handleScreenPress}>
+                <View style={styles.gestureZoneFullScreen} />
+              </TouchableWithoutFeedback>
             )}
 
             {/* 🎯 CONTRÔLES TIVIMATE - Enveloppé pour gérer les pointerEvents */}
@@ -1996,6 +2473,7 @@ const GlobalVideoPlayer: React.FC = () => {
                 epgData={epgData}
                 recentChannels={stableRecentChannels}
                 isFromMultiScreen={isFromMultiScreen}
+                isFromAutoStart={isFromAutoStart}
                 currentTime={currentTime}
                 duration={duration}
                 onChannelsPress={() => {
@@ -2235,11 +2713,15 @@ onChannelFullscreen={selectedChannel => {
         selectedAudioTrack={selectedAudioTrack}
         selectedSubtitleTrack={selectedSubtitleTrack}
         onClose={() => {
+          console.log('🔧 [GlobalVideoPlayer] onClose appelé - fermeture menu settings');
           setShowSettingsMenu(false);
           setActiveSubMenu(null);
         }}
         onOpenSubMenu={openSubMenu}
-        onCloseSubMenu={closeSubMenu}
+        onCloseSubMenu={() => {
+          console.log('🔧 [GlobalVideoPlayer] onCloseSubMenu appelé - fermeture sous-menu');
+          closeSubMenu();
+        }}
         onZoomModeChange={videoSettings.setZoomMode}
         onBufferModeChange={videoSettings.setBufferMode}
         onSleepTimerChange={setSleepTimer}
@@ -2300,7 +2782,13 @@ onChannelFullscreen={selectedChannel => {
         animationType="fade"
         statusBarTranslucent={true}
         onRequestClose={() => channelSelector.close()}>
-        <View style={styles.channelSelectorOverlay}>
+        <TouchableOpacity
+          style={styles.channelSelectorOverlay}
+          activeOpacity={1}
+          onPress={() => {
+            console.log('🎬 [ChannelSelector] Fermeture par clic extérieur');
+            channelSelector.close();
+          }}>
           <View style={styles.channelSelectorContainer}>
             {/* Contenu: Sidebar catégories + Liste chaînes */}
             <View style={styles.channelSelectorContent}>
@@ -2367,8 +2855,59 @@ onChannelFullscreen={selectedChannel => {
               </View>
             </View>
           </View>
-        </View>
+        </TouchableOpacity>
+
       </Modal>
+
+      {/* 🎭 Popup moderne de retry avec animation fluide */}
+      {showRetryPopup && (
+        <RNAnimated.View
+          style={[
+            styles.modernRetryPopup,
+            {
+              opacity: popupAnimValue,
+              transform: [
+                {
+                  translateY: popupAnimValue.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [50, 0], // Slide up de 50px à 0px
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          <View style={styles.modernRetryContent}>
+            <RNAnimated.View
+              style={[
+                styles.modernRetryIcon,
+                {
+                  transform: [
+                    {
+                      rotate: iconRotationAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ['0deg', '360deg'],
+                      }),
+                    },
+                  ],
+                },
+              ]}
+            >
+              <Icon
+                name="refresh"
+                size={20}
+                color="#FFFFFF"
+              />
+            </RNAnimated.View>
+            <Text style={styles.modernRetryText} numberOfLines={1}>
+              {retryState === 'failed'
+                ? 'Impossible de lire cette chaîne'
+                : `Reconnexion en cours... (${retryCount + 1}/${maxRetries})`
+              }
+            </Text>
+          </View>
+        </RNAnimated.View>
+      )}
     </>
   );
 };
@@ -2418,6 +2957,64 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
+    marginBottom: 16,
+  },
+  // 🎨 Styles pour les erreurs (design moderne type IPTV)
+  errorOverlay: {
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+  },
+  retryButton: {
+    backgroundColor: 'rgba(59, 130, 246, 0.8)', // Bleu moderne
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 0,
+    marginTop: 16,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontSize: 15,
+    fontWeight: '600',
+    textAlign: 'center',
+    letterSpacing: 0.3,
+  },
+  retryIndicator: {
+    marginTop: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.3)',
+  },
+  retryIndicatorText: {
+    color: '#93C5FD', // Bleu clair
+    fontSize: 13,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  errorInfoBox: {
+    marginTop: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: 'rgba(31, 41, 55, 0.8)', // Gris foncé
+    borderRadius: 12,
+    maxWidth: '85%',
+    borderWidth: 1,
+    borderColor: 'rgba(75, 85, 99, 0.3)',
+  },
+  errorInfoText: {
+    color: '#D1D5DB', // Gris clair
+    fontSize: 13,
+    fontWeight: '400',
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 6,
   },
   pipResizeButton: {
     position: 'absolute',
@@ -2455,35 +3052,14 @@ const styles = StyleSheet.create({
   },
   
   // 🎯 STYLES POUR ZONES GESTUELLES AVANCÉES (FULLSCREEN UNIQUEMENT)
-  gestureZoneLeft: {
+  // Zone fullscreen pour simple tap + double tap (comme YouTube)
+  gestureZoneFullScreen: {
     position: 'absolute',
     left: 0,
-    top: 0,
-    bottom: 0,
-    width: '30%',
-    zIndex: 15,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  gestureZoneRight: {
-    position: 'absolute',
     right: 0,
     top: 0,
     bottom: 0,
-    width: '30%',
     zIndex: 15,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  gestureZoneCenter: {
-    position: 'absolute',
-    left: '30%',
-    right: '30%',
-    top: 0,
-    bottom: 0,
-    zIndex: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
 
   // 🎯 STYLES DEBUG POUR ZONES GESTUELLES
@@ -3317,6 +3893,63 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#999',
     textAlign: 'center',
+  },
+  // Styles pour le placeholder de lecteur externe
+  externalPlayerPlaceholder: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#000000',
+    padding: 20,
+  },
+  externalPlayerText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  externalPlayerSubtext: {
+    color: '#CCCCCC',
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  
+  // 🎭 Styles modernes pour la popup de retry avec animation
+  modernRetryPopup: {
+    position: 'absolute',
+    bottom: 100, // Position en bas de l'écran
+    alignSelf: 'center', // Centré horizontalement
+    zIndex: 9999,
+  },
+  modernRetryContent: {
+    backgroundColor: 'rgba(30, 30, 30, 0.95)', // Fond semi-transparent foncé
+    borderRadius: 20, // Bords très arrondis pour design moderne
+    paddingHorizontal: 20, // Augmenté pour plus d'espace
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 8},
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
+    minWidth: 350, // Garder la largeur qui fonctionnait bien
+    maxWidth: '95%', // Maximum d'espace pour le texte complet
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)', // Léger bordure pour effet premium
+  },
+  modernRetryIcon: {
+    marginRight: 8, // Réduit pour plus d'espace pour le texte
+    // Animation de rotation subtile pour l'icône de refresh
+  },
+  modernRetryText: {
+    color: '#FFFFFF',
+    fontSize: 13, // Encore plus réduit pour éviter la troncature
+    fontWeight: '500', // Un peu moins gras pour économiser de l'espace
+    textAlign: 'center',
+    letterSpacing: 0.2, // Espacement réduit
+    flex: 1, // Permet au texte de bien s'adapter
   },
 });
 
