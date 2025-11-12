@@ -28,6 +28,7 @@ const LoadingOverlay: React.FC = () => {
   const rotateValue = useRef(new Animated.Value(0)).current;
   const pulseValue = useRef(new Animated.Value(1)).current;
   const dotsValue = useRef(new Animated.Value(0)).current;
+  const hasAnimatedOut = useRef(false);
 
   // Animations continues
   const rotateAnimation = useRef<Animated.CompositeAnimation>();
@@ -36,6 +37,7 @@ const LoadingOverlay: React.FC = () => {
 
   useEffect(() => {
     if (visible) {
+      hasAnimatedOut.current = false;
       // Animation d'entrée
       Animated.parallel([
         Animated.timing(opacity, {
@@ -117,7 +119,9 @@ const LoadingOverlay: React.FC = () => {
           duration: 200,
           useNativeDriver: true,
         }),
-      ]).start();
+      ]).start(() => {
+        hasAnimatedOut.current = true;
+      });
 
       // Arrêter toutes les animations
       if (rotateAnimation.current) {
@@ -144,7 +148,7 @@ const LoadingOverlay: React.FC = () => {
     };
   }, [visible]);
 
-  if (!visible && opacity._value === 0) {
+  if (!visible && hasAnimatedOut.current) {
     return null;
   }
 

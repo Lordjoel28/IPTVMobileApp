@@ -21,6 +21,7 @@ import type {StackNavigationProp} from '@react-navigation/stack';
 import SystemNavigationBar from 'react-native-system-navigation-bar';
 
 import {useTheme, useThemeColors, useIsDark} from '../contexts/ThemeContext';
+import {useI18n} from '../hooks/useI18n';
 import {availableThemes, getThemesList} from '../themes/themeConfig';
 import ThemePreviewCard from '../components/ThemePreviewCard';
 import ThemeQuickActions from '../components/ThemeQuickActions';
@@ -36,6 +37,30 @@ const ThemeSettingsScreen: React.FC = () => {
   const colors = useThemeColors();
   const isDark = useIsDark();
 
+  // Nouveau système i18n avec namespaces themes, profiles et common
+  const {t: tThemes} = useI18n('themes');
+  const {t: tProfiles} = useI18n('profiles');
+  const {t: tCommon} = useI18n('common');
+
+  // Fonction pour obtenir le nom traduit d'un thème
+  const getTranslatedThemeName = (themeId: string): string => {
+    const themeKeyMap: Record<string, string> = {
+      'dark': 'themeDark',
+      'light': 'themeLight',
+      'gray': 'themeGray',
+      'brown': 'themeBrown',
+      'green': 'themeGreen',
+      'purple': 'themePurple',
+      'sunset': 'themeSunset',
+      'ocean-comfort': 'themeOceanComfort',
+      'warm-amber': 'themeWarmAmber',
+      'tivimate-pro': 'themeTivimatePro',
+    };
+
+    const key = themeKeyMap[themeId];
+    return key ? tThemes(key) : currentTheme.name;
+  };
+
   useEffect(() => {
     SystemNavigationBar.immersive();
 
@@ -48,17 +73,17 @@ const ThemeSettingsScreen: React.FC = () => {
     try {
       await setTheme(themeId);
     } catch (error) {
-      Alert.alert('Erreur', 'Impossible de changer le thème');
+      Alert.alert(tCommon('error'), tCommon('error'));
     }
   };
 
   const handleThemePreview = (themeId: string) => {
     Alert.alert(
-      'Prévisualisation',
-      `Aperçu du thème: ${availableThemes.find(t => t.id === themeId)?.name}`,
+      tCommon('preview'),
+      `${availableThemes.find(theme => theme.id === themeId)?.name}`,
       [
-        {text: 'Annuler', style: 'cancel'},
-        {text: 'Appliquer', onPress: () => handleThemeSelect(themeId)},
+        {text: tCommon('cancel'), style: 'cancel'},
+        {text: tCommon('apply'), onPress: () => handleThemeSelect(themeId)},
       ],
     );
   };
@@ -79,7 +104,7 @@ const ThemeSettingsScreen: React.FC = () => {
 
         <View style={styles.headerContent}>
           <Text style={[styles.headerTitle, {color: colors.text.primary}]}>
-            THÈMES
+            {tThemes('themes').toUpperCase()}
           </Text>
           <View style={styles.currentThemeInfo}>
             <View
@@ -90,7 +115,7 @@ const ThemeSettingsScreen: React.FC = () => {
             />
             <Text
               style={[styles.currentThemeText, {color: colors.text.secondary}]}>
-              {currentTheme.name} {isSystemTheme ? '(Auto)' : ''}
+              {getTranslatedThemeName(currentTheme.id)} {isSystemTheme ? `(${tCommon('auto')})` : ''}
             </Text>
           </View>
         </View>
@@ -104,7 +129,7 @@ const ThemeSettingsScreen: React.FC = () => {
         {/* Section Actions Rapides - Maintenant en haut */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, {color: colors.text.primary}]}>
-            Actions rapides
+            {tThemes('quickActions')}
           </Text>
           <ThemeQuickActions style={styles.quickActions} />
         </View>
@@ -112,11 +137,11 @@ const ThemeSettingsScreen: React.FC = () => {
         {/* Section Sélection des Thèmes */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, {color: colors.text.primary}]}>
-            Choisir un thème
+            {tProfiles('chooseTheme')}
           </Text>
           <Text
             style={[styles.sectionSubtitle, {color: colors.text.secondary}]}>
-            Appui long pour prévisualiser. Le choix est désactivé si le thème automatique est actif.
+            {tThemes('longPressPreview')}
           </Text>
 
           <View style={[styles.themesGrid, {opacity: isSystemTheme ? 0.5 : 1}]}>
@@ -142,8 +167,7 @@ const ThemeSettingsScreen: React.FC = () => {
             ]}>
             <Icon name="info-outline" size={20} color={colors.accent.info} />
             <Text style={[styles.infoText, {color: colors.text.secondary}]}>
-              Les thèmes s'appliquent instantanément à toute l'application. Le
-              thème automatique suit les réglages système de votre appareil.
+              {tThemes('themeAppliesInstantly')}
             </Text>
           </View>
         </View>

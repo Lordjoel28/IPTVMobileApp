@@ -39,12 +39,14 @@ const ModernToast: React.FC<ModernToastProps> = ({
   const opacity = useRef(new Animated.Value(0)).current;
   const scale = useRef(new Animated.Value(0.8)).current;
   const rotateValue = useRef(new Animated.Value(0)).current;
+  const hasAnimatedOut = useRef(false);
 
   // Animation de rotation pour le loading
   const rotateAnimation = useRef<Animated.CompositeAnimation>();
 
   useEffect(() => {
     if (visible) {
+      hasAnimatedOut.current = false;
       // Animation d'entrée
       Animated.parallel([
         Animated.spring(translateY, {
@@ -109,7 +111,9 @@ const ModernToast: React.FC<ModernToastProps> = ({
           duration: 200,
           useNativeDriver: true,
         }),
-      ]).start();
+      ]).start(() => {
+        hasAnimatedOut.current = true;
+      });
 
       // Arrêter l'animation de rotation
       if (rotateAnimation.current) {
@@ -124,7 +128,7 @@ const ModernToast: React.FC<ModernToastProps> = ({
     }
   };
 
-  if (!visible && opacity._value === 0) {
+  if (!visible && hasAnimatedOut.current) {
     return null;
   }
 

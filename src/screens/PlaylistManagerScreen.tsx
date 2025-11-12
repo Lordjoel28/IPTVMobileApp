@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useNavigation} from '@react-navigation/native';
+import {useI18n} from '../hooks/useI18n';
 
 interface PlaylistItem {
   id: string;
@@ -23,6 +24,7 @@ interface PlaylistItem {
 
 const PlaylistManagerScreen = () => {
   const navigation = useNavigation();
+  const {t: tCommon} = useI18n('common');
   const [playlists, setPlaylists] = useState<PlaylistItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -108,9 +110,9 @@ const PlaylistManagerScreen = () => {
       'Supprimer playlist',
       `Êtes-vous sûr de vouloir supprimer "${playlistItem.name}" ?`,
       [
-        {text: 'Annuler', style: 'cancel'},
+        {text: tCommon('cancel'), style: 'cancel'},
         {
-          text: 'Supprimer',
+          text: tCommon('delete'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -287,7 +289,7 @@ const PlaylistManagerScreen = () => {
               <TouchableOpacity
                 style={[styles.modalButton, styles.cancelButton]}
                 onPress={() => setRenameModalVisible(false)}>
-                <Text style={styles.cancelButtonText}>Annuler</Text>
+                <Text style={styles.cancelButtonText}>{tCommon('cancel')}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity

@@ -239,7 +239,7 @@ const AddProfileScreen: React.FC = () => {
                   styles.cancelButtonText,
                   {color: colors.text.secondary},
                 ]}>
-                Annuler
+                {tCommon('cancel')}
               </Text>
             </TouchableOpacity>
           </View>

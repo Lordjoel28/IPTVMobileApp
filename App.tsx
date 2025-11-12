@@ -25,6 +25,7 @@ console.warn = (...args) => {
   originalWarn(...args);
 };
 import './src/version'; // Load version info
+import './src/i18n/config'; // Initialisation i18n avec react-i18next
 import {NavigationContainer} from '@react-navigation/native';
 import {createStackNavigator} from '@react-navigation/stack';
 import {PaperProvider} from 'react-native-paper';
@@ -67,6 +68,9 @@ import SettingsScreen from './src/screens/SettingsScreen';
 import VideoPlayerSettingsScreen from './src/screens/VideoPlayerSettingsScreen';
 import TVGuideSettingsScreen from './src/screens/TVGuideSettingsScreen';
 import ThemeSettingsScreen from './src/screens/ThemeSettingsScreen';
+import PlayerSettingsScreen from './src/screens/PlayerSettingsScreen';
+import LanguageSettingsScreen from './src/screens/LanguageSettingsScreen';
+import PerformanceSettingsScreen from './src/screens/PerformanceSettingsScreen';
 import AccountScreen from './src/screens/AccountScreen';
 import AccountInfoScreen from './src/screens/AccountInfoScreen';
 import ParentalControlScreen from './src/screens/ParentalControlScreen';
@@ -111,6 +115,8 @@ export type RootStackParamList = {
   VideoPlayerSettings: undefined;
   TVGuideSettings: undefined;
   ThemeSettings: undefined;
+  PlayerSettings: undefined;
+  LanguageSettings: undefined;
   Account: undefined;
   AccountInfo: undefined;
     AddProfile: undefined;
@@ -192,6 +198,13 @@ const App: React.FC = () => {
                 <Stack.Screen
                   name="ChannelPlayer"
                   component={ChannelPlayerScreen}
+                  options={{
+                    cardStyleInterpolator: ({current: {progress}}) => ({
+                      cardStyle: {
+                        opacity: progress,
+                      },
+                    }),
+                  }}
                 />
                                   <Stack.Screen
                   name="FinalSearch"
@@ -226,6 +239,18 @@ const App: React.FC = () => {
                 <Stack.Screen
                   name="ThemeSettings"
                   component={ThemeSettingsScreen}
+                />
+                <Stack.Screen
+                  name="PerformanceSettings"
+                  component={PerformanceSettingsScreen}
+                />
+                <Stack.Screen
+                  name="PlayerSettings"
+                  component={PlayerSettingsScreen}
+                />
+                <Stack.Screen
+                  name="LanguageSettings"
+                  component={LanguageSettingsScreen}
                 />
                 <Stack.Screen
                   name="Account"

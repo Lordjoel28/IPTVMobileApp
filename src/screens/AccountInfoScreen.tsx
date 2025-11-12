@@ -21,6 +21,7 @@ import { useNavigation, useIsFocused } from '@react-navigation/native';
 import type {StackNavigationProp} from '@react-navigation/stack';
 import type {RootStackParamList} from '../../App';
 import { useThemeColors, useTheme } from '../contexts/ThemeContext';
+import {useI18n} from '../hooks/useI18n';
 import { availableThemes } from '../themes/themeConfig';
 import ProfileService, { AVAILABLE_AVATARS } from '../services/ProfileService';
 import database from '../database';
@@ -58,6 +59,12 @@ const AccountInfoScreen: React.FC = () => {
   const styles = createStyles(colors);
   const navigation = useNavigation<NavigationProp>();
   const { currentTheme, setTheme } = useTheme();
+  const {t: tCommon} = useI18n('common');
+  const {t: tSettings} = useI18n('settings');
+  const {t: tThemes} = useI18n('themes');
+  const {t: tProfiles} = useI18n('profiles');
+  const {t: tPlaylists} = useI18n('playlists');
+  const {t: tEpg} = useI18n('epg');
   const isFocused = useIsFocused();
 
   const [currentProfile, setCurrentProfile] = useState<Profile | null>(null);
@@ -72,7 +79,7 @@ const AccountInfoScreen: React.FC = () => {
   // États pour les informations de la playlist active
   const [activePlaylist, setActivePlaylist] = useState<any>(null);
   const [playlistInfo, setPlaylistInfo] = useState({
-    name: 'Chargement...',
+    name: tCommon('loading'),
     type: 'M3U',
     expirationDate: null,
     createdDate: null,
@@ -126,7 +133,7 @@ const AccountInfoScreen: React.FC = () => {
 
       if (activePlaylists.length === 0) {
         setPlaylistInfo({
-          name: 'Aucune playlist',
+          name: tEpg('noPlaylist'),
           type: 'M3U',
           expirationDate: null,
           createdDate: null,
@@ -145,7 +152,7 @@ const AccountInfoScreen: React.FC = () => {
       }
 
       // Nettoyer le nom de la playlist en supprimant "(Xtream)"
-      const cleanName = playlistData.name ? playlistData.name.replace(/\s*\(.*?\)$/g, '') : 'Playlist sans nom';
+      const cleanName = playlistData.name ? playlistData.name.replace(/\s*\(.*?\)$/g, '') : `${tEpg('noPlaylist')} - ${tPlaylists('loadingError')}`;
 
       const formattedInfo = {
         name: cleanName,
@@ -162,7 +169,7 @@ const AccountInfoScreen: React.FC = () => {
     } catch (error) {
       console.error('❌ [AccountInfoScreen] Erreur chargement playlist:', error);
       setPlaylistInfo({
-        name: 'Erreur de chargement',
+        name: tPlaylists('loadingError'),
         type: 'M3U',
         expirationDate: null,
         createdDate: null,
@@ -220,9 +227,9 @@ const AccountInfoScreen: React.FC = () => {
       await ProfileService.updateProfile(currentProfile.id, { avatar });
       setCurrentProfile({ ...currentProfile, avatar });
       setShowAvatarPicker(false);
-      Alert.alert('Succès', 'Avatar modifié avec succès');
+      Alert.alert(tCommon('success'), tProfiles('avatarChanged'));
     } catch (error) {
-      Alert.alert('Erreur', 'Impossible de modifier l\'avatar');
+      Alert.alert(tCommon('error'), tProfiles('avatarChangeError'));
     }
   };
 
@@ -234,9 +241,9 @@ const AccountInfoScreen: React.FC = () => {
       await setTheme(themeId);
       setCurrentProfile({ ...currentProfile, theme: themeId as any });
       setShowThemePicker(false);
-      Alert.alert('Succès', 'Thème modifié avec succès');
+      Alert.alert(tCommon('success'), tThemes('themeChanged'));
     } catch (error) {
-      Alert.alert('Erreur', 'Impossible de modifier le thème');
+      Alert.alert(tCommon('error'), tThemes('themeChangeError'));
     }
   };
 
@@ -246,9 +253,9 @@ const AccountInfoScreen: React.FC = () => {
     try {
       await ProfileService.setDefaultProfile(currentProfile.id);
       await loadProfileData();
-      Alert.alert('Succès', 'Profil défini par défaut');
+      Alert.alert(tCommon('success'), tProfiles('profileSetDefault'));
     } catch (error) {
-      Alert.alert('Erreur', 'Impossible de définir le profil par défaut');
+      Alert.alert(tCommon('error'), tProfiles('profileSetDefaultError'));
     }
   };
 
@@ -266,33 +273,33 @@ const AccountInfoScreen: React.FC = () => {
       // Retourner à l'écran précédent après le changement
       navigation.goBack();
 
-      Alert.alert('Succès', `Profil "${profile.name}" activé`);
+      Alert.alert(tCommon('success'), tProfiles('profileActivated').replace('{name}', profile.name));
     } catch (error) {
       console.error('❌ Erreur changement de profil:', error);
-      Alert.alert('Erreur', 'Impossible de changer de profil');
+      Alert.alert(tCommon('error'), tProfiles('profileSwitchError'));
     }
   };
 
   const handleDeleteProfile = () => {
     if (!currentProfile || allProfiles.length <= 1) {
-      Alert.alert('Erreur', 'Vous ne pouvez pas supprimer le seul profil existant');
+      Alert.alert(tCommon('error'), tProfiles('cannotDeleteLastProfile'));
       return;
     }
 
     Alert.alert(
-      'Supprimer le profil',
-      `Êtes-vous sûr de vouloir supprimer le profil "${currentProfile.name}" ?`,
+      tProfiles('deleteProfile'),
+      `Êtes-vous sûr de vouloir supprimer le profil "${currentProfile.name}" ?\n\n${tCommon('thisActionIsPermanent')}`,
       [
-        { text: 'Annuler', style: 'cancel' },
+        { text: tCommon('cancel'), style: 'cancel' },
         {
-          text: 'Supprimer',
+          text: tProfiles('deleteProfile'),
           style: 'destructive',
           onPress: async () => {
             try {
               await ProfileService.deleteProfile(currentProfile.id);
               navigation.goBack();
             } catch (error) {
-              Alert.alert('Erreur', 'Impossible de supprimer le profil');
+              Alert.alert(tCommon('error'), tProfiles('deleteProfileError'));
             }
           }
         }
@@ -307,9 +314,9 @@ const AccountInfoScreen: React.FC = () => {
     try {
       const newProfile = await ProfileService.createProfile(newName);
       await loadProfileData();
-      Alert.alert('Succès', `Profil "${newProfile.name}" créé avec succès`);
+      Alert.alert(tCommon('success'), tProfiles('profileDuplicateSuccess').replace('{name}', newProfile.name));
     } catch (error) {
-      Alert.alert('Erreur', 'Impossible de dupliquer le profil');
+      Alert.alert(tCommon('error'), tProfiles('duplicateProfileError'));
     }
   };
 
@@ -323,17 +330,17 @@ const AccountInfoScreen: React.FC = () => {
           <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
             <Icon name="arrow-back" size={24} color={colors.text.primary} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Informations du compte</Text>
+          <Text style={styles.headerTitle}>{tSettings('accountInfo')}</Text>
         </View>
 
         <View style={styles.errorContainer}>
           <Icon name="error" size={48} color="#F44336" />
-          <Text style={styles.errorText}>Aucun profil trouvé</Text>
+          <Text style={styles.errorText}>{tProfiles('noProfileFound')}</Text>
           <TouchableOpacity
             style={[styles.actionButton, { backgroundColor: colors.primary }]}
             onPress={() => setShowCreateModal(true)}
           >
-            <Text style={styles.actionButtonText}>Créer un profil</Text>
+            <Text style={styles.actionButtonText}>{tProfiles('createProfile')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -355,7 +362,7 @@ const AccountInfoScreen: React.FC = () => {
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Icon name="arrow-back" size={24} color={colors.text.primary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Informations du compte</Text>
+        <Text style={styles.headerTitle}>{tSettings('accountInfo')}</Text>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -376,13 +383,13 @@ const AccountInfoScreen: React.FC = () => {
                 {currentProfile.isDefault && (
                   <View style={styles.badge}>
                     <Icon name="star" size={10} color="white" />
-                    <Text style={styles.badgeText}>Par défaut</Text>
+                    <Text style={styles.badgeText}>{tCommon('default')}</Text>
                   </View>
                 )}
                 {currentProfile.isKids && (
                   <View style={[styles.badge, { backgroundColor: '#4CAF50' }]}>
                     <Icon name="child-friendly" size={10} color="white" />
-                    <Text style={styles.badgeText}>Enfant</Text>
+                    <Text style={styles.badgeText}>{tProfiles('child')}</Text>
                   </View>
                 )}
               </View>
@@ -419,7 +426,7 @@ const AccountInfoScreen: React.FC = () => {
                   <Icon name="calendar-today" size={18} color={colors.accent.primary} />
                 </View>
                 <View style={styles.mainInfoText}>
-                  <Text style={styles.mainInfoLabel}>Création</Text>
+                  <Text style={styles.mainInfoLabel}>{tCommon('creation')}</Text>
                   <Text style={styles.mainInfoValue}>{formatDate(playlistInfo.createdDate)}</Text>
                 </View>
               </View>
@@ -446,7 +453,7 @@ const AccountInfoScreen: React.FC = () => {
                 />
               </View>
               <View style={styles.mainInfoText}>
-                <Text style={styles.mainInfoLabel}>Statut</Text>
+                <Text style={styles.mainInfoLabel}>{tCommon('status')}</Text>
                 <Text style={[
                   styles.mainInfoValue,
                   {
@@ -462,9 +469,9 @@ const AccountInfoScreen: React.FC = () => {
                 ]}>
                   {playlistInfo.type === 'XTREAM'
                     ? playlistInfo.connectionStatus === 'error'
-                      ? 'Hors ligne'
-                      : 'En ligne'
-                    : 'Locale'
+                      ? tCommon('offline')
+                      : tCommon('online')
+                    : tCommon('local')
                   }
                 </Text>
               </View>
@@ -477,7 +484,7 @@ const AccountInfoScreen: React.FC = () => {
                   <Icon name="timer" size={18} color={colors.accent.primary} />
                 </View>
                 <View style={styles.mainInfoText}>
-                  <Text style={styles.mainInfoLabel}>Expiration</Text>
+                  <Text style={styles.mainInfoLabel}>{tCommon('expiration')}</Text>
                   <Text style={styles.mainInfoValue}>{formatDate(playlistInfo.expirationDate)}</Text>
                 </View>
               </View>
@@ -490,7 +497,7 @@ const AccountInfoScreen: React.FC = () => {
                   <Icon name="device-hub" size={18} color={colors.primary || '#667eea'} />
                 </View>
                 <View style={styles.mainInfoText}>
-                  <Text style={styles.mainInfoLabel}>Connexion active</Text>
+                  <Text style={styles.mainInfoLabel}>{tCommon('activeConnection')}</Text>
                   <Text style={styles.mainInfoValue}>{playlistInfo.activeConnections}</Text>
                 </View>
               </View>
@@ -504,26 +511,26 @@ const AccountInfoScreen: React.FC = () => {
           {/* Modifier le profil */}
           <TouchableOpacity style={styles.actionCard} onPress={() => setShowEditModal(true)}>
             <Icon name="edit" size={24} color="#667eea" />
-            <Text style={styles.actionCardTitle}>Modifier</Text>
+            <Text style={styles.actionCardTitle}>{tCommon('edit')}</Text>
           </TouchableOpacity>
 
           {/* Changer de thème */}
           <TouchableOpacity style={styles.actionCard} onPress={() => setShowThemePicker(true)}>
             <Icon name="brush" size={24} color="#9C27B0" />
-            <Text style={styles.actionCardTitle}>Thème</Text>
+            <Text style={styles.actionCardTitle}>{tThemes('theme')}</Text>
           </TouchableOpacity>
 
           {/* Dupliquer le profil */}
           <TouchableOpacity style={styles.actionCard} onPress={handleDuplicateProfile}>
             <Icon name="file-copy" size={24} color="#4CAF50" />
-            <Text style={styles.actionCardTitle}>Dupliquer</Text>
+            <Text style={styles.actionCardTitle}>{tCommon('duplicate')}</Text>
           </TouchableOpacity>
 
           {/* Définir par défaut */}
           {!currentProfile.isDefault && (
             <TouchableOpacity style={styles.actionCard} onPress={handleSetDefaultProfile}>
               <Icon name="star" size={24} color="#FF9800" />
-              <Text style={styles.actionCardTitle}>Par défaut</Text>
+              <Text style={styles.actionCardTitle}>{tProfiles('setDefault')}</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -536,7 +543,7 @@ const AccountInfoScreen: React.FC = () => {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Icon name="warning" size={20} color="#F44336" />
-              <Text style={styles.sectionTitle}>Actions irréversibles</Text>
+              <Text style={styles.sectionTitle}>{tCommon('irreversibleActions')}</Text>
             </View>
 
             <View style={[styles.actionCardGeneral, styles.dangerCard]}>
@@ -548,9 +555,9 @@ const AccountInfoScreen: React.FC = () => {
                   <View style={styles.actionIcon}>
                     <Icon name="delete" size={24} color="#F44336" />
                   </View>
-                  <Text style={[styles.actionTitle, { color: '#F44336' }]}>Supprimer le profil</Text>
+                  <Text style={[styles.actionTitle, { color: '#F44336' }]}>{tProfiles('deleteProfile')}</Text>
                   <Text style={[styles.actionValue, { color: '#F44336', fontSize: 12, marginTop: 4 }]}>
-                    Cette action est définitive
+                    {tCommon('thisActionIsPermanent')}
                   </Text>
                 </View>
                 <Icon name="arrow-forward" size={22} color="#F44336" />
@@ -578,7 +585,7 @@ const AccountInfoScreen: React.FC = () => {
           />
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Choisir un avatar</Text>
+              <Text style={styles.modalTitle}>{tProfiles('chooseAvatar')}</Text>
               <TouchableOpacity onPress={() => setShowAvatarPicker(false)}>
                 <Icon name="close" size={22} color="#F44336" />
               </TouchableOpacity>
@@ -618,7 +625,7 @@ const AccountInfoScreen: React.FC = () => {
 
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Choisir un thème</Text>
+              <Text style={styles.modalTitle}>{tThemes('chooseTheme')}</Text>
               <TouchableOpacity onPress={() => setShowThemePicker(false)}>
                 <Icon name="close" size={22} color="#F44336" />
               </TouchableOpacity>
@@ -666,7 +673,7 @@ const AccountInfoScreen: React.FC = () => {
         <View style={styles.modalBlurOverlay}>
           <View style={styles.switcherModal}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Choisir un profil</Text>
+              <Text style={styles.modalTitle}>{tProfiles('chooseProfile')}</Text>
               <TouchableOpacity onPress={() => setShowProfileSwitcher(false)}>
                 <Icon name="close" size={22} color="#F44336" />
               </TouchableOpacity>

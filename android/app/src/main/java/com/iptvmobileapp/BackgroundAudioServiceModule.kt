@@ -72,7 +72,7 @@ class BackgroundAudioServiceModule(reactContext: ReactApplicationContext) : Reac
                 channel.description = "Maintient la lecture audio en arrière-plan"
                 channel.setShowBadge(false)
                 channel.setSound(null, null)
-                channel.setVibrationEnabled(false)
+                channel.enableVibration(false)
 
                 notificationManager.createNotificationChannel(channel)
             }

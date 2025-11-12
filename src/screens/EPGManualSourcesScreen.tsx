@@ -26,6 +26,7 @@ import {useNavigation} from '@react-navigation/native';
 import type {StackNavigationProp} from '@react-navigation/stack';
 import type {RootStackParamList} from '../../App';
 import {EPGSourceManager, EPGSource} from '../services/epg/EPGSourceManager';
+import {useI18n} from '../hooks/useI18n';
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -37,6 +38,7 @@ interface EPGSourceForm {
 
 const EPGManualSourcesScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
+  const {t: tCommon} = useI18n('common');
   const [sources, setSources] = useState<EPGSource[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
@@ -85,12 +87,12 @@ const EPGManualSourcesScreen: React.FC = () => {
 
   const handleDeleteSource = (source: EPGSource) => {
     Alert.alert(
-      'Supprimer la source EPG',
-      `Êtes-vous sûr de vouloir supprimer "${source.name}" ?`,
+      tCommon('deleteEPGSource'),
+      `${tCommon('confirmDeleteSource} "${source.name')}" ?`,
       [
-        {text: 'Annuler', style: 'cancel'},
+        {text: tCommon('cancel'), style: 'cancel'},
         {
-          text: 'Supprimer',
+          text: tCommon('delete'),
           style: 'destructive',
           onPress: () => deleteSource(source.id),
         },
@@ -104,7 +106,7 @@ const EPGManualSourcesScreen: React.FC = () => {
       await loadManualSources();
     } catch (error) {
       console.error('Erreur suppression source:', error);
-      Alert.alert('Erreur', 'Impossible de supprimer la source');
+      Alert.alert(tCommon('error'), tCommon('cannotDeleteSource'));
     }
   };
 
@@ -151,15 +153,15 @@ const EPGManualSourcesScreen: React.FC = () => {
   const handleSaveSource = async () => {
     // Validation
     if (!formData.name.trim()) {
-      Alert.alert('Erreur', 'Le nom de la source est requis');
+      Alert.alert(tCommon('error'), tCommon('sourceNameRequired'));
       return;
     }
     if (!formData.url.trim()) {
-      Alert.alert('Erreur', "L'URL de la source est requise");
+      Alert.alert(tCommon('error'), tCommon('sourceUrlRequired'));
       return;
     }
     if (!validateURL(formData.url)) {
-      Alert.alert('Erreur', 'URL invalide. Utilisez http:// ou https://');
+      Alert.alert(tCommon('error'), tCommon('invalidUrl'));
       return;
     }
 
@@ -185,7 +187,7 @@ const EPGManualSourcesScreen: React.FC = () => {
       await loadManualSources();
     } catch (error) {
       console.error('Erreur sauvegarde source:', error);
-      Alert.alert('Erreur', 'Impossible de sauvegarder la source');
+      Alert.alert(tCommon('error'), tCommon('cannotSaveSource'));
     } finally {
       setValidating(false);
     }
@@ -198,16 +200,16 @@ const EPGManualSourcesScreen: React.FC = () => {
 
       if (result.success) {
         Alert.alert(
-          'Test réussi',
-          `Source EPG valide!\nChaînes détectées: ${
+          tCommon('testSuccess'),
+          `${tCommon('validEPGSource')}\n${tCommon('channelsDetected')}: ${
             result.channelsCount || 'Non déterminé'
           }`,
         );
       } else {
-        Alert.alert('Test échoué', result.error || 'URL EPG inaccessible');
+        Alert.alert(tCommon('testFailed'), result.error || tCommon('epgUrlInaccessible'));
       }
     } catch (error) {
-      Alert.alert('Erreur', 'Impossible de tester la source');
+      Alert.alert(tCommon('error'), tCommon('cannotTestSource'));
     } finally {
       setValidating(false);
     }
@@ -297,21 +299,21 @@ const EPGManualSourcesScreen: React.FC = () => {
             onPress={() => testSource(source)}
             disabled={validating}>
             <Icon name="wifi-find" size={16} color="#ffffff" />
-            <Text style={styles.actionButtonText}>Tester</Text>
+            <Text style={styles.actionButtonText}>{tCommon('test')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.actionButton, styles.editButton]}
             onPress={() => handleEditSource(source)}>
             <Icon name="edit" size={16} color="#ffffff" />
-            <Text style={styles.actionButtonText}>Modifier</Text>
+            <Text style={styles.actionButtonText}>{tCommon('edit')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.actionButton, styles.deleteButton]}
             onPress={() => handleDeleteSource(source)}>
             <Icon name="delete" size={16} color="#ffffff" />
-            <Text style={styles.actionButtonText}>Supprimer</Text>
+            <Text style={styles.actionButtonText}>{tCommon('delete')}</Text>
           </TouchableOpacity>
         </View>
       </LinearGradient>
@@ -354,7 +356,7 @@ const EPGManualSourcesScreen: React.FC = () => {
                 styles.loadingText,
                 {color: isDarkMode ? '#94a3b8' : '#64748b'},
               ]}>
-              Chargement des sources...
+              {tCommon('loadingSources')}
             </Text>
           </View>
         ) : sources.length === 0 ? (
@@ -369,20 +371,20 @@ const EPGManualSourcesScreen: React.FC = () => {
                 styles.emptyTitle,
                 {color: isDarkMode ? '#e2e8f0' : '#1e293b'},
               ]}>
-              Aucune source EPG manuelle
+              {tCommon('noManualEPGSources')}
             </Text>
             <Text
               style={[
                 styles.emptyText,
                 {color: isDarkMode ? '#94a3b8' : '#64748b'},
               ]}>
-              Ajoutez des sources EPG personnalisées pour enrichir vos guides TV
+              {tCommon('addCustomEPGSources')}
             </Text>
             <TouchableOpacity
               style={styles.emptyButton}
               onPress={handleAddSource}>
               <Icon name="add" size={20} color="#ffffff" />
-              <Text style={styles.emptyButtonText}>Ajouter une source</Text>
+              <Text style={styles.emptyButtonText}>{tCommon('addSource')}</Text>
             </TouchableOpacity>
           </View>
         ) : (
@@ -418,8 +420,8 @@ const EPGManualSourcesScreen: React.FC = () => {
                     {color: isDarkMode ? '#e2e8f0' : '#1e293b'},
                   ]}>
                   {editingSource
-                    ? 'Modifier la source'
-                    : 'Ajouter une source EPG'}
+                    ? tCommon('editSource')
+                    : tCommon('addEPGSource')}
                 </Text>
                 <TouchableOpacity
                   style={styles.modalCloseButton}
@@ -440,7 +442,7 @@ const EPGManualSourcesScreen: React.FC = () => {
                       styles.inputLabel,
                       {color: isDarkMode ? '#e2e8f0' : '#1e293b'},
                     ]}>
-                    Nom de la source
+                    {tCommon('epgSourceName')}
                   </Text>
                   <TextInput
                     style={[
@@ -468,7 +470,7 @@ const EPGManualSourcesScreen: React.FC = () => {
                       styles.inputLabel,
                       {color: isDarkMode ? '#e2e8f0' : '#1e293b'},
                     ]}>
-                    URL EPG (XMLTV)
+                    {tCommon('epgSourceUrl')}
                   </Text>
                   <TextInput
                     style={[
@@ -497,7 +499,7 @@ const EPGManualSourcesScreen: React.FC = () => {
                     style={[styles.modalButton, styles.cancelButton]}
                     onPress={() => setModalVisible(false)}
                     disabled={validating}>
-                    <Text style={styles.cancelButtonText}>Annuler</Text>
+                    <Text style={styles.cancelButtonText}>{tCommon('cancel')}</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -510,7 +512,7 @@ const EPGManualSourcesScreen: React.FC = () => {
                       <>
                         <Icon name="save" size={18} color="#ffffff" />
                         <Text style={styles.saveButtonText}>
-                          {editingSource ? 'Modifier' : 'Ajouter'}
+                          {editingSource ? tCommon('edit') : tCommon('addSource')}
                         </Text>
                       </>
                     )}

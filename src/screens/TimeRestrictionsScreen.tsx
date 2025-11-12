@@ -344,10 +344,10 @@ const TimeRestrictionsScreen: React.FC<Props> = ({route, navigation}) => {
       {/* Footer avec boutons */}
       <View style={[styles.footer, {backgroundColor: theme.colors.surface}]}>
         <Button mode="outlined" onPress={() => navigation.goBack()} style={styles.cancelButton}>
-          Annuler
+          {tCommon('cancel')}
         </Button>
         <Button mode="contained" onPress={handleSave} style={styles.saveButton} icon="check">
-          Sauvegarder
+          {tCommon('save')}
         </Button>
       </View>
     </SafeAreaView>

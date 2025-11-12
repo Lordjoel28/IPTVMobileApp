@@ -60,6 +60,14 @@
 - **File System**: react-native-fs pour M3U locaux
 - **Network**: Fetch API avec retry logic
 
+### **Internationalisation (i18n)**
+- **react-i18next**: Système de traduction moderne
+- **4 langues**: Français, Anglais, Espagnol, Arabe
+- **9 namespaces**: common, settings, player, channels, profiles, playlists, parental, epg, themes
+- **RTL Support**: Support automatique droite-à-gauche pour l'arabe
+- **Lazy Loading**: Charge uniquement la langue active (90% moins de mémoire)
+- **Persistance**: Langue sauvegardée dans AsyncStorage
+
 ---
 
 ## 🎨 DESIGN ET UX
@@ -294,6 +302,55 @@ adb reverse tcp:8081 tcp:8081
 ---
 
 ## 🚨 BONNES PRATIQUES
+
+### **🌐 RÈGLE ABSOLUE: Internationalisation (i18n)**
+
+⚠️ **INTERDICTION FORMELLE: JAMAIS coder en dur des textes !**
+
+❌ **INTERDIT - Ne JAMAIS faire:**
+```typescript
+<Text>Annuler</Text>
+<Button>Se connecter</Button>
+Alert.alert('Confirmer', 'Êtes-vous sûr ?');
+const message = "Chargement en cours...";
+```
+
+✅ **OBLIGATOIRE - Toujours utiliser react-i18next:**
+```typescript
+import {useI18n} from '../hooks/useI18n';
+
+const MyScreen = () => {
+  const {t: tCommon} = useI18n('common');
+  const {t: tSettings} = useI18n('settings');
+
+  return (
+    <>
+      <Text>{tCommon('cancel')}</Text>
+      <Button>{tCommon('login')}</Button>
+      <Alert.alert(tCommon('confirm'), tCommon('areYouSure'));
+    </>
+  );
+};
+```
+
+**Namespaces disponibles:**
+- `common` → Textes communs (boutons, messages génériques)
+- `settings` → Paramètres
+- `player` → Lecteur vidéo
+- `channels` → Chaînes
+- `profiles` → Profils
+- `playlists` → Playlists
+- `parental` → Contrôle parental
+- `epg` → Guide TV
+- `themes` → Thèmes
+
+**Ajouter une nouvelle clé:**
+1. Ajouter dans **les 4 fichiers** : `fr/common.json`, `en/common.json`, `es/common.json`, `ar/common.json`
+2. Vérifier les logs : si `missingKey` apparaît → ajouter la clé manquante
+
+**Voir FINAL_I18N_STATUS.md pour la documentation complète**
+
+---
 
 ### **Développement UI-First**
 - ✅ **Interface d'abord**: Design complet avant fonctionnalités

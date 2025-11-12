@@ -26,6 +26,7 @@ export type RootStackParamList = {
   ThemeSettings: undefined;
   VideoPlayerSettings: undefined;
   TVGuideSettings: undefined;
+  PerformanceSettings: undefined;
   PlaylistDetail: {playlist: Playlist};
   Search: undefined;
   Account: undefined;

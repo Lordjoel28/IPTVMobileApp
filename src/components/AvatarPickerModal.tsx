@@ -16,6 +16,7 @@ import {BlurView} from '@react-native-community/blur';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import {AVAILABLE_AVATARS} from '../services/ProfileService';
 import {useThemeColors} from '../contexts/ThemeContext';
+import {useI18n} from '../hooks/useI18n';
 
 interface AvatarPickerModalProps {
   visible: boolean;
@@ -31,6 +32,7 @@ const AvatarPickerModal: React.FC<AvatarPickerModalProps> = ({
   onClose,
 }) => {
   const colors = useThemeColors();
+  const {t: tCommon} = useI18n('common');
 
   const handleAvatarSelect = (avatar: string) => {
     onSelect(avatar);
@@ -61,7 +63,7 @@ const AvatarPickerModal: React.FC<AvatarPickerModalProps> = ({
               {/* Header */}
               <View style={styles.modalHeader}>
                 <Text style={[styles.modalTitle, {color: colors.text.primary}]}>
-                  Choisir un avatar
+                  {tCommon('chooseAvatar')}
                 </Text>
                 <TouchableOpacity
                   onPress={onClose}

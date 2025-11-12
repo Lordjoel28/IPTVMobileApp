@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Dimensions } from 'react-native';
+import NetInfo from '@react-native-community/netinfo';
+import videoSettingsService from '../services/VideoSettingsService';
 
 /**
  * Hook pour gérer les paramètres d'affichage et de performance vidéo.
@@ -12,7 +14,7 @@ import { Dimensions } from 'react-native';
  */
 
 export type ZoomMode = 'fit' | 'fill' | 'stretch' | '4:3' | '16:9';
-export type BufferMode = 'low' | 'normal' | 'high';
+export type BufferMode = 'low' | 'normal' | 'high' | 'auto';
 
 interface CustomVideoDimensions {
   width: number;
@@ -68,6 +70,54 @@ export const useVideoSettings = (
   const [bufferMode, setBufferMode] = useState<BufferMode>(initialBufferMode);
   const [isScreenLocked, setIsScreenLocked] = useState<boolean>(initialScreenLocked);
   const [customVideoDimensions, setCustomVideoDimensions] = useState<CustomVideoDimensions | null>(null);
+  const [detectedBufferMode, setDetectedBufferMode] = useState<BufferMode>('normal');
+
+  /**
+   * Charge les paramètres sauvegardés et détecte la connexion réseau pour le mode auto
+   */
+  useEffect(() => {
+    // Charger le buffer mode sauvegardé
+    videoSettingsService.loadSettings().then(settings => {
+      if (settings.bufferMode) {
+        setBufferMode(settings.bufferMode);
+      }
+    });
+
+    // Détecter la qualité réseau pour le mode auto
+    const unsubscribe = NetInfo.addEventListener(state => {
+      if (!state.isConnected) {
+        setDetectedBufferMode('low');
+        return;
+      }
+
+      // Détecter selon type de connexion
+      const connectionType = state.type;
+      if (connectionType === 'wifi') {
+        setDetectedBufferMode('high');
+      } else if (connectionType === 'cellular') {
+        // Vérifier la génération (3G/4G/5G)
+        const details = state.details as any;
+        if (details?.cellularGeneration === '5g') {
+          setDetectedBufferMode('high');
+        } else if (details?.cellularGeneration === '4g') {
+          setDetectedBufferMode('normal');
+        } else {
+          setDetectedBufferMode('low');
+        }
+      } else {
+        setDetectedBufferMode('normal');
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  /**
+   * Sauvegarder le buffer mode quand il change
+   */
+  useEffect(() => {
+    videoSettingsService.updateSetting('bufferMode', bufferMode);
+  }, [bufferMode]);
 
   /**
    * Calcule les dimensions personnalisées pour les ratios 4:3 et 16:9
@@ -129,14 +179,17 @@ export const useVideoSettings = (
    * Retourne la configuration du buffer selon le mode
    */
   const getBufferConfig = () => {
-    if (bufferMode === 'low') {
+    // Si mode auto, utiliser le mode détecté
+    const effectiveMode = bufferMode === 'auto' ? detectedBufferMode : bufferMode;
+
+    if (effectiveMode === 'low') {
       return {
         minBufferMs: 5000,
         maxBufferMs: 10000,
         bufferForPlaybackMs: 1000,
         bufferForPlaybackAfterRebufferMs: 2000,
       };
-    } else if (bufferMode === 'high') {
+    } else if (effectiveMode === 'high') {
       return {
         minBufferMs: 30000,
         maxBufferMs: 60000,

@@ -24,6 +24,7 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import LinearGradient from 'react-native-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {BlurView} from '@react-native-community/blur';
+import {useI18n} from '../hooks/useI18n';
 // AppContext removed - using UIStore instead
 import {useUIStore} from '../stores/UIStore';
 
@@ -63,6 +64,7 @@ const ProfilesModal: React.FC<ProfilesModalProps> = ({
   // Replaced AppContext with UIStore
   const {showLoading, updateLoading, hideLoading, showNotification} =
     useUIStore();
+  const {t: tCommon} = useI18n('common');
   const [playlists, setPlaylists] = useState<PlaylistItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [contextMenu, setContextMenu] = useState<{
@@ -364,7 +366,7 @@ const ProfilesModal: React.FC<ProfilesModalProps> = ({
       console.log(`Playlist supprimée: ${playlist.name}`);
     } catch (error) {
       console.error('Erreur suppression playlist:', error);
-      Alert.alert('Erreur', 'Impossible de supprimer la playlist');
+      Alert.alert(tCommon('error'), tCommon('playlistDeleteError'));
     }
   };
 
@@ -476,7 +478,7 @@ const ProfilesModal: React.FC<ProfilesModalProps> = ({
             {/* Indicateur de sélection au lieu du status */}
             {isSelected && (
               <View style={styles.selectedBadge}>
-                <Text style={styles.selectedText}>ACTIVE</Text>
+                <Text style={styles.selectedText}>{tCommon('active')}</Text>
               </View>
             )}
 
@@ -499,7 +501,7 @@ const ProfilesModal: React.FC<ProfilesModalProps> = ({
 
             {/* URL/Server (tronqué) */}
             <Text style={styles.playlistSource} numberOfLines={1}>
-              {item.url || item.server || 'Source non disponible'}
+              {item.url || item.server || tCommon('sourceNotAvailable')}
             </Text>
 
             {/* Informations du bas */}
@@ -543,7 +545,7 @@ const ProfilesModal: React.FC<ProfilesModalProps> = ({
         <SafeAreaView style={styles.safeArea}>
           {/* Header moderne */}
           <View style={styles.modernHeader}>
-            <Text style={styles.headerTitle}>Mes Playlists</Text>
+            <Text style={styles.headerTitle}>{tCommon('myPlaylists')}</Text>
             <View style={styles.headerButtons}>
               {onAddPlaylist && (
                 <Pressable
@@ -573,7 +575,7 @@ const ProfilesModal: React.FC<ProfilesModalProps> = ({
           {loading ? (
             <View style={styles.centerContainer}>
               <Icon name="refresh" size={48} color="rgba(226, 232, 240, 0.6)" />
-              <Text style={styles.loadingText}>Chargement...</Text>
+              <Text style={styles.loadingText}>{tCommon('loadingPlaylists')}</Text>
             </View>
           ) : playlists.length === 0 ? (
             <View style={styles.centerContainer}>
@@ -582,9 +584,9 @@ const ProfilesModal: React.FC<ProfilesModalProps> = ({
                 size={64}
                 color="rgba(226, 232, 240, 0.4)"
               />
-              <Text style={styles.emptyTitle}>Aucune playlist</Text>
+              <Text style={styles.emptyTitle}>{tCommon('noPlaylistsFound')}</Text>
               <Text style={styles.emptySubtitle}>
-                Ajoutez des playlists pour les voir ici
+                {tCommon('addPlaylistsToSee')}
               </Text>
             </View>
           ) : (
@@ -629,7 +631,7 @@ const ProfilesModal: React.FC<ProfilesModalProps> = ({
                 style={styles.contextMenuItem}
                 onPress={handleConnect}>
                 <Icon name="play-circle-outline" size={20} color="#4a9b8e" />
-                <Text style={styles.contextMenuText}>Se connecter</Text>
+                <Text style={styles.contextMenuText}>{tCommon('connect')}</Text>
               </TouchableOpacity>
 
               <View style={styles.contextMenuDivider} />
@@ -639,7 +641,7 @@ const ProfilesModal: React.FC<ProfilesModalProps> = ({
                 onPress={handleDelete}>
                 <Icon name="delete-outline" size={20} color="#ef4444" />
                 <Text style={[styles.contextMenuText, {color: '#ef4444'}]}>
-                  Supprimer
+                  {tCommon('delete')}
                 </Text>
               </TouchableOpacity>
             </LinearGradient>
@@ -679,20 +681,20 @@ const ProfilesModal: React.FC<ProfilesModalProps> = ({
 
               {/* Titre */}
               <Text style={styles.deleteModalTitle}>
-                Supprimer la playlist
+                {tCommon('deletePlaylist')}
               </Text>
 
               {/* Message */}
               <Text style={styles.deleteModalMessage}>
-                Êtes-vous sûr de vouloir supprimer la playlist{'\n'}
+                {tCommon('confirmDeletePlaylist').replace('?', '')}{'\n'}
                 <Text style={styles.playlistNameHighlight}>
                   "{deleteModal.playlist.name}"
-                </Text>{' '}
+                </Text>
                 ?
               </Text>
 
               <Text style={styles.deleteModalWarning}>
-                Cette action est irréversible.
+                {tCommon('irreversibleActionWarning')}
               </Text>
 
               {/* Boutons */}
@@ -702,7 +704,7 @@ const ProfilesModal: React.FC<ProfilesModalProps> = ({
                   onPress={() =>
                     setDeleteModal({visible: false, playlist: null})
                   }>
-                  <Text style={styles.cancelButtonText}>Annuler</Text>
+                  <Text style={styles.cancelButtonText}>{tCommon('cancel')}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -711,7 +713,7 @@ const ProfilesModal: React.FC<ProfilesModalProps> = ({
                   <LinearGradient
                     colors={['#ef4444', '#dc2626']}
                     style={styles.deleteButtonGradient}>
-                    <Text style={styles.deleteButtonText}>Supprimer</Text>
+                    <Text style={styles.deleteButtonText}>{tCommon('delete')}</Text>
                   </LinearGradient>
                 </TouchableOpacity>
               </View>

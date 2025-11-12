@@ -5,6 +5,7 @@
 import React from 'react';
 import {View, Text, StyleSheet, TouchableOpacity, Switch} from 'react-native';
 import {useTheme, useThemeColors, useIsDark} from '../contexts/ThemeContext';
+import {useI18n} from '../hooks/useI18n';
 
 interface ThemeQuickActionsProps {
   style?: any;
@@ -20,6 +21,7 @@ const ThemeQuickActions: React.FC<ThemeQuickActionsProps> = ({style}) => {
   } = useTheme();
   const colors = useThemeColors();
   const isDark = useIsDark();
+  const {t: tCommon} = useI18n('common');
 
   const handleSystemToggle = async (enabled: boolean) => {
     if (enabled) {
@@ -40,7 +42,7 @@ const ThemeQuickActions: React.FC<ThemeQuickActionsProps> = ({style}) => {
     <View style={[styles.container, style]}>
       {/* Section 1: Sélecteur de mode manuel */}
       <View style={styles.manualToggleContainer}>
-        <Text style={[styles.label, {color: colors.text.secondary}]}>Mode</Text>
+        <Text style={[styles.label, {color: colors.text.secondary}]}>{tCommon('mode')}</Text>
         <View
           style={[
             styles.segmentedControl,
@@ -61,7 +63,7 @@ const ThemeQuickActions: React.FC<ThemeQuickActionsProps> = ({style}) => {
                 styles.segmentText,
                 {color: !isDark ? '#fff' : colors.text.primary},
               ]}>
-              Clair
+              {tCommon('light')}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -76,7 +78,7 @@ const ThemeQuickActions: React.FC<ThemeQuickActionsProps> = ({style}) => {
                 styles.segmentText,
                 {color: isDark ? '#fff' : colors.text.primary},
               ]}>
-              Sombre
+              {tCommon('dark')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -85,7 +87,7 @@ const ThemeQuickActions: React.FC<ThemeQuickActionsProps> = ({style}) => {
       {/* Section 2: Interrupteur pour le mode automatique */}
       <View style={styles.autoToggleContainer}>
         <Text style={[styles.label, {color: colors.text.primary}]}>
-          Thème automatique
+          {tCommon('automaticTheme')}
         </Text>
         <Switch
           value={isSystemTheme}

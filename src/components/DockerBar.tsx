@@ -6,7 +6,6 @@ import {
   StyleSheet,
   ScrollView,
 } from 'react-native';
-import Animated from 'react-native-reanimated';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import FastImage from 'react-native-fast-image';
@@ -24,8 +23,6 @@ interface RecentChannel {
 interface DockerBarProps {
   /** État de visibilité du docker */
   isVisible: boolean;
-  /** Style animé pour l'opacité */
-  animatedStyle: any;
   /** Chaîne en cours de lecture */
   channel: Channel | null;
   /** Données EPG actuelles */
@@ -34,6 +31,8 @@ interface DockerBarProps {
   recentChannels: RecentChannel[];
   /** Est-ce qu'on vient du multi-écran */
   isFromMultiScreen: boolean;
+  /** Est-ce qu'on vient du démarrage automatique */
+  isFromAutoStart?: boolean;
   /** Temps actuel de la vidéo */
   currentTime: number;
   /** Durée totale de la vidéo */
@@ -63,11 +62,11 @@ interface DockerBarProps {
  */
 export const DockerBar: React.FC<DockerBarProps> = ({
   isVisible,
-  animatedStyle,
   channel,
   epgData,
   recentChannels,
   isFromMultiScreen,
+  isFromAutoStart = false,
   currentTime,
   duration,
   onChannelsPress,
@@ -102,10 +101,9 @@ export const DockerBar: React.FC<DockerBarProps> = ({
   }, [epgData, currentTime, duration]);
 
   return (
-    <Animated.View
+    <View
       style={[
         styles.dockerOverlay,
-        animatedStyle,
         {
           pointerEvents: isVisible ? 'box-none' : 'none',
         },
@@ -195,31 +193,35 @@ export const DockerBar: React.FC<DockerBarProps> = ({
               onScrollEnd?.();
             }, 1000);
           }}>
-          {/* Bouton Chaînes */}
-          <TouchableOpacity
-            style={styles.recentChannelItem}
-            onPress={() => {
-              console.log('🐛 [DockerBar] Clic Bouton Chaînes');
-              onChannelsPress();
-            }}>
-            <View style={styles.recentChannelPreview}>
-              <Icon name="live-tv" size={28} color="#fff" />
-              <Text style={styles.dockerButtonTextModern}>Chaînes</Text>
-            </View>
-          </TouchableOpacity>
+          {/* Bouton Chaînes - Masqué pendant l'autostart */}
+          {!isFromAutoStart && (
+            <TouchableOpacity
+              style={styles.recentChannelItem}
+              onPress={() => {
+                console.log('🐛 [DockerBar] Clic Bouton Chaînes');
+                onChannelsPress();
+              }}>
+              <View style={styles.recentChannelPreview}>
+                <Icon name="live-tv" size={28} color="#fff" />
+                <Text style={styles.dockerButtonTextModern}>Chaînes</Text>
+              </View>
+            </TouchableOpacity>
+          )}
 
-          {/* Bouton Multi-écran */}
-          <TouchableOpacity
-            style={styles.recentChannelItem}
-            onPress={() => {
-              console.log('🐛 [DockerBar] Clic Bouton Multi-écran');
-              onMultiScreenPress();
-            }}>
-            <View style={styles.recentChannelPreview}>
-              <Icon name="view-comfy" size={28} color="#fff" />
-              <Text style={styles.dockerButtonTextModern}>Multi-écran</Text>
-            </View>
-          </TouchableOpacity>
+          {/* Bouton Multi-écran - Masqué pendant l'autostart */}
+          {!isFromAutoStart && (
+            <TouchableOpacity
+              style={styles.recentChannelItem}
+              onPress={() => {
+                console.log('🐛 [DockerBar] Clic Bouton Multi-écran');
+                onMultiScreenPress();
+              }}>
+              <View style={styles.recentChannelPreview}>
+                <Icon name="view-comfy" size={28} color="#fff" />
+                <Text style={styles.dockerButtonTextModern}>Multi-écran</Text>
+              </View>
+            </TouchableOpacity>
+          )}
 
           {/* Chaînes récentes */}
           {recentChannels.map((recentChannel, index) => {
@@ -276,7 +278,7 @@ export const DockerBar: React.FC<DockerBarProps> = ({
         </ScrollView>
       </LinearGradient>
       )}
-    </Animated.View>
+    </View>
   );
 };
 

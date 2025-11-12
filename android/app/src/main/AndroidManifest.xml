@@ -4,6 +4,30 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
+    <!-- Queries pour Android 11+ : Permet de vérifier les lecteurs externes installés -->
+    <queries>
+        <!-- VLC Player -->
+        <package android:name="org.videolan.vlc" />
+
+        <!-- MX Player Free -->
+        <package android:name="com.mxtech.videoplayer.ad" />
+
+        <!-- MX Player Pro -->
+        <package android:name="com.mxtech.videoplayer.pro" />
+
+        <!-- Intent pour ouvrir les vidéos -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:mimeType="video/*" />
+        </intent>
+
+        <!-- VLC custom scheme -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="vlc" />
+        </intent>
+    </queries>
+
     <!-- Permissions Google Cast pour découverte des appareils -->
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
@@ -30,12 +54,6 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- Service foreground pour background audio -->
-    <service
-        android:name=".BackgroundAudioService"
-        android:foregroundServiceType="mediaPlayback"
-        android:exported="false" />
-
     <application
       android:name=".MainApplication"
       android:label="@string/app_name"
@@ -53,6 +71,12 @@
       <meta-data
         android:name="com.reactnative.googlecast.RECEIVER_APPLICATION_ID"
         android:value="C3F6E6E9" />
+
+      <!-- Service foreground pour background audio -->
+      <service
+          android:name=".BackgroundAudioService"
+          android:foregroundServiceType="mediaPlayback"
+          android:exported="false" />
 
       <activity
         android:name=".MainActivity"

@@ -48,16 +48,9 @@ export const useVideoPlayerSettings = () => {
     return settings?.backgroundPlay || false;
   };
 
-  const getSkipDuration = (): number => {
-    return settings?.skipDuration || 10;
-  };
-
+  
   const getPlaybackSpeed = (): number => {
     return settings?.playbackSpeed || 1.0;
-  };
-
-  const getQualityPriority = (): 'resolution' | 'fluidity' => {
-    return settings?.qualityPriority || 'resolution';
   };
 
   const getAutoplay = (): boolean => {
@@ -68,12 +61,24 @@ export const useVideoPlayerSettings = () => {
     return settings?.rememberPosition || true;
   };
 
-  const getQuality = (): 'auto' | '1080p' | '720p' | '480p' => {
-    return settings?.quality || 'auto';
+  const getHardwareAcceleration = (): boolean => {
+    return settings?.hardwareAcceleration ?? true;
   };
 
-  const getVolume = (): number => {
-    return settings?.volume || 75;
+  const getDecoderType = (): 'auto' | 'hardware' | 'software' => {
+    return settings?.decoderType || 'auto';
+  };
+
+  const getNetworkTimeout = (): number => {
+    return settings?.networkTimeout || 10;
+  };
+
+  const getTimeFormat = (): '12h' | '24h' => {
+    return settings?.timeFormat || '24h';
+  };
+
+  const getAppLanguage = (): 'fr' | 'en' | 'es' | 'ar' => {
+    return settings?.appLanguage || 'fr';
   };
 
   return {
@@ -87,23 +92,25 @@ export const useVideoPlayerSettings = () => {
 
     // Accesseurs rapides
     getBackgroundPlay,
-    getSkipDuration,
     getPlaybackSpeed,
-    getQualityPriority,
     getAutoplay,
     getRememberPosition,
-    getQuality,
-    getVolume,
+    getHardwareAcceleration,
+    getDecoderType,
+    getNetworkTimeout,
+    getTimeFormat,
+    getAppLanguage,
 
     // Valeurs directes (pour commodité)
     backgroundPlay: getBackgroundPlay(),
-    skipDuration: getSkipDuration(),
     playbackSpeed: getPlaybackSpeed(),
-    qualityPriority: getQualityPriority(),
     autoplay: getAutoplay(),
     rememberPosition: getRememberPosition(),
-    quality: getQuality(),
-    volume: getVolume(),
+    hardwareAcceleration: getHardwareAcceleration(),
+    decoderType: getDecoderType(),
+    networkTimeout: getNetworkTimeout(),
+    timeFormat: getTimeFormat(),
+    appLanguage: getAppLanguage(),
   };
 };
 

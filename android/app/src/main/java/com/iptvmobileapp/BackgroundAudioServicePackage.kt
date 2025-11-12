@@ -8,7 +8,7 @@ import com.facebook.react.uimanager.ViewManager
 
 class BackgroundAudioServicePackage : ReactPackage {
 
-    override fun createViewManagers(reactContext: ReactApplicationContext): List<ViewManager> {
+    override fun createViewManagers(reactContext: ReactApplicationContext): List<ViewManager<*, *>> {
         return emptyList()
     }
 

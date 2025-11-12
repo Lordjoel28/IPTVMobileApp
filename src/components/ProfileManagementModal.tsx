@@ -31,6 +31,7 @@ import {Q} from '@nozbe/watermelondb';
 import {Category, Playlist} from '../database/models';
 import type {Profile} from '../types';
 import {useThemeColors} from '../contexts/ThemeContext';
+import {useI18n} from '../hooks/useI18n';
 import {useAlert} from '../contexts/AlertContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -95,6 +96,11 @@ const ProfileManagementModal: React.FC<ProfileManagementModalProps> = ({
   refreshKey,
 }) => {
   const colors = useThemeColors();
+  const {t: tChannels} = useI18n('channels');
+  const {t: tCommon} = useI18n('common');
+  const {t: tParental} = useI18n('parental');
+  const {t: tPlaylists} = useI18n('playlists');
+  const {t: tProfiles} = useI18n('profiles');
   const {showAlert} = useAlert();
   const [profiles, setProfiles] = useState<Profile[]>([]);
 
@@ -408,9 +414,9 @@ const ProfileManagementModal: React.FC<ProfileManagementModalProps> = ({
       'Supprimer le profil',
       `Êtes-vous sûr de vouloir supprimer "${profile.name}" ?`,
       [
-        {text: 'Annuler', style: 'cancel'},
+        {text: tCommon('cancel'), style: 'cancel'},
         {
-          text: 'Supprimer',
+          text: tCommon('delete'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -673,7 +679,7 @@ const ProfileManagementModal: React.FC<ProfileManagementModalProps> = ({
         <View style={styles.header}>
           <View style={styles.headerLeft} />
           <Text style={[styles.headerTitle, {color: colors.text.primary}]}>
-            Gérer les profils
+            {tProfiles('manageProfiles')}
           </Text>
           <Pressable
             onPress={onClose}
@@ -814,13 +820,13 @@ const ProfileManagementModal: React.FC<ProfileManagementModalProps> = ({
                     />
                     <Text
                       style={[styles.formTitle, {color: colors.text.primary}]}>
-                      {editingProfile ? 'Modifier le profil' : 'Nouveau profil'}
+                      {editingProfile ? tProfiles('modifyProfile') : tProfiles('newProfile')}
                     </Text>
                   </View>
 
                   {/* Grille avatars compacte */}
                   <Text style={[styles.label, {color: colors.text.secondary}]}>
-                    Choisir un avatar
+                    {tProfiles('chooseAvatar')}
                   </Text>
                   <View
                     style={[
@@ -845,7 +851,7 @@ const ProfileManagementModal: React.FC<ProfileManagementModalProps> = ({
                   </View>
 
                   <Text style={[styles.label, {color: colors.text.secondary}]}>
-                    Nom du profil
+                    {tProfiles('profileNameLabel')}
                   </Text>
                   <TextInput
                     style={[
@@ -883,7 +889,7 @@ const ProfileManagementModal: React.FC<ProfileManagementModalProps> = ({
                       )}
                     </View>
                     <Text style={[styles.kidsText, {color: colors.text.primary}]}>
-                      👶 Profil enfant (filtre le contenu sensible)
+                      {tProfiles('kidsProfileDesc')}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -913,7 +919,7 @@ const ProfileManagementModal: React.FC<ProfileManagementModalProps> = ({
                           styles.groupsHeaderText,
                           {color: colors.text.primary},
                         ]}>
-                        Groupes visibles{' '}
+                        {tParental('visibleGroups')}{' '}
                         {selectedGroups.length > 0 &&
                           `(${selectedGroups.length})`}
                       </Text>
@@ -973,7 +979,7 @@ const ProfileManagementModal: React.FC<ProfileManagementModalProps> = ({
                         <View style={styles.loadingContainer}>
                           <Icon name="hourglass-empty" size={24} color={colors.text.tertiary} />
                           <Text style={[styles.loadingText, {color: colors.text.secondary}]}>
-                            Chargement des catégories...
+                            {tPlaylists('loadingCategories')}
                           </Text>
                         </View>
                       ) : categoriesError ? (
@@ -986,7 +992,7 @@ const ProfileManagementModal: React.FC<ProfileManagementModalProps> = ({
                             style={[styles.retryButton, {backgroundColor: colors.accent.info}]}
                             onPress={loadAvailableCategories}>
                             <Icon name="refresh" size={16} color="#ffffff" />
-                            <Text style={styles.retryText}>Réessayer</Text>
+                            <Text style={styles.retryText}>{tCommon('retry')}</Text>
                           </TouchableOpacity>
                         </View>
                       ) : availableCategories.length === 0 ? (
@@ -995,8 +1001,7 @@ const ProfileManagementModal: React.FC<ProfileManagementModalProps> = ({
                             styles.groupsHint,
                             {color: colors.text.secondary, textAlign: 'center'},
                           ]}>
-                          ℹ️ Aucune playlist active. Importez une playlist pour
-                          configurer les groupes visibles.
+                          {tPlaylists('noActivePlaylistDesc')}
                         </Text>
                       ) : (
                         <>
@@ -1005,9 +1010,8 @@ const ProfileManagementModal: React.FC<ProfileManagementModalProps> = ({
                               styles.groupsHint,
                               {color: colors.text.secondary},
                             ]}>
-                            Sélectionnez les catégories visibles pour ce profil.
-                            Si aucune n'est sélectionnée, toutes seront
-                            visibles.
+                            {tParental('selectVisibleCategories')}
+                            {tParental('selectVisibleCategoriesDesc')}
                           </Text>
 
                           {/* 🆕 Barre de recherche compacte */}
@@ -1022,7 +1026,7 @@ const ProfileManagementModal: React.FC<ProfileManagementModalProps> = ({
                                   borderColor: colors.ui.border,
                                 },
                               ]}
-                              placeholder="Rechercher..."
+                              placeholder={tChannels('searchPlaceholder')}
                               placeholderTextColor={colors.text.placeholder}
                               value={searchQuery}
                               onChangeText={handleSearchChange}
@@ -1081,7 +1085,7 @@ const ProfileManagementModal: React.FC<ProfileManagementModalProps> = ({
                             </Text>
                           </View>
 
-                          {/* Boutons Tout/Rien compacts */}
+                          {/* Boutons {tCommon('all')}/Rien compacts */}
                           <View style={styles.groupsActionsCompact}>
                             <TouchableOpacity
                               style={[
@@ -1102,7 +1106,7 @@ const ProfileManagementModal: React.FC<ProfileManagementModalProps> = ({
                                   styles.groupsActionTextCompact,
                                   {color: colors.text.primary},
                                 ]}>
-                                Tout
+                                {tCommon('all')}
                               </Text>
                             </TouchableOpacity>
                             <TouchableOpacity
@@ -1124,7 +1128,7 @@ const ProfileManagementModal: React.FC<ProfileManagementModalProps> = ({
                                   styles.groupsActionTextCompact,
                                   {color: colors.text.primary},
                                 ]}>
-                                Aucun
+                                {tCommon('none')}
                               </Text>
                             </TouchableOpacity>
                           </View>
@@ -1210,7 +1214,7 @@ const ProfileManagementModal: React.FC<ProfileManagementModalProps> = ({
                         styles.cancelText,
                         {color: colors.text.secondary},
                       ]}>
-                      Annuler
+                      {tCommon('cancel')}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -1231,7 +1235,7 @@ const ProfileManagementModal: React.FC<ProfileManagementModalProps> = ({
                       color="#ffffff"
                     />
                     <Text style={styles.saveText}>
-                      {editingProfile ? 'Enregistrer' : 'Créer'}
+                      {editingProfile ? tCommon('save') : tProfiles('createProfile')}
                     </Text>
                   </TouchableOpacity>
                 </View>

@@ -17,8 +17,10 @@ import {Playlist} from '../types';
 import {usePlaylistSelection} from '../hooks/usePlaylistSelection';
 // AppContext removed - using UIStore instead
 import {useUIStore} from '../stores/UIStore';
+import {useI18n} from '../hooks/useI18n';
 
 const PlaylistsScreen: React.FC = () => {
+  const {t: tCommon} = useI18n('common');
   // AppManager removed - will be replaced by DI services + Zustand
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -203,9 +205,9 @@ const PlaylistsScreen: React.FC = () => {
       'Confirmer la suppression',
       `Êtes-vous sûr de vouloir supprimer la playlist "${playlist.name}" ?`,
       [
-        {text: 'Annuler', style: 'cancel'},
+        {text: tCommon('cancel'), style: 'cancel'},
         {
-          text: 'Supprimer',
+          text: tCommon('delete'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -375,7 +377,7 @@ const PlaylistsScreen: React.FC = () => {
               <TouchableOpacity
                 style={[styles.modalButton, styles.modalButtonSecondary]}
                 onPress={() => setShowAddModal(false)}>
-                <Text style={styles.modalButtonTextSecondary}>Annuler</Text>
+                <Text style={styles.modalButtonTextSecondary}>{tCommon('cancel')}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity

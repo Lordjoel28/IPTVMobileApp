@@ -3,8 +3,6 @@
  *
  * Affiche les indicateurs visuels pour:
  * - Seek forward/backward (avec icônes et durée)
- * - Volume (barre verticale + icône)
- * - Luminosité (barre verticale + icône)
  * - Ripple effect (effet de vague)
  */
 
@@ -26,11 +24,6 @@ interface RippleFeedback {
   position: {x: number; y: number};
 }
 
-interface VolumeBrightnessFeedback {
-  visible: boolean;
-  level: number;
-}
-
 interface VideoFeedbackOverlayProps {
   // Feedback seek
   seekFeedback: SeekFeedback;
@@ -39,14 +32,6 @@ interface VideoFeedbackOverlayProps {
   // Feedback ripple
   rippleFeedback: RippleFeedback;
   rippleStyle: any;
-
-  // Feedback volume
-  volumeFeedback: VolumeBrightnessFeedback;
-  volumeFeedbackStyle: any;
-
-  // Feedback luminosité
-  brightnessFeedback: VolumeBrightnessFeedback;
-  brightnessFeedbackStyle: any;
 }
 
 // 🎯 COMPOSANT: Indicateur de Seek
@@ -70,54 +55,6 @@ const SeekIndicator: React.FC<{
         <Text style={styles.seekText}>
           {isForward ? '+' : '-'}{seconds}s
         </Text>
-      </LinearGradient>
-    </Animated.View>
-  );
-};
-
-// 🎯 COMPOSANT: Indicateur de Volume/Luminosité
-const VerticalIndicator: React.FC<{
-  type: 'volume' | 'brightness';
-  level: number;
-  style: any;
-}> = ({type, level, style}) => {
-  const isVolume = type === 'volume';
-  const icon = isVolume ? 'volume-up' : 'brightness-high';
-  const color = isVolume ? '#FF9500' : '#FFD700';
-
-  // Normaliser le level entre 0 et 100
-  const normalizedLevel = Math.max(0, Math.min(100, level));
-
-  return (
-    <Animated.View
-      style={[
-        styles.verticalIndicator,
-        isVolume ? styles.volumeIndicator : styles.brightnessIndicator,
-        style,
-      ]}>
-      <LinearGradient
-        colors={['rgba(0,0,0,0.8)', 'rgba(0,0,0,0.6)']}
-        style={styles.indicatorContainer}>
-        {/* Icône */}
-        <Icon name={icon} size={28} color={color} />
-
-        {/* Barre de progression verticale */}
-        <View style={styles.progressBarContainer}>
-          <View style={styles.progressBarBackground}>
-            <View
-              style={[
-                styles.progressBarFill,
-                {
-                  height: `${normalizedLevel}%`,
-                  backgroundColor: color,
-                },
-              ]}
-            />
-          </View>
-        </View>
-
-        {/* Pourcentage */}
-        <Text style={styles.indicatorText}>{normalizedLevel}%</Text>
       </LinearGradient>
     </Animated.View>
   );
@@ -152,10 +89,6 @@ export const VideoFeedbackOverlay: React.FC<VideoFeedbackOverlayProps> = ({
   seekFeedbackStyle,
   rippleFeedback,
   rippleStyle,
-  volumeFeedback,
-  volumeFeedbackStyle,
-  brightnessFeedback,
-  brightnessFeedbackStyle,
 }) => {
   return (
     <>
@@ -171,24 +104,6 @@ export const VideoFeedbackOverlay: React.FC<VideoFeedbackOverlayProps> = ({
       {/* Ripple Effect - Position dynamique */}
       {rippleFeedback.visible && (
         <RippleEffect position={rippleFeedback.position} style={rippleStyle} />
-      )}
-
-      {/* Volume Feedback - Côté droit */}
-      {volumeFeedback.visible && (
-        <VerticalIndicator
-          type="volume"
-          level={volumeFeedback.level}
-          style={volumeFeedbackStyle}
-        />
-      )}
-
-      {/* Brightness Feedback - Côté gauche */}
-      {brightnessFeedback.visible && (
-        <VerticalIndicator
-          type="brightness"
-          level={brightnessFeedback.level}
-          style={brightnessFeedbackStyle}
-        />
       )}
     </>
   );
@@ -222,56 +137,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     marginTop: 8,
-  },
-
-  // Vertical Indicator (Volume/Brightness)
-  verticalIndicator: {
-    position: 'absolute',
-    top: '50%',
-    transform: [{translateY: -100}],
-    width: 80,
-    height: 200,
-    zIndex: 1000,
-  },
-  volumeIndicator: {
-    right: 30,
-  },
-  brightnessIndicator: {
-    left: 30,
-  },
-  indicatorContainer: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 12,
-    padding: 12,
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-
-  // Progress Bar
-  progressBarContainer: {
-    flex: 1,
-    width: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: 8,
-  },
-  progressBarBackground: {
-    width: 8,
-    height: '100%',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 4,
-    overflow: 'hidden',
-    justifyContent: 'flex-end',
-  },
-  progressBarFill: {
-    width: '100%',
-    borderRadius: 4,
-  },
-  indicatorText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
   },
 
   // Ripple Effect

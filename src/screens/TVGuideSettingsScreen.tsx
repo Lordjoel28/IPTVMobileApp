@@ -20,6 +20,7 @@ import {EPGSourceManager} from '../services/epg/EPGSourceManager';
 import {XtreamEPG, FullEPGData, EPGChannel} from '../services/XtreamEPGService';
 import {EPGCacheManager} from '../services/epg/EPGCacheManager';
 import {ModernDialog} from '../components/ModernDialog';
+import {useI18n} from '../hooks/useI18n';
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -35,7 +36,10 @@ const xtreamCredentials = {
 
 const TVGuideSettingsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
-  const [epgGlobalStatus, setEpgGlobalStatus] = useState('Non téléchargé');
+  const {t: tCommon} = useI18n('common');
+  const {t: tSettings} = useI18n('settings');
+  const {t: tEpg} = useI18n('epg');
+  const [epgGlobalStatus, setEpgGlobalStatus] = useState(tEpg('notDownloaded'));
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [epgStats, setEpgStats] = useState({
@@ -70,7 +74,7 @@ const TVGuideSettingsScreen: React.FC = () => {
   const checkEPGStatus = () => {
     const cacheStats = epgCache.getCacheStats();
     const hasValidData = cacheStats.hasData && cacheStats.channelsCount > 0;
-    const newStatus = hasValidData ? 'Téléchargé' : 'Non téléchargé';
+    const newStatus = hasValidData ? tEpg('upToDate') : tEpg('notDownloaded');
 
     if (newStatus !== epgGlobalStatus) {
       console.log('🔍 [TVGuideSettings] Mise à jour statut EPG:', newStatus);
@@ -121,14 +125,14 @@ const TVGuideSettingsScreen: React.FC = () => {
       // Vérifier le cache global pour le statut EPG
       const cacheStats = epgCache.getCacheStats();
       if (cacheStats.hasData) {
-        setEpgGlobalStatus('Téléchargé');
+        setEpgGlobalStatus(tEpg('upToDate'));
         console.log(
           '✅ [TVGuideSettings] EPG global détecté en cache:',
           cacheStats.channelsCount,
           'chaînes',
         );
       } else {
-        setEpgGlobalStatus('Non téléchargé');
+        setEpgGlobalStatus(tEpg('notDownloaded'));
       }
     } catch (error) {
       console.error('Erreur chargement stats EPG:', error);
@@ -138,14 +142,14 @@ const TVGuideSettingsScreen: React.FC = () => {
   const handleDownloadGlobalEPG = async () => {
     if (isDownloading) {
       Alert.alert(
-        'Information',
+        tSettings('information'),
         'Un téléchargement EPG est déjà en cours. Veuillez patienter.',
       );
       return;
     }
 
     // Si EPG déjà téléchargé, c'est une actualisation
-    if (epgGlobalStatus === 'Téléchargé') {
+    if (epgGlobalStatus === tEpg('upToDate')) {
       console.log('🔄 Actualisation EPG Global');
       setShowRefreshDialog(true);
     } else {
@@ -158,11 +162,11 @@ const TVGuideSettingsScreen: React.FC = () => {
     try {
       setIsDownloading(true);
       setDownloadProgress(0);
-      setEpgGlobalStatus('Initialisation...');
+      setEpgGlobalStatus(tEpg('initializationDots'));
 
       // Éviter les chargements multiples
       if (epgCache.isLoadingFullEPG) {
-        Alert.alert('⚠️ Attention', 'Un téléchargement EPG est déjà en cours.');
+        Alert.alert(tCommon('attention'), 'Un téléchargement EPG est déjà en cours.');
         setIsDownloading(false);
         return;
       }
@@ -171,16 +175,16 @@ const TVGuideSettingsScreen: React.FC = () => {
 
       // Étape 1: Connexion au serveur EPG
       setDownloadProgress(5);
-      setEpgGlobalStatus('Connexion au serveur EPG...');
+      setEpgGlobalStatus(tEpg('connectingToServer'));
       await new Promise(resolve => setTimeout(resolve, 800));
 
       setDownloadProgress(15);
-      setEpgGlobalStatus('Authentification...');
+      setEpgGlobalStatus(tEpg('authentication'));
       await new Promise(resolve => setTimeout(resolve, 600));
 
       // Étape 2: Téléchargement des données EPG
       setDownloadProgress(30);
-      setEpgGlobalStatus('Téléchargement programmes TV...');
+      setEpgGlobalStatus(tEpg('downloadingPrograms'));
 
       console.log(
         '🔄 [TVGuideSettings] Démarrage téléchargement EPG Xtream...',
@@ -195,11 +199,11 @@ const TVGuideSettingsScreen: React.FC = () => {
 
       // Étape 3: Traitement des données
       setDownloadProgress(65);
-      setEpgGlobalStatus('Analyse des données...');
+      setEpgGlobalStatus(tEpg('analyzingData'));
       await new Promise(resolve => setTimeout(resolve, 400));
 
       setDownloadProgress(80);
-      setEpgGlobalStatus('Traitement des données...');
+      setEpgGlobalStatus(tEpg('processingData'));
 
       console.log(
         '✅ [TVGuideSettings] EPG téléchargé:',
@@ -211,11 +215,11 @@ const TVGuideSettingsScreen: React.FC = () => {
 
       // Étape 4: Construction de l'index et sauvegarde en cache
       setDownloadProgress(88);
-      setEpgGlobalStatus('Construction index...');
+      setEpgGlobalStatus(tEpg('buildingIndex'));
       await new Promise(resolve => setTimeout(resolve, 300));
 
       setDownloadProgress(95);
-      setEpgGlobalStatus('Sauvegarde en cache...');
+      setEpgGlobalStatus(tEpg('savingToCache'));
 
       // Mettre à jour le cache global
       epgCache.updateCache(epgData);
@@ -225,13 +229,13 @@ const TVGuideSettingsScreen: React.FC = () => {
 
       // Étape 5: Finalisation
       setDownloadProgress(100);
-      setEpgGlobalStatus('Téléchargement terminé');
+      setEpgGlobalStatus(tEpg('downloadComplete'));
       await new Promise(resolve => setTimeout(resolve, 800));
 
       // Finalisation
       setIsDownloading(false);
       epgCache.isLoadingFullEPG = false;
-      setEpgGlobalStatus('Téléchargé');
+      setEpgGlobalStatus(tEpg('upToDate'));
 
       // On recharge les stats pour mettre à jour les compteurs, mais sans toucher au statut EPG global
       // qui vient d'être défini correctement.
@@ -250,24 +254,20 @@ const TVGuideSettingsScreen: React.FC = () => {
       console.error('❌ [TVGuideSettings] Erreur téléchargement EPG:', error);
       setIsDownloading(false);
       epgCache.isLoadingFullEPG = false;
-      setEpgGlobalStatus('Erreur de téléchargement');
+      setEpgGlobalStatus(tEpg('downloadError'));
 
-      let errorMessage =
-        'Échec du téléchargement EPG. Vérifiez votre connexion internet.';
+      let errorMessage = tEpg('downloadError');
       if (error instanceof Error) {
         if (error.name === 'AbortError' || error.message.includes('timeout')) {
-          errorMessage =
-            'Timeout de connexion (15s). Le serveur EPG met trop de temps à répondre. Réessayez plus tard.';
+          errorMessage = tEpg('connectionTimeout');
         } else if (error.message.includes('Network')) {
-          errorMessage =
-            'Erreur de connexion réseau. Vérifiez votre connexion internet.';
+          errorMessage = tEpg('networkError');
         } else if (error.message.includes('Aucune donnée')) {
-          errorMessage =
-            "Le serveur EPG n'a retourné aucune donnée. Réessayez plus tard.";
+          errorMessage = tEpg('noDataFromServer');
         }
       }
 
-      Alert.alert('❌ Erreur', errorMessage);
+      Alert.alert(tCommon('error'), errorMessage);
     }
   };
 
@@ -316,9 +316,9 @@ const TVGuideSettingsScreen: React.FC = () => {
   const handleOldManageEPGSources = () => {
     console.log('📋 Gestion sources EPG');
     Alert.alert(
-      'Sources EPG Manuelles',
+      tEpg('manualEPGSources'),
       "Cette fonctionnalité permettra d'assigner des sources EPG spécifiques à vos playlists.",
-      [{text: 'OK'}],
+      [{text: tCommon('ok')}],
     );
   };
 
@@ -330,7 +330,7 @@ const TVGuideSettingsScreen: React.FC = () => {
     try {
       setIsDownloading(true);
       setDownloadProgress(0);
-      setEpgGlobalStatus('Actualisation...');
+      setEpgGlobalStatus(tEpg('refreshStarting'));
 
       // Vider le cache actuel
       epgCache.clearCache();
@@ -340,10 +340,10 @@ const TVGuideSettingsScreen: React.FC = () => {
     } catch (error) {
       console.error('❌ Erreur actualisation EPG:', error);
       setIsDownloading(false);
-      setEpgGlobalStatus("Erreur d'actualisation");
+      setEpgGlobalStatus(tEpg('refreshError'));
       Alert.alert(
-        '❌ Erreur',
-        "Erreur lors de l'actualisation EPG. Vérifiez votre connexion.",
+        tCommon('error'),
+        tEpg('refreshError'),
       );
     }
   };
@@ -370,7 +370,7 @@ const TVGuideSettingsScreen: React.FC = () => {
       epgCache.clearCache();
 
       setClearProgress(90);
-      setEpgGlobalStatus('Non téléchargé');
+      setEpgGlobalStatus(tEpg('notDownloaded'));
 
       // Finalisation
       setClearProgress(100);
@@ -379,9 +379,7 @@ const TVGuideSettingsScreen: React.FC = () => {
       setIsClearingCache(false);
       setClearProgress(0);
 
-      setSuccessMessage(
-        'Cache EPG supprimé avec succès !\n\nToutes les données EPG en cache ont été effacées. Vous pouvez maintenant télécharger de nouvelles données.',
-      );
+      setSuccessMessage(tEpg('cacheClearedMessage'));
       setShowSuccessDialog(true);
 
       console.log('✅ [TVGuideSettings] Cache EPG supprimé avec succès !');
@@ -405,7 +403,7 @@ const TVGuideSettingsScreen: React.FC = () => {
           onPress={() => navigation.goBack()}>
           <Icon name="arrow-back-ios" size={20} color="#FFFFFF" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>TV Guide</Text>
+        <Text style={styles.headerTitle}>{tEpg('tvGuide')}</Text>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -427,7 +425,7 @@ const TVGuideSettingsScreen: React.FC = () => {
                 <Icon name="file-download" size={16} color="#FFFFFF" />
               </LinearGradient>
               <Text style={styles.modernSectionTitle}>
-                EPG Automatique (Global)
+                {tEpg('automaticEPGGlobal')}
               </Text>
             </View>
           </View>
@@ -441,7 +439,7 @@ const TVGuideSettingsScreen: React.FC = () => {
             end={{x: 1, y: 1}}>
             <View style={styles.statusCardContent}>
               <View style={styles.statusInfo}>
-                <Text style={styles.statusTitle}>Statut</Text>
+                <Text style={styles.statusTitle}>{tCommon('status')}</Text>
                 <View style={styles.statusWithIcon}>
                   {isDownloading ? (
                     <>
@@ -455,10 +453,10 @@ const TVGuideSettingsScreen: React.FC = () => {
                           styles.statusDescription,
                           styles.statusInProgress,
                         ]}>
-                        En cours...
+                        {tEpg('inProgress')}
                       </Text>
                     </>
-                  ) : epgGlobalStatus === 'Téléchargé' ? (
+                  ) : epgGlobalStatus === tEpg('upToDate') ? (
                     <>
                       <Icon
                         name="check-circle"
@@ -471,10 +469,10 @@ const TVGuideSettingsScreen: React.FC = () => {
                           styles.statusDescription,
                           styles.statusSuccessText,
                         ]}>
-                        À jour
+                        {tEpg('upToDate')}
                       </Text>
                     </>
-                  ) : epgGlobalStatus.includes('Erreur') ? (
+                  ) : epgGlobalStatus.includes(tCommon('error')) ? (
                     <>
                       <Icon
                         name="error"
@@ -487,7 +485,7 @@ const TVGuideSettingsScreen: React.FC = () => {
                           styles.statusDescription,
                           styles.statusErrorText,
                         ]}>
-                        Erreur
+                        {tCommon('error')}
                       </Text>
                     </>
                   ) : (
@@ -503,7 +501,7 @@ const TVGuideSettingsScreen: React.FC = () => {
                           styles.statusDescription,
                           styles.statusInactive,
                         ]}>
-                        Non téléchargé
+                        {tEpg('notDownloaded')}
                       </Text>
                     </>
                   )}
@@ -568,20 +566,17 @@ const TVGuideSettingsScreen: React.FC = () => {
                 )}
                 <Text style={styles.modernActionButtonText}>
                   {isDownloading
-                    ? 'Téléchargement...'
-                    : epgGlobalStatus === 'Téléchargé'
-                    ? 'Actualiser EPG Global'
-                    : 'Télécharger EPG Global'}
+                    ? tEpg('downloading')
+                    : epgGlobalStatus === tEpg('upToDate')
+                    ? tEpg('refreshEPGGlobal')
+                    : tEpg('downloadEPGGlobal')}
                 </Text>
               </View>
             </LinearGradient>
           </TouchableOpacity>
 
           <Text style={styles.modernHelpText}>
-            📡 Solution de secours automatique : Téléchargez un guide TV global
-            qui s'applique automatiquement à toutes vos playlists qui n'ont pas
-            d'EPG intégré. Idéal quand vos playlists ne fournissent pas de guide
-            TV.
+            {tEpg('epgGlobalHelpText')}
           </Text>
         </LinearGradient>
 
@@ -600,7 +595,7 @@ const TVGuideSettingsScreen: React.FC = () => {
                 <Icon name="tune" size={16} color="#FFFFFF" />
               </LinearGradient>
               <Text style={styles.modernSectionTitle}>
-                Sources EPG Manuelles
+                {tEpg('manualEPGSources')}
               </Text>
             </View>
           </View>
@@ -614,7 +609,7 @@ const TVGuideSettingsScreen: React.FC = () => {
             end={{x: 1, y: 1}}>
             <View style={styles.unifiedStatContent}>
               <View style={styles.statInfo}>
-                <Text style={styles.statLabel}>Sources assignées</Text>
+                <Text style={styles.statLabel}>{tEpg('assignedSources')}</Text>
                 <View style={styles.ratioContainer}>
                   <Text style={styles.ratioValue}>
                     <Text style={styles.ratioActive}>
@@ -657,7 +652,7 @@ const TVGuideSettingsScreen: React.FC = () => {
                 <View style={styles.actionButtonContent}>
                   <Icon name="tune" size={14} color="#FFFFFF" />
                   <Text style={styles.modernActionButtonText}>
-                    Gérer les Sources
+                    {tEpg('manageSources')}
                   </Text>
                 </View>
               </LinearGradient>
@@ -675,7 +670,7 @@ const TVGuideSettingsScreen: React.FC = () => {
                 <View style={styles.actionButtonContent}>
                   <Icon name="playlist-add" size={14} color="#FFFFFF" />
                   <Text style={styles.modernActionButtonText}>
-                    Assigner aux Playlists
+                    {tEpg('assignToPlaylists')}
                   </Text>
                 </View>
               </LinearGradient>
@@ -683,8 +678,7 @@ const TVGuideSettingsScreen: React.FC = () => {
           </View>
 
           <Text style={styles.modernHelpText}>
-            Gérez vos sources EPG manuelles et assignez-les à des playlists
-            spécifiques pour optimiser la précision du guide TV.
+            {tEpg('manualEPGHelpText')}
           </Text>
         </LinearGradient>
 
@@ -702,7 +696,7 @@ const TVGuideSettingsScreen: React.FC = () => {
                 style={styles.sectionIcon}>
                 <Icon name="build" size={16} color="#FFFFFF" />
               </LinearGradient>
-              <Text style={styles.modernSectionTitle}>Actions EPG</Text>
+              <Text style={styles.modernSectionTitle}>{tEpg('epgActions')}</Text>
             </View>
           </View>
 
@@ -712,7 +706,7 @@ const TVGuideSettingsScreen: React.FC = () => {
               <View style={styles.progressHeader}>
                 <ActivityIndicator size="small" color="#F44336" />
                 <Text style={styles.progressTitle}>
-                  Suppression du cache EPG...
+                  {tEpg('deletingCache')}
                 </Text>
               </View>
               <View style={styles.modernProgressBar}>
@@ -754,7 +748,7 @@ const TVGuideSettingsScreen: React.FC = () => {
                     <Icon name="delete-sweep" size={14} color="#FFFFFF" />
                   )}
                   <Text style={styles.modernActionButtonText}>
-                    {isClearingCache ? 'Suppression...' : 'Vider le Cache'}
+                    {isClearingCache ? tEpg('clearing') : tEpg('clearCache')}
                   </Text>
                 </View>
               </LinearGradient>
@@ -776,7 +770,7 @@ const TVGuideSettingsScreen: React.FC = () => {
                 style={styles.sectionIcon}>
                 <Icon name="info-outline" size={16} color="#FFFFFF" />
               </LinearGradient>
-              <Text style={styles.modernSectionTitle}>Informations</Text>
+              <Text style={styles.modernSectionTitle}>{tSettings('information')}</Text>
             </View>
           </View>
 
@@ -790,13 +784,11 @@ const TVGuideSettingsScreen: React.FC = () => {
               <View style={styles.infoCardHeader}>
                 <Icon name="help-outline" size={14} color="#4CAF50" />
                 <Text style={styles.modernInfoTitle}>
-                  Qu'est-ce que l'EPG ?
+                  {tEpg('whatIsEPG')}
                 </Text>
               </View>
               <Text style={styles.modernInfoText}>
-                L'EPG (Electronic Program Guide) est un guide électronique des
-                programmes qui affiche les informations sur les émissions TV
-                actuelles et à venir.
+                {tEpg('whatIsEPGDescription')}
               </Text>
             </LinearGradient>
 
@@ -809,7 +801,7 @@ const TVGuideSettingsScreen: React.FC = () => {
               <View style={styles.infoCardHeader}>
                 <Icon name="priority-high" size={14} color="#FF9800" />
                 <Text style={styles.modernInfoTitle}>
-                  Priorités EPG automatiques
+                  {tEpg('epgPriorities')}
                 </Text>
               </View>
               <View style={styles.priorityList}>
@@ -822,7 +814,7 @@ const TVGuideSettingsScreen: React.FC = () => {
                     <Text style={styles.priorityNumber}>1</Text>
                   </View>
                   <Text style={styles.priorityText}>
-                    EPG intégré playlist (url-tvg)
+                    {tEpg('integratedPlaylistEPG')}
                   </Text>
                 </View>
                 <View style={styles.priorityItem}>
@@ -834,7 +826,7 @@ const TVGuideSettingsScreen: React.FC = () => {
                     <Text style={styles.priorityNumber}>2</Text>
                   </View>
                   <Text style={styles.priorityText}>
-                    EPG manuel assigné par utilisateur
+                    {tEpg('manualAssignedEPG')}
                   </Text>
                 </View>
                 <View style={styles.priorityItem}>
@@ -846,7 +838,7 @@ const TVGuideSettingsScreen: React.FC = () => {
                     <Text style={styles.priorityNumber}>3</Text>
                   </View>
                   <Text style={styles.priorityText}>
-                    EPG global (solution de secours)
+                    {tEpg('globalEPG')}
                   </Text>
                 </View>
                 <View style={styles.priorityItem}>
@@ -857,7 +849,7 @@ const TVGuideSettingsScreen: React.FC = () => {
                     ]}>
                     <Text style={styles.priorityNumber}>4</Text>
                   </View>
-                  <Text style={styles.priorityText}>Aucun EPG</Text>
+                  <Text style={styles.priorityText}>{tEpg('noEPG')}</Text>
                 </View>
               </View>
             </LinearGradient>
@@ -868,40 +860,40 @@ const TVGuideSettingsScreen: React.FC = () => {
       {/* Dialogues modernes */}
       <ModernDialog
         visible={showDownloadDialog}
-        title="EPG Global"
-        message="Le téléchargement du guide EPG global va commencer. Cette opération peut prendre quelques minutes."
+        title={tEpg('automaticEPGGlobal')}
+        message={tEpg('downloadEPGMessage')}
         icon="file-download"
         iconColor="#4A90E2"
         buttons={[
-          {text: 'Annuler', style: 'cancel', onPress: () => {}},
-          {text: 'Télécharger', onPress: () => startEPGDownload()},
+          {text: tCommon('cancel'), style: 'cancel', onPress: () => {}},
+          {text: tEpg('downloadStarting'), onPress: () => startEPGDownload()},
         ]}
         onClose={() => setShowDownloadDialog(false)}
       />
 
       <ModernDialog
         visible={showRefreshDialog}
-        title="Actualiser EPG"
-        message="Voulez-vous actualiser toutes les données EPG ?"
+        title={tEpg('refreshEPGGlobal')}
+        message={tEpg('refreshEPGMessage')}
         icon="refresh"
         iconColor="#FF9800"
         buttons={[
-          {text: 'Annuler', style: 'cancel', onPress: () => {}},
-          {text: 'Actualiser', onPress: () => executeRefreshEPG()},
+          {text: tCommon('cancel'), style: 'cancel', onPress: () => {}},
+          {text: tEpg('refreshStarting'), onPress: () => executeRefreshEPG()},
         ]}
         onClose={() => setShowRefreshDialog(false)}
       />
 
       <ModernDialog
         visible={showClearCacheDialog}
-        title="Attention"
-        message="Cette action supprimera toutes les données EPG en cache. Elles devront être retéléchargées."
+        title={tCommon('attention')}
+        message={tEpg('clearCacheMessage')}
         icon="warning"
         iconColor="#F44336"
         buttons={[
-          {text: 'Annuler', style: 'cancel', onPress: () => {}},
+          {text: tCommon('cancel'), style: 'cancel', onPress: () => {}},
           {
-            text: 'Supprimer',
+            text: tEpg('clearCacheWarning'),
             style: 'destructive',
             onPress: () => executeClearCache(),
           },
@@ -912,11 +904,11 @@ const TVGuideSettingsScreen: React.FC = () => {
       {/* ModernDialog de succès pour actions comme vider le cache */}
       <ModernDialog
         visible={showSuccessDialog}
-        title="Action Terminée"
+        title={tEpg('actionCompleted')}
         message={successMessage}
         icon="check-circle"
         iconColor="#4CAF50"
-        buttons={[{text: 'Parfait !', onPress: () => {}}]}
+        buttons={[{text: tCommon('perfect'), onPress: () => {}}]}
         onClose={() => setShowSuccessDialog(false)}
       />
     </LinearGradient>
