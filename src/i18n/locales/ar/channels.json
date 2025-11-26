@@ -38,5 +38,13 @@
   "all": "الكل",
   "selectAll": "الكل",
   "deselectAll": "لا شيء",
-  "search": "بحث"
+  "search": "بحث",
+  "allCategories": "جميع الفئات",
+  "recentlyAdded": "أضيف مؤخراً",
+  "recentlyWatched": "شوهد مؤخراً",
+  "loading": "جاري التحميل...",
+  "noMoviesAvailable": "لا توجد أفلام متاحة",
+  "noSeriesAvailable": "لا توجد مسلسلات متاحة",
+  "tryAnotherCategory": "جرب فئة أخرى",
+  "checkConnectionOrPlaylist": "تحقق من اتصالك أو قائمة التشغيل"
 }

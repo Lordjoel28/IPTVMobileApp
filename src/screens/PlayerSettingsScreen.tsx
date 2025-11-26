@@ -16,6 +16,7 @@ import SystemNavigationBar from 'react-native-system-navigation-bar';
 import type {RootStackParamList} from '../../App';
 import {useThemeColors} from '../contexts/ThemeContext';
 import {useI18n} from '../hooks/useI18n';
+import {useUISettings} from '../stores/UIStore';
 import {playerManager, type PlayerType} from '../services/PlayerManager';
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
@@ -35,6 +36,7 @@ const PlayerSettingsScreen: React.FC = () => {
   const {t: tCommon} = useI18n('common');
   const {t: tSettings} = useI18n('settings');
   const {t: tPlayer} = useI18n('player');
+  const { getScaledTextSize } = useUISettings();
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerType>('default');
 
   const playerOptions: PlayerOption[] = [
@@ -56,6 +58,7 @@ const PlayerSettingsScreen: React.FC = () => {
 
   useEffect(() => {
     SystemNavigationBar.immersive();
+    console.log(`🎨 [PlayerSettings] Text scale: ${getScaledTextSize(20)}`);
     loadPlayerPreference();
     return () => {
       SystemNavigationBar.navigationShow();
@@ -105,10 +108,11 @@ const PlayerSettingsScreen: React.FC = () => {
                 style={[
                   styles.optionTitle,
                   isSelected && styles.optionTitleSelected,
+                  {fontSize: getScaledTextSize(16)},
                 ]}>
                 {option.name}
               </Text>
-              <Text style={styles.optionDescription}>{option.description}</Text>
+              <Text style={[styles.optionDescription, {fontSize: getScaledTextSize(13)}]}>{option.description}</Text>
             </View>
           </View>
           <View style={styles.radioContainer}>
@@ -140,7 +144,7 @@ const PlayerSettingsScreen: React.FC = () => {
           onPress={() => navigation.goBack()}>
           <Icon name="arrow-back" size={24} color={colors.text.primary} />
         </Pressable>
-        <Text style={styles.headerTitle}>{tPlayer('playerScreen')}</Text>
+        <Text style={[styles.headerTitle, {fontSize: getScaledTextSize(22)}]}>{tPlayer('playerScreen')}</Text>
       </View>
 
       <ScrollView
@@ -148,10 +152,10 @@ const PlayerSettingsScreen: React.FC = () => {
         contentContainerStyle={styles.scrollContent}>
         <View style={styles.sectionHeader}>
           <Icon name="play-circle-outline" size={24} color={colors.accent.primary} />
-          <Text style={styles.sectionTitle}>{tPlayer('selectPlayer')}</Text>
+          <Text style={[styles.sectionTitle, {fontSize: getScaledTextSize(18)}]}>{tPlayer('selectPlayer')}</Text>
         </View>
 
-        <Text style={styles.sectionDescription}>
+        <Text style={[styles.sectionDescription, {fontSize: getScaledTextSize(14)}]}>
           {tPlayer('selectPlayerDescription')}
         </Text>
 
@@ -161,7 +165,7 @@ const PlayerSettingsScreen: React.FC = () => {
 
         <View style={styles.infoBox}>
           <Icon name="info-outline" size={20} color={colors.accent.info} />
-          <Text style={styles.infoText}>
+          <Text style={[styles.infoText, {fontSize: getScaledTextSize(13)}]}>
             {tPlayer('playerInfo')}
           </Text>
         </View>

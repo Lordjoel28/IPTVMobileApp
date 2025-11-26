@@ -5,9 +5,12 @@
 
 import { CacheManager, CacheSettings } from './CacheManager';
 import { CacheService } from './CacheService';
-import { SmartCacheService } from './SmartCacheService';
+import SmartCacheService from './SmartCacheService'; // Instance exportée
 import { ImageCacheService } from './ImageCacheService';
-import { EPGCacheManager } from './epg/EPGCacheManager';
+import EPGCacheManager from './epg/EPGCacheManager'; // Objet exporté
+import AutoClearService from './AutoClearService'; // Service nettoyage auto
+import HLSCacheService from './HLSCacheService'; // Service cache HLS
+import DNSCacheService from './DNSCacheService'; // Service cache DNS
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Alert } from 'react-native';
 
@@ -53,6 +56,11 @@ class CacheMetricsService {
   private monitoringInterval: NodeJS.Timeout | null = null;
   private readonly MONITORING_INTERVAL_MS = 120000; // 2 minutes (optimisé)
 
+  // Cache des métriques pour éviter recalculs constants (60s)
+  private cachedMetrics: CacheMetrics | null = null;
+  private cacheTimestamp: number = 0;
+  private readonly CACHE_DURATION_MS = 60000; // 60 secondes
+
   private constructor() {}
 
   public static getInstance(): CacheMetricsService {
@@ -72,6 +80,11 @@ class CacheMetricsService {
 
     console.log('📊 [CacheMetricsService] Démarrage monitoring cache...');
 
+    // Démarrer le service de nettoyage automatique
+    AutoClearService.start().catch(error => {
+      console.error('📊 [CacheMetricsService] Erreur démarrage AutoClear:', error);
+    });
+
     // Vérification immédiate
     this.checkCacheLimits();
 
@@ -88,6 +101,10 @@ class CacheMetricsService {
     if (this.monitoringInterval) {
       clearInterval(this.monitoringInterval);
       this.monitoringInterval = null;
+
+      // Arrêter le service de nettoyage automatique
+      AutoClearService.stop();
+
       console.log('📊 [CacheMetricsService] Monitoring arrêté');
     }
   }
@@ -106,18 +123,29 @@ class CacheMetricsService {
   }
 
   /**
-   * Calcule des métriques détaillées du cache (optimisé)
+   * Invalide le cache des métriques pour forcer un recalcul
+   */
+  public invalidateCache(): void {
+    this.cachedMetrics = null;
+    this.cacheTimestamp = 0;
+  }
+
+  /**
+   * Calcule des métriques détaillées du cache (optimisé avec cache 60s)
    */
   public async calculateMetrics(): Promise<CacheMetrics> {
     try {
-      // Récupérer la limite configurée
-      const cacheSettings = await CacheManager.getSettings();
+      // Vérifier le cache d'abord (performances)
+      const now = Date.now();
+      if (this.cachedMetrics && (now - this.cacheTimestamp < this.CACHE_DURATION_MS)) {
+        return this.cachedMetrics;
+      }
 
-      // Calcul optimisé : éviter trop de logs et d'opérations
+      // ÉTAPE 1: Calculer la taille TOTALE réelle depuis AsyncStorage (échantillonnage)
       const keys = await AsyncStorage.getAllKeys();
       let totalSizeBytes = 0;
 
-      // Limiter le nombre d'opérations pour les performances
+      // Limiter le nombre d'opérations pour les performances (50 clés)
       const maxKeysToProcess = Math.min(keys.length, 50);
       const keysToProcess = keys.slice(0, maxKeysToProcess);
 
@@ -128,7 +156,7 @@ class CacheMetricsService {
             totalSizeBytes += value.length;
           }
         } catch (error) {
-          // Ignorer silencieusement les erreurs pour les performances
+          // Ignorer silencieusement les erreurs
         }
       }
 
@@ -136,26 +164,73 @@ class CacheMetricsService {
       const avgKeySize = keysToProcess.length > 0 ? totalSizeBytes / keysToProcess.length : 0;
       const estimatedTotalSize = avgKeySize * keys.length;
       const totalSizeMB = estimatedTotalSize / (1024 * 1024);
-
-      // Utiliser la taille réelle ou un minimum pour l'affichage
       const finalSize = Math.max(totalSizeMB, 0.1);
 
-      return {
+      // ÉTAPE 2: Calculer le breakdown détaillé (en parallèle pour performances)
+      const [cacheServiceMetrics, imageCacheMetrics, epgCacheMetrics, otherMetrics] = await Promise.all([
+        this.getCacheServiceMetrics(),
+        this.getImageCacheMetrics(),
+        this.getEPGCacheMetrics(),
+        this.getOtherStorageMetrics(),
+      ]);
+
+      // Si le breakdown est vide, utiliser des proportions de finalSize
+      const breakdownTotal =
+        cacheServiceMetrics.l1SizeMB + cacheServiceMetrics.l2SizeMB +
+        imageCacheMetrics.memorySizeMB + imageCacheMetrics.diskSizeMB +
+        epgCacheMetrics.dbSizeMB + epgCacheMetrics.memorySizeMB +
+        otherMetrics.settingsSizeMB + otherMetrics.storageSizeMB;
+
+      // Si breakdown trop faible comparé au total, utiliser des proportions
+      let finalBreakdown = {
+        cacheService: cacheServiceMetrics,
+        imageCache: imageCacheMetrics,
+        epgCache: epgCacheMetrics,
+        other: otherMetrics,
+      };
+
+      if (breakdownTotal < finalSize * 0.5) {
+        // Utiliser des proportions réalistes basées sur finalSize
+        finalBreakdown = {
+          cacheService: {
+            l1SizeMB: finalSize * 0.2,
+            l2SizeMB: finalSize * 0.1,
+            entries: keys.length,
+          },
+          imageCache: {
+            memorySizeMB: finalSize * 0.4,
+            diskSizeMB: finalSize * 0.2,
+            entries: Math.floor(keys.length * 0.3),
+          },
+          epgCache: {
+            dbSizeMB: finalSize * 0.05,
+            memorySizeMB: finalSize * 0.02,
+            programs: 150,
+          },
+          other: {
+            settingsSizeMB: Math.min(0.5, finalSize * 0.01),
+            storageSizeMB: finalSize * 0.02,
+          },
+        };
+      }
+
+      const metrics: CacheMetrics = {
         totalSizeMB: finalSize,
-        breakdown: {
-          cacheService: { l1SizeMB: finalSize * 0.2, l2SizeMB: finalSize * 0.1, entries: keys.length },
-          imageCache: { memorySizeMB: finalSize * 0.4, diskSizeMB: finalSize * 0.2, entries: Math.floor(keys.length * 0.3) },
-          epgCache: { dbSizeMB: finalSize * 0.05, memorySizeMB: finalSize * 0.02, programs: 150 },
-          other: { settingsSizeMB: 0.5, storageSizeMB: finalSize * 0.03 },
-        },
+        breakdown: finalBreakdown,
         performance: {
-          hitRate: 75,
-          evictions: 0,
-          compressionSavingsMB: 2.3,
+          hitRate: await this.calculateHitRate(),
+          evictions: await this.getTotalEvictions(),
+          compressionSavingsMB: await this.calculateCompressionSavings(),
         },
       };
-      } catch (error) {
-      // Éviter les logs d'erreur fréquents pour les performances
+
+      // Mettre en cache le résultat
+      this.cachedMetrics = metrics;
+      this.cacheTimestamp = now;
+
+      return metrics;
+    } catch (error) {
+      console.error('📊 [CacheMetrics] Erreur calcul:', error);
       return this.getEmptyMetrics();
     }
   }
@@ -551,36 +626,60 @@ class CacheMetricsService {
   }
 
   /**
-   * Calcule le hit rate global
+   * Calcule le hit rate global (optimisé)
    */
   private async calculateHitRate(): Promise<number> {
     try {
-      // TODO: Agréger les hit rates de tous les services
-      return 75; // Placeholder - à implémenter avec les vrais services
+      const cacheInstance = CacheService.getInstance();
+      const stats = cacheInstance.getStats();
+
+      // Calculer le hit rate basé sur les stats L1 et L2
+      const totalHits = stats.L1.hits + stats.L2.hits;
+      const totalMisses = stats.L1.misses + stats.L2.misses;
+      const totalRequests = totalHits + totalMisses;
+
+      if (totalRequests === 0) {
+        return 0; // Pas encore de données
+      }
+
+      return Math.round((totalHits / totalRequests) * 100);
     } catch (error) {
       return 0;
     }
   }
 
   /**
-   * Total des évictions
+   * Total des évictions (optimisé)
    */
   private async getTotalEvictions(): Promise<number> {
     try {
-      // TODO: Agréger les évictions de tous les services
-      return 0;
+      const cacheInstance = CacheService.getInstance();
+      const stats = cacheInstance.getStats();
+
+      // Sommer les évictions L1 et L2
+      return stats.L1.evictions + stats.L2.evictions;
     } catch (error) {
       return 0;
     }
   }
 
   /**
-   * Économies grâce à la compression
+   * Économies grâce à la compression (estimation basique)
    */
   private async calculateCompressionSavings(): Promise<number> {
     try {
-      // TODO: Calculer les économies réelles de compression
-      return 0;
+      const settings = await CacheManager.getSettings();
+
+      // Si compression désactivée, pas d'économies
+      if (!settings.compressionEnabled) {
+        return 0;
+      }
+
+      // Estimation : compression peut économiser ~20-30% en moyenne
+      const totalSize = await this.getTotalCacheSize();
+      const estimatedSavings = totalSize * 0.25; // 25% d'économies moyennes
+
+      return Math.round(estimatedSavings * 10) / 10; // Arrondi à 1 décimale
     } catch (error) {
       return 0;
     }
@@ -650,6 +749,118 @@ class CacheMetricsService {
    */
   public async forceCheckLimits(): Promise<void> {
     await this.checkCacheLimits();
+  }
+
+  /**
+   * Vide tous les caches de l'application
+   * ⚠️ NE touche PAS aux données utilisateur (paramètres, playlists, favoris, profils)
+   */
+  public async clearAllCaches(): Promise<{success: boolean; clearedMB: number; error?: string}> {
+    console.log('🗑️ [CacheMetrics] Début vidage de tous les caches...');
+
+    try {
+      let totalClearedMB = 0;
+
+      // 1. Vider SmartCacheService (inclut L1 + L2 + L3)
+      try {
+        await SmartCacheService.clear(); // Instance exportée directement
+        console.log('✅ [CacheMetrics] SmartCacheService vidé (L1+L2+L3)');
+        totalClearedMB += 5; // Estimation
+      } catch (error) {
+        console.error('❌ [CacheMetrics] Erreur vidage SmartCache:', error);
+      }
+
+      // 2. Vider ImageCacheService
+      try {
+        const imageCache = ImageCacheService.getInstance();
+        await imageCache.clearCache();
+        console.log('✅ [CacheMetrics] ImageCacheService vidé');
+        totalClearedMB += 10; // Estimation
+      } catch (error) {
+        console.error('❌ [CacheMetrics] Erreur vidage ImageCache:', error);
+      }
+
+      // 3. Vider EPGCacheManager
+      try {
+        await EPGCacheManager.clearCache(); // Objet exporté directement
+        console.log('✅ [CacheMetrics] EPGCacheManager vidé');
+        totalClearedMB += 2; // Estimation
+      } catch (error) {
+        console.error('❌ [CacheMetrics] Erreur vidage EPGCache:', error);
+      }
+
+      // 3.5. Vider HLSCacheService (segments vidéo)
+      try {
+        const hlsResult = await HLSCacheService.clearCache();
+        if (hlsResult.success) {
+          console.log(`✅ [CacheMetrics] HLS Cache vidé: ${hlsResult.freedMB.toFixed(1)} MB`);
+          totalClearedMB += hlsResult.freedMB;
+        }
+      } catch (error) {
+        console.error('❌ [CacheMetrics] Erreur vidage HLSCache:', error);
+      }
+
+      // 3.6. Vider DNSCacheService
+      try {
+        const dnsResult = await DNSCacheService.clearCache();
+        if (dnsResult.success) {
+          console.log(`✅ [CacheMetrics] DNS Cache vidé: ${dnsResult.entriesCleared} entrées`);
+        }
+      } catch (error) {
+        console.error('❌ [CacheMetrics] Erreur vidage DNSCache:', error);
+      }
+
+      // 4. Vider les clés AsyncStorage de cache (SANS toucher aux données utilisateur)
+      try {
+        const allKeys = await AsyncStorage.getAllKeys();
+
+        // Filtrer UNIQUEMENT les clés de cache (pas les données utilisateur)
+        const cacheKeys = allKeys.filter(key =>
+          key.startsWith('@cache_') ||
+          key.startsWith('@image_') ||
+          key.startsWith('@epg_') ||
+          key.includes('_cache') ||
+          key.includes('_cached')
+        );
+
+        // Exclure explicitement les données importantes
+        const safeToDelete = cacheKeys.filter(key =>
+          !key.includes('settings') &&
+          !key.includes('playlist') &&
+          !key.includes('favorite') &&
+          !key.includes('profile') &&
+          !key.includes('user') &&
+          !key.includes('history') &&
+          !key.includes('theme') &&
+          !key.includes('language')
+        );
+
+        if (safeToDelete.length > 0) {
+          await AsyncStorage.multiRemove(safeToDelete);
+          console.log(`✅ [CacheMetrics] ${safeToDelete.length} clés AsyncStorage supprimées`);
+          totalClearedMB += safeToDelete.length * 0.01; // Estimation
+        }
+      } catch (error) {
+        console.error('❌ [CacheMetrics] Erreur vidage AsyncStorage:', error);
+      }
+
+      // 5. Invalider le cache des métriques pour forcer un recalcul
+      this.invalidateCache();
+
+      console.log(`✅ [CacheMetrics] Nettoyage terminé: ~${totalClearedMB.toFixed(1)}MB libérés`);
+
+      return {
+        success: true,
+        clearedMB: totalClearedMB,
+      };
+    } catch (error) {
+      console.error('❌ [CacheMetrics] Erreur critique lors du vidage:', error);
+      return {
+        success: false,
+        clearedMB: 0,
+        error: error instanceof Error ? error.message : 'Erreur inconnue',
+      };
+    }
   }
 
   /**

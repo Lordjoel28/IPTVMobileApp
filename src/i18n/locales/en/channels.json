@@ -38,5 +38,13 @@
   "all": "ALL",
   "selectAll": "All",
   "deselectAll": "None",
-  "search": "Search"
+  "search": "Search",
+  "allCategories": "All categories",
+  "recentlyAdded": "Recently added",
+  "recentlyWatched": "Recently watched",
+  "loading": "Loading...",
+  "noMoviesAvailable": "No movies available",
+  "noSeriesAvailable": "No series available",
+  "tryAnotherCategory": "Try another category",
+  "checkConnectionOrPlaylist": "Check your connection or your playlist"
 }

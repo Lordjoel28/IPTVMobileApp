@@ -21,6 +21,7 @@ import {XtreamEPG, FullEPGData, EPGChannel} from '../services/XtreamEPGService';
 import {EPGCacheManager} from '../services/epg/EPGCacheManager';
 import {ModernDialog} from '../components/ModernDialog';
 import {useI18n} from '../hooks/useI18n';
+import {useUISettings} from '../stores/UIStore';
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -39,6 +40,7 @@ const TVGuideSettingsScreen: React.FC = () => {
   const {t: tCommon} = useI18n('common');
   const {t: tSettings} = useI18n('settings');
   const {t: tEpg} = useI18n('epg');
+  const { getScaledTextSize } = useUISettings();
   const [epgGlobalStatus, setEpgGlobalStatus] = useState(tEpg('notDownloaded'));
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
@@ -67,6 +69,7 @@ const TVGuideSettingsScreen: React.FC = () => {
 
   // Effet d'initialisation - charge les stats EPG une seule fois
   useEffect(() => {
+    console.log(`🎨 [TVGuideSettings] Text scale: ${getScaledTextSize(20)}`);
     loadEPGStats();
   }, []);
 
@@ -403,7 +406,7 @@ const TVGuideSettingsScreen: React.FC = () => {
           onPress={() => navigation.goBack()}>
           <Icon name="arrow-back-ios" size={20} color="#FFFFFF" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{tEpg('tvGuide')}</Text>
+        <Text style={[styles.headerTitle, {fontSize: getScaledTextSize(18)}]}>{tEpg('tvGuide')}</Text>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -424,7 +427,7 @@ const TVGuideSettingsScreen: React.FC = () => {
                 style={styles.sectionIcon}>
                 <Icon name="file-download" size={16} color="#FFFFFF" />
               </LinearGradient>
-              <Text style={styles.modernSectionTitle}>
+              <Text style={[styles.modernSectionTitle, {fontSize: getScaledTextSize(16)}]}>
                 {tEpg('automaticEPGGlobal')}
               </Text>
             </View>
@@ -439,7 +442,7 @@ const TVGuideSettingsScreen: React.FC = () => {
             end={{x: 1, y: 1}}>
             <View style={styles.statusCardContent}>
               <View style={styles.statusInfo}>
-                <Text style={styles.statusTitle}>{tCommon('status')}</Text>
+                <Text style={[styles.statusTitle, {fontSize: getScaledTextSize(14)}]}>{tCommon('status')}</Text>
                 <View style={styles.statusWithIcon}>
                   {isDownloading ? (
                     <>
@@ -452,6 +455,7 @@ const TVGuideSettingsScreen: React.FC = () => {
                         style={[
                           styles.statusDescription,
                           styles.statusInProgress,
+                          {fontSize: getScaledTextSize(12)},
                         ]}>
                         {tEpg('inProgress')}
                       </Text>
@@ -468,6 +472,7 @@ const TVGuideSettingsScreen: React.FC = () => {
                         style={[
                           styles.statusDescription,
                           styles.statusSuccessText,
+                          {fontSize: getScaledTextSize(12)},
                         ]}>
                         {tEpg('upToDate')}
                       </Text>
@@ -484,6 +489,7 @@ const TVGuideSettingsScreen: React.FC = () => {
                         style={[
                           styles.statusDescription,
                           styles.statusErrorText,
+                          {fontSize: getScaledTextSize(12)},
                         ]}>
                         {tCommon('error')}
                       </Text>
@@ -500,6 +506,7 @@ const TVGuideSettingsScreen: React.FC = () => {
                         style={[
                           styles.statusDescription,
                           styles.statusInactive,
+                          {fontSize: getScaledTextSize(12)},
                         ]}>
                         {tEpg('notDownloaded')}
                       </Text>
@@ -526,7 +533,7 @@ const TVGuideSettingsScreen: React.FC = () => {
                     ]}
                   />
                 </View>
-                <Text style={styles.modernProgressText}>
+                <Text style={[styles.modernProgressText, {fontSize: getScaledTextSize(10)}]}>
                   {Math.round(downloadProgress)}%
                 </Text>
               </View>
@@ -564,7 +571,7 @@ const TVGuideSettingsScreen: React.FC = () => {
                     color="#FFFFFF"
                   />
                 )}
-                <Text style={styles.modernActionButtonText}>
+                <Text style={[styles.modernActionButtonText, {fontSize: getScaledTextSize(13)}]}>
                   {isDownloading
                     ? tEpg('downloading')
                     : epgGlobalStatus === tEpg('upToDate')
@@ -575,7 +582,7 @@ const TVGuideSettingsScreen: React.FC = () => {
             </LinearGradient>
           </TouchableOpacity>
 
-          <Text style={styles.modernHelpText}>
+          <Text style={[styles.modernHelpText, {fontSize: getScaledTextSize(10)}]}>
             {tEpg('epgGlobalHelpText')}
           </Text>
         </LinearGradient>
@@ -594,7 +601,7 @@ const TVGuideSettingsScreen: React.FC = () => {
                 style={styles.sectionIcon}>
                 <Icon name="tune" size={16} color="#FFFFFF" />
               </LinearGradient>
-              <Text style={styles.modernSectionTitle}>
+              <Text style={[styles.modernSectionTitle, {fontSize: getScaledTextSize(16)}]}>
                 {tEpg('manualEPGSources')}
               </Text>
             </View>
@@ -609,14 +616,14 @@ const TVGuideSettingsScreen: React.FC = () => {
             end={{x: 1, y: 1}}>
             <View style={styles.unifiedStatContent}>
               <View style={styles.statInfo}>
-                <Text style={styles.statLabel}>{tEpg('assignedSources')}</Text>
+                <Text style={[styles.statLabel, {fontSize: getScaledTextSize(10)}]}>{tEpg('assignedSources')}</Text>
                 <View style={styles.ratioContainer}>
-                  <Text style={styles.ratioValue}>
-                    <Text style={styles.ratioActive}>
+                  <Text style={[styles.ratioValue, {fontSize: getScaledTextSize(16)}]}>
+                    <Text style={[styles.ratioActive, {fontSize: getScaledTextSize(18)}]}>
                       {epgStats.manualCount}
                     </Text>
-                    <Text style={styles.ratioSeparator}> / </Text>
-                    <Text style={styles.ratioTotal}>
+                    <Text style={[styles.ratioSeparator, {fontSize: getScaledTextSize(14)}]}> / </Text>
+                    <Text style={[styles.ratioTotal, {fontSize: getScaledTextSize(16)}]}>
                       {epgStats.totalSources}
                     </Text>
                   </Text>
@@ -651,7 +658,7 @@ const TVGuideSettingsScreen: React.FC = () => {
                 end={{x: 1, y: 1}}>
                 <View style={styles.actionButtonContent}>
                   <Icon name="tune" size={14} color="#FFFFFF" />
-                  <Text style={styles.modernActionButtonText}>
+                  <Text style={[styles.modernActionButtonText, {fontSize: getScaledTextSize(13)}]}>
                     {tEpg('manageSources')}
                   </Text>
                 </View>
@@ -669,7 +676,7 @@ const TVGuideSettingsScreen: React.FC = () => {
                 end={{x: 1, y: 1}}>
                 <View style={styles.actionButtonContent}>
                   <Icon name="playlist-add" size={14} color="#FFFFFF" />
-                  <Text style={styles.modernActionButtonText}>
+                  <Text style={[styles.modernActionButtonText, {fontSize: getScaledTextSize(13)}]}>
                     {tEpg('assignToPlaylists')}
                   </Text>
                 </View>
@@ -677,7 +684,7 @@ const TVGuideSettingsScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.modernHelpText}>
+          <Text style={[styles.modernHelpText, {fontSize: getScaledTextSize(10)}]}>
             {tEpg('manualEPGHelpText')}
           </Text>
         </LinearGradient>
@@ -696,7 +703,7 @@ const TVGuideSettingsScreen: React.FC = () => {
                 style={styles.sectionIcon}>
                 <Icon name="build" size={16} color="#FFFFFF" />
               </LinearGradient>
-              <Text style={styles.modernSectionTitle}>{tEpg('epgActions')}</Text>
+              <Text style={[styles.modernSectionTitle, {fontSize: getScaledTextSize(16)}]}>{tEpg('epgActions')}</Text>
             </View>
           </View>
 
@@ -705,7 +712,7 @@ const TVGuideSettingsScreen: React.FC = () => {
             <View style={styles.clearProgressContainer}>
               <View style={styles.progressHeader}>
                 <ActivityIndicator size="small" color="#F44336" />
-                <Text style={styles.progressTitle}>
+                <Text style={[styles.progressTitle, {fontSize: getScaledTextSize(14)}]}>
                   {tEpg('deletingCache')}
                 </Text>
               </View>
@@ -717,7 +724,7 @@ const TVGuideSettingsScreen: React.FC = () => {
                   ]}
                 />
               </View>
-              <Text style={styles.modernProgressText}>{clearProgress}%</Text>
+              <Text style={[styles.modernProgressText, {fontSize: getScaledTextSize(10)}]}>{clearProgress}%</Text>
             </View>
           )}
 
@@ -747,7 +754,7 @@ const TVGuideSettingsScreen: React.FC = () => {
                   ) : (
                     <Icon name="delete-sweep" size={14} color="#FFFFFF" />
                   )}
-                  <Text style={styles.modernActionButtonText}>
+                  <Text style={[styles.modernActionButtonText, {fontSize: getScaledTextSize(13)}]}>
                     {isClearingCache ? tEpg('clearing') : tEpg('clearCache')}
                   </Text>
                 </View>
@@ -770,7 +777,7 @@ const TVGuideSettingsScreen: React.FC = () => {
                 style={styles.sectionIcon}>
                 <Icon name="info-outline" size={16} color="#FFFFFF" />
               </LinearGradient>
-              <Text style={styles.modernSectionTitle}>{tSettings('information')}</Text>
+              <Text style={[styles.modernSectionTitle, {fontSize: getScaledTextSize(16)}]}>{tSettings('information')}</Text>
             </View>
           </View>
 
@@ -783,11 +790,11 @@ const TVGuideSettingsScreen: React.FC = () => {
               end={{x: 1, y: 1}}>
               <View style={styles.infoCardHeader}>
                 <Icon name="help-outline" size={14} color="#4CAF50" />
-                <Text style={styles.modernInfoTitle}>
+                <Text style={[styles.modernInfoTitle, {fontSize: getScaledTextSize(13)}]}>
                   {tEpg('whatIsEPG')}
                 </Text>
               </View>
-              <Text style={styles.modernInfoText}>
+              <Text style={[styles.modernInfoText, {fontSize: getScaledTextSize(11)}]}>
                 {tEpg('whatIsEPGDescription')}
               </Text>
             </LinearGradient>
@@ -800,7 +807,7 @@ const TVGuideSettingsScreen: React.FC = () => {
               end={{x: 1, y: 1}}>
               <View style={styles.infoCardHeader}>
                 <Icon name="priority-high" size={14} color="#FF9800" />
-                <Text style={styles.modernInfoTitle}>
+                <Text style={[styles.modernInfoTitle, {fontSize: getScaledTextSize(13)}]}>
                   {tEpg('epgPriorities')}
                 </Text>
               </View>
@@ -811,9 +818,9 @@ const TVGuideSettingsScreen: React.FC = () => {
                       styles.priorityBadge,
                       {backgroundColor: '#4CAF50'},
                     ]}>
-                    <Text style={styles.priorityNumber}>1</Text>
+                    <Text style={[styles.priorityNumber, {fontSize: getScaledTextSize(8)}]}>1</Text>
                   </View>
-                  <Text style={styles.priorityText}>
+                  <Text style={[styles.priorityText, {fontSize: getScaledTextSize(11)}]}>
                     {tEpg('integratedPlaylistEPG')}
                   </Text>
                 </View>
@@ -823,9 +830,9 @@ const TVGuideSettingsScreen: React.FC = () => {
                       styles.priorityBadge,
                       {backgroundColor: '#FF9800'},
                     ]}>
-                    <Text style={styles.priorityNumber}>2</Text>
+                    <Text style={[styles.priorityNumber, {fontSize: getScaledTextSize(8)}]}>2</Text>
                   </View>
-                  <Text style={styles.priorityText}>
+                  <Text style={[styles.priorityText, {fontSize: getScaledTextSize(11)}]}>
                     {tEpg('manualAssignedEPG')}
                   </Text>
                 </View>
@@ -835,9 +842,9 @@ const TVGuideSettingsScreen: React.FC = () => {
                       styles.priorityBadge,
                       {backgroundColor: '#2196F3'},
                     ]}>
-                    <Text style={styles.priorityNumber}>3</Text>
+                    <Text style={[styles.priorityNumber, {fontSize: getScaledTextSize(8)}]}>3</Text>
                   </View>
-                  <Text style={styles.priorityText}>
+                  <Text style={[styles.priorityText, {fontSize: getScaledTextSize(11)}]}>
                     {tEpg('globalEPG')}
                   </Text>
                 </View>
@@ -847,9 +854,9 @@ const TVGuideSettingsScreen: React.FC = () => {
                       styles.priorityBadge,
                       {backgroundColor: '#9E9E9E'},
                     ]}>
-                    <Text style={styles.priorityNumber}>4</Text>
+                    <Text style={[styles.priorityNumber, {fontSize: getScaledTextSize(8)}]}>4</Text>
                   </View>
-                  <Text style={styles.priorityText}>{tEpg('noEPG')}</Text>
+                  <Text style={[styles.priorityText, {fontSize: getScaledTextSize(11)}]}>{tEpg('noEPG')}</Text>
                 </View>
               </View>
             </LinearGradient>

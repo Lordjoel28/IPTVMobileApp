@@ -19,6 +19,7 @@ import playlistsFr from './locales/fr/playlists.json';
 import parentalFr from './locales/fr/parental.json';
 import epgFr from './locales/fr/epg.json';
 import themesFr from './locales/fr/themes.json';
+import speedtestFr from './locales/fr/speedtest.json';
 
 // Import EN
 import commonEn from './locales/en/common.json';
@@ -30,6 +31,7 @@ import playlistsEn from './locales/en/playlists.json';
 import parentalEn from './locales/en/parental.json';
 import epgEn from './locales/en/epg.json';
 import themesEn from './locales/en/themes.json';
+import speedtestEn from './locales/en/speedtest.json';
 
 // Import ES
 import commonEs from './locales/es/common.json';
@@ -41,6 +43,7 @@ import playlistsEs from './locales/es/playlists.json';
 import parentalEs from './locales/es/parental.json';
 import epgEs from './locales/es/epg.json';
 import themesEs from './locales/es/themes.json';
+import speedtestEs from './locales/es/speedtest.json';
 
 // Import AR
 import commonAr from './locales/ar/common.json';
@@ -52,6 +55,7 @@ import playlistsAr from './locales/ar/playlists.json';
 import parentalAr from './locales/ar/parental.json';
 import epgAr from './locales/ar/epg.json';
 import themesAr from './locales/ar/themes.json';
+import speedtestAr from './locales/ar/speedtest.json';
 
 // Initialiser immédiatement avec la langue par défaut
 i18n
@@ -69,6 +73,7 @@ i18n
         parental: parentalFr,
         epg: epgFr,
         themes: themesFr,
+        speedtest: speedtestFr,
       },
       en: {
         common: commonEn,
@@ -80,6 +85,7 @@ i18n
         parental: parentalEn,
         epg: epgEn,
         themes: themesEn,
+        speedtest: speedtestEn,
       },
       es: {
         common: commonEs,
@@ -91,6 +97,7 @@ i18n
         parental: parentalEs,
         epg: epgEs,
         themes: themesEs,
+        speedtest: speedtestEs,
       },
       ar: {
         common: commonAr,
@@ -102,6 +109,7 @@ i18n
         parental: parentalAr,
         epg: epgAr,
         themes: themesAr,
+        speedtest: speedtestAr,
       },
     },
 
@@ -123,6 +131,7 @@ i18n
       'parental',
       'epg',
       'themes',
+      'speedtest',
     ],
 
     // Interpolation

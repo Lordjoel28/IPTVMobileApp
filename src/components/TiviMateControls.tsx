@@ -17,6 +17,8 @@ interface TiviMateControlsProps {
   isFromMultiScreen: boolean;
   /** État du menu paramètres */
   showSettingsMenu: boolean;
+  /** Est-ce qu'on vient de l'autostart (interface simplifiée) */
+  isFromAutoStart: boolean;
 
   // Callbacks
   /** Callback bouton retour */
@@ -50,6 +52,7 @@ export const TiviMateControls: React.FC<TiviMateControlsProps> = ({
   isScreenLocked,
   isFromMultiScreen,
   showSettingsMenu,
+  isFromAutoStart,
   onBackPress,
   onFavoriteToggle,
   onCastStateChange,
@@ -99,30 +102,39 @@ export const TiviMateControls: React.FC<TiviMateControlsProps> = ({
             </View>
           </TouchableOpacity>
 
-          {channel?.category && (
+          {channel && (
             <Text style={styles.headerChannelCategory}>
-              {channel.category.toUpperCase()}
+              {channel.contentType === 'movie' || channel.contentType === 'series'
+                ? channel.name
+                : (channel.category ? channel.category.toUpperCase() : '')
+              }
             </Text>
           )}
         </View>
 
         <View style={styles.headerSpacer} />
 
-        <View style={styles.headerRightButtons}>
-          {/* Bouton Favoris */}
-          <TouchableOpacity
-            style={styles.headerIconButton}
-            onPress={onFavoriteToggle}
-            activeOpacity={0.7}>
-            <Icon
-              name={isChannelFavorite ? 'favorite' : 'favorite-border'}
-              size={22}
-              color={isChannelFavorite ? '#ff5252' : 'white'}
-            />
-          </TouchableOpacity>
+        {/* 🎯 HEADER SIMPLIFIÉ POUR AUTOSTART */}
+        {isFromAutoStart ? (
+          // Mode autostart : pas de boutons à droite (le retour est déjà à gauche)
+          <View style={styles.headerRightButtons} />
+        ) : (
+          // Mode normal : interface complète
+          <View style={styles.headerRightButtons}>
+            {/* Bouton Favoris */}
+            <TouchableOpacity
+              style={styles.headerIconButton}
+              onPress={onFavoriteToggle}
+              activeOpacity={0.7}>
+              <Icon
+                name={isChannelFavorite ? 'favorite' : 'favorite-border'}
+                size={22}
+                color={isChannelFavorite ? '#ff5252' : 'white'}
+              />
+            </TouchableOpacity>
 
-          {/* Bouton Cast - Désactivé si on vient du multiscreen */}
-          {!isFromMultiScreen && channel && (
+          {/* Bouton Cast - Désactivé si on vient du multiscreen ou si c'est un film/série */}
+          {!isFromMultiScreen && channel && (!channel.contentType || channel.contentType === 'live') && (
             <CastButton
               style={styles.headerIconButton}
               size={22}
@@ -173,6 +185,7 @@ export const TiviMateControls: React.FC<TiviMateControlsProps> = ({
             </View>
           </TouchableOpacity>
         </View>
+        )}
       </LinearGradient>
 
       {/* Center: Bouton Play/Pause SIMPLE */}

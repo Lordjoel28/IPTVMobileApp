@@ -448,9 +448,9 @@ export class PlaylistService {
    */
   async getAllPlaylists(): Promise<Playlist[]> {
     try {
-      console.log(
-        '📋 Chargement de toutes les playlists depuis WatermelonDB...',
-      );
+      // console.log(
+      //   '📋 Chargement de toutes les playlists depuis WatermelonDB...',
+      // );
 
       const database = (await import('../database')).default;
       const {Playlist: PlaylistModel} = await import('../database/models');
@@ -460,9 +460,9 @@ export class PlaylistService {
         .query()
         .fetch();
 
-      console.log(
-        `📋 ${watermelonPlaylists.length} playlists trouvées dans WatermelonDB`,
-      );
+      // console.log(
+      //   `📋 ${watermelonPlaylists.length} playlists trouvées dans WatermelonDB`,
+      // );
 
       return watermelonPlaylists.map(p => ({
         id: p.id,

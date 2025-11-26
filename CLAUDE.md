@@ -407,4 +407,43 @@ const MyScreen = () => {
 
 ---
 
+## ⚠️ RÈGLES DE SÉCURITÉ Git - INTERDICTIONS FORMELLES
+
+### **🚫 COMMANDES Git INTERDITES SANS AUTORISATION**
+
+**ABSOLUMENT INTERDIT - JAMAIS SANS DEMANDE EXPLICITE :**
+
+```bash
+# ❌ TOTALEMENT INTERDIT - Demander toujours l'autorisation préalable
+git checkout --
+git reset --hard
+git clean -fd
+git stash drop
+git branch -D
+git push --force
+git revert
+git rebase --interactive
+```
+
+**🛡️ RÈGLE D'OR :** Toujours demander explicitement l'autorisation avant toute commande Git qui modifie ou supprime :
+- Des fichiers non commités
+- L'historique des commits
+- Des branches
+- Des changements en cours
+
+**✅ COMMANDES AUTORISÉES :**
+- `git status` (visualisation)
+- `git diff` (visualisation)
+- `git log` (visualisation)
+- `git add` (préparation de commit)
+- `git commit` (création de commit)
+- `git branch` (création/listing)
+- `git checkout` (changement de branche SANS `--`)
+- `git merge` (fusion de branches)
+
+**💡 EXEMPLE DE DEMANDE CORRECTE :**
+> "Je voudrais faire un `git checkout -- fichier.ts` pour annuler mes modifications sur ce fichier. Puis-je procéder ?"
+
+---
+
 *📱 Projet optimisé pour développement mobile sur Ubuntu avec Claude Code*

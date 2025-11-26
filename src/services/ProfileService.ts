@@ -324,6 +324,13 @@ class ProfileService {
         return null; // Afficher écran "Qui regarde ?" pour créer profils
       }
 
+      // Vérifier si l'utilisateur veut toujours afficher la sélection au démarrage
+      const alwaysShowSelection = await this.getAskOnStartup();
+      if (alwaysShowSelection) {
+        console.log('⚙️ Paramètre "Toujours afficher sélection" activé, affichage de la sélection');
+        return null; // Toujours afficher l'écran de sélection
+      }
+
       // Chercher un profil défini comme par défaut
       const defaultProfile = await this.getDefaultProfile();
       if (defaultProfile) {

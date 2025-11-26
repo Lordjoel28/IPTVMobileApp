@@ -3,7 +3,8 @@
  * Layout 3 zones: Liste chaînes (gauche) + Mini lecteur (droite haut) + EPG future (droite bas)
  */
 
-import React, {useState, useEffect, useRef, useCallback} from 'react';
+import React from 'react';
+import {useState, useEffect, useRef, useCallback} from 'react';
 // import { WatermelonXtreamService } from '../services/WatermelonXtreamService'; // TEMPORAIRE: Désactivé (GitHub Issue #3692)
 import {
   View,
@@ -62,6 +63,7 @@ import {useThemeColors} from '../contexts/ThemeContext';
 import {useI18n} from '../hooks/useI18n';
 import type { VideoSettings } from '../services/VideoSettingsService';
 import {useImmersiveScreen} from '../hooks/useStatusBar';
+import {useUISettings} from '../stores/UIStore';
 import FavoritesService from '../services/FavoritesService';
 import ProfileService from '../services/ProfileService';
 import ParentalControlService from '../services/ParentalControlService';
@@ -111,6 +113,9 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({route}) => {
   const {t: tCommon} = useI18n('common');
   const {t: tProfiles} = useI18n('profiles');
   const navigation = useNavigation<NavigationProp>();
+  const { getScaledTextSize } = useUISettings();
+
+  console.log(`🎨 [ChannelPlayerScreen] Text scale: ${getScaledTextSize(18)}`);
 
   // StatusBar immersif automatique pour cet écran
   useImmersiveScreen('ChannelPlayer', true);
@@ -2858,7 +2863,7 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({route}) => {
               labelStyle={{fontSize: 10, fontWeight: '600'}}
             />
           )}
-          <Text style={styles.headerChannelName} numberOfLines={1}>
+          <Text style={[styles.headerChannelName, { fontSize: getScaledTextSize(18) }]} numberOfLines={1}>
             {cleanChannelName(selectedChannel.name)}
           </Text>
         </View>
@@ -2866,7 +2871,7 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({route}) => {
         {/* Bloc Droite: Heure + Date + Actions */}
         <View style={styles.headerRightBlock}>
           <View style={styles.headerTimeContainer}>
-            <Text style={styles.headerTime}>{currentTime}</Text>
+            <Text style={[styles.headerTime, { fontSize: getScaledTextSize(14) }]}>{currentTime}</Text>
           </View>
           <View style={styles.headerIconContainer}>
             <TouchableOpacity
@@ -2904,7 +2909,7 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({route}) => {
               />
             </TouchableOpacity>
 
-            <Text style={styles.categoryTitle} numberOfLines={1}>
+            <Text style={[styles.categoryTitle, { fontSize: getScaledTextSize(14) }]} numberOfLines={1}>
               {categories[currentCategoryIndex]?.name || 'Catégories'} (
               {categories[currentCategoryIndex]
                 ? getCategoryChannelCount(
@@ -2940,7 +2945,7 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({route}) => {
                 color="#00BCD4"
                 style={styles.loadingMoreIndicator}
               />
-              <Text style={styles.loadingMoreText}>
+              <Text style={[styles.loadingMoreText, { fontSize: getScaledTextSize(12) }]}>
                 Chargement des chaînes...
               </Text>
             </View>
@@ -3136,7 +3141,7 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({route}) => {
               onPress={handleGoHome}
               activeOpacity={0.7}>
               <Icon name="home" size={20} color={colors.text.primary} style={styles.optionMenuIcon} />
-              <Text style={styles.optionMenuText}>{tCommon('home')}</Text>
+              <Text style={[styles.optionMenuText, { fontSize: getScaledTextSize(14) }]}>{tCommon('home')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -3144,7 +3149,7 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({route}) => {
               onPress={handleSortChannels}
               activeOpacity={0.7}>
               <Icon name="sort" size={20} color={colors.text.primary} style={styles.optionMenuIcon} />
-              <Text style={styles.optionMenuText}>{tCommon('sort')}</Text>
+              <Text style={[styles.optionMenuText, { fontSize: getScaledTextSize(14) }]}>{tCommon('sort')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -3152,7 +3157,7 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({route}) => {
               onPress={handleGoToSettings}
               activeOpacity={0.7}>
               <Icon name="settings" size={20} color={colors.text.primary} style={styles.optionMenuIcon} />
-              <Text style={styles.optionMenuText}>{tCommon('settings')}</Text>
+              <Text style={[styles.optionMenuText, { fontSize: getScaledTextSize(14) }]}>{tCommon('settings')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -3160,7 +3165,7 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({route}) => {
               onPress={handleLogoutOrProfiles}
               activeOpacity={0.7}>
               <Icon name="logout" size={20} color={colors.text.primary} style={styles.optionMenuIcon} />
-              <Text style={styles.optionMenuText}>{tProfiles('logoutProfiles')}</Text>
+              <Text style={[styles.optionMenuText, { fontSize: getScaledTextSize(14) }]}>{tProfiles('logoutProfiles')}</Text>
             </TouchableOpacity>
           </Animated.View>
         </View>
@@ -3211,7 +3216,7 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({route}) => {
                 onPress={() => applySort('name-asc')}
                 activeOpacity={0.7}>
                 <Icon name="sort" size={20} color={colors.text.primary} style={styles.optionMenuIcon} />
-                <Text style={styles.optionMenuText}>{tChannels('nameAZ')}</Text>
+                <Text style={[styles.optionMenuText, { fontSize: getScaledTextSize(14) }]}>{tChannels('nameAZ')}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -3219,7 +3224,7 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({route}) => {
                 onPress={() => applySort('name-desc')}
                 activeOpacity={0.7}>
                 <Icon name="sort" size={20} color={colors.text.primary} style={styles.optionMenuIcon} />
-                <Text style={styles.optionMenuText}>{tChannels('nameZA')}</Text>
+                <Text style={[styles.optionMenuText, { fontSize: getScaledTextSize(14) }]}>{tChannels('nameZA')}</Text>
               </TouchableOpacity>
 
 
@@ -3228,7 +3233,7 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({route}) => {
                 onPress={() => applySort('default')}
                 activeOpacity={0.7}>
                 <Icon name="list" size={20} color={colors.text.primary} style={styles.optionMenuIcon} />
-                <Text style={styles.optionMenuText}>{tCommon('byDefault')}</Text>
+                <Text style={[styles.optionMenuText, { fontSize: getScaledTextSize(14) }]}>{tCommon('byDefault')}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -3236,7 +3241,7 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({route}) => {
                 onPress={cancelSort}
                 activeOpacity={0.7}>
                 <Icon name="close" size={20} color={colors.accent.error} style={styles.optionMenuIcon} />
-                <Text style={[styles.optionMenuText, {color: colors.accent.error}]}>{tCommon('cancel')}</Text>
+                <Text style={[styles.optionMenuText, {color: colors.accent.error, fontSize: getScaledTextSize(14) }]}>{tCommon('cancel')}</Text>
               </TouchableOpacity>
             </Animated.View>
           </View>
@@ -3283,12 +3288,12 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({route}) => {
               </View>
 
               {/* Titre */}
-              <Text style={styles.logoutDialogTitle}>
+              <Text style={[styles.logoutDialogTitle, { fontSize: getScaledTextSize(18) }]}>
                 {tProfiles('logout')}
               </Text>
 
               {/* Message simple */}
-              <Text style={styles.logoutDialogMessage}>
+              <Text style={[styles.logoutDialogMessage, { fontSize: getScaledTextSize(16) }]}>
                 {tProfiles('confirmLogout')}
               </Text>
 
@@ -3298,7 +3303,7 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({route}) => {
                   style={[styles.logoutDialogButton, styles.logoutDialogButtonCancel]}
                   onPress={handleCancelLogout}
                   activeOpacity={0.7}>
-                  <Text style={styles.logoutDialogButtonTextCancel}>
+                  <Text style={[styles.logoutDialogButtonTextCancel, { fontSize: getScaledTextSize(16) }]}>
                     {tCommon('cancel')}
                   </Text>
                 </TouchableOpacity>
@@ -3313,7 +3318,7 @@ const ChannelPlayerScreen: React.FC<ChannelPlayerScreenProps> = ({route}) => {
                     color="#FFFFFF"
                     style={styles.logoutDialogButtonIcon}
                   />
-                  <Text style={styles.logoutDialogButtonTextConfirm}>
+                  <Text style={[styles.logoutDialogButtonTextConfirm, { fontSize: getScaledTextSize(16) }]}>
                     {tProfiles('logoutConfirmButton')}
                   </Text>
                 </TouchableOpacity>

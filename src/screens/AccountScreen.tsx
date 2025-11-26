@@ -18,6 +18,7 @@ import { useNavigation, useIsFocused } from '@react-navigation/native';
 import { useThemeColors } from '../contexts/ThemeContext';
 import {useI18n} from '../hooks/useI18n';
 import { useUserStore } from '../stores/UserStore';
+import {useUISettings} from '../stores/UIStore';
 import ProfileService from '../services/ProfileService';
 
 const AccountScreen: React.FC = () => {
@@ -27,6 +28,9 @@ const AccountScreen: React.FC = () => {
   const isFocused = useIsFocused();
   const {t: tCommon} = useI18n('common');
   const {t: tSettings} = useI18n('settings');
+  const { getScaledTextSize } = useUISettings();
+
+  console.log(`🎨 [AccountScreen] Text scale: ${getScaledTextSize(16)}`);
 
   const { currentUser, isAuthenticated } = useUserStore();
   const [currentProfile, setCurrentProfile] = React.useState<any>(null);
@@ -62,6 +66,12 @@ const AccountScreen: React.FC = () => {
       icon: 'info',
       subtitle: currentProfile ? currentProfile.name : tCommon('notDefined'),
       onPress: () => navigation.navigate('AccountInfo' as any),
+    },
+    {
+      id: 'profileStartup',
+      title: tSettings('alwaysShowProfileSelection'),
+      icon: 'person-outline',
+      onPress: () => navigation.navigate('ProfileStartupSettings' as any),
     },
     {
       id: 'password',
@@ -146,7 +156,7 @@ const AccountScreen: React.FC = () => {
           <Icon name="arrow-back" size={24} color="#FFFFFF" />
         </TouchableOpacity>
 
-        <Text style={styles.headerTitle}>{tSettings('account')}</Text>
+        <Text style={[styles.headerTitle, { fontSize: getScaledTextSize(22) }]}>{tSettings('account')}</Text>
       </View>
 
       {/* Liste des options */}
@@ -174,7 +184,7 @@ const AccountScreen: React.FC = () => {
                 {option.title}
               </Text>
               {option.subtitle && (
-                <Text style={styles.optionSubtitle}>{option.subtitle}</Text>
+                <Text style={[styles.optionSubtitle, { fontSize: getScaledTextSize(12) }]}>{option.subtitle}</Text>
               )}
             </View>
             <Icon

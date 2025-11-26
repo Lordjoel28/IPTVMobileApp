@@ -3,7 +3,8 @@
  * Optimisé performance avec driver natif
  */
 
-import React, {useEffect, useRef} from 'react';
+import React from 'react';
+import {useEffect, useRef} from 'react';
 import {
   View,
   Text,
@@ -16,6 +17,7 @@ import FastImage from 'react-native-fast-image';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import {useThemeColors} from '../contexts/ThemeContext';
+import {useUISettings} from '../stores/UIStore';
 import LockedChannelBadge from './LockedChannelBadge';
 
 interface Channel {
@@ -51,7 +53,10 @@ const ChannelCard: React.FC<ChannelCardProps> = ({
   hideChannelNames = false,
 }) => {
   const colors = useThemeColors();
+  const { getOverlayAlpha, getScaledTextSize } = useUISettings();
   const styles = createStyles(colors, width);
+
+  console.log(`🎨 [ChannelCard] ${index} - Overlay alpha: ${getOverlayAlpha()}, Text scale: ${getScaledTextSize(12)}`);
   // 🎬 ÉTAPE 3: Animations avec driver natif
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -171,13 +176,16 @@ const ChannelCard: React.FC<ChannelCardProps> = ({
           <LinearGradient
             colors={[
               'transparent',
-              'rgba(0, 0, 0, 0.3)',
-              'rgba(0, 0, 0, 0.85)',
+              getOverlayAlpha().replace('0.', '0.3'), // Utilise 30% de l'opacité configurée
+              getOverlayAlpha(), // Utilise l'opacité configurée pour l'overlay
             ]}
             locations={[0, 0.4, 1]}
             style={styles.channelNameOverlay}>
             <Text
-              style={styles.channelCardName}
+              style={[
+                styles.channelCardName,
+                { fontSize: getScaledTextSize(12) } // Applique le scaling configuré
+              ]}
               numberOfLines={2}
               ellipsizeMode="tail"
               adjustsFontSizeToFit={false}>

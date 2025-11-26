@@ -659,19 +659,19 @@ export class UltraOptimizedM3UParser {
       duplicateUrls: this.diagnostics.duplicateUrls,
     };
 
-    // 🔧 DIAGNOSTIC PARSING - Logger pour debugging
-    console.log('📊 PARSING DIAGNOSTICS:');
-    console.log(`   EXTINF found: ${this.diagnostics.extinfCount}`);
-    console.log(`   Valid URLs: ${this.diagnostics.validUrlCount}`);
-    console.log(`   Channels created: ${channelCount}`);
-    console.log(`   Orphan channels: ${this.diagnostics.orphanChannels}`);
-    console.log(`   Duplicate URLs: ${this.diagnostics.duplicateUrls}`);
-    console.log(
-      `   Match rate: ${(
-        (channelCount / this.diagnostics.extinfCount) *
-        100
-      ).toFixed(1)}%`,
-    );
+    // 🔧 DIAGNOSTIC PARSING - Logs désactivés pour mode production
+    // console.log('📊 PARSING DIAGNOSTICS:');
+    // console.log(`   EXTINF found: ${this.diagnostics.extinfCount}`);
+    // console.log(`   Valid URLs: ${this.diagnostics.validUrlCount}`);
+    // console.log(`   Channels created: ${channelCount}`);
+    // console.log(`   Orphan channels: ${this.diagnostics.orphanChannels}`);
+    // console.log(`   Duplicate URLs: ${this.diagnostics.duplicateUrls}`);
+    // console.log(
+    //   `   Match rate: ${(
+    //     (channelCount / this.diagnostics.extinfCount) *
+    //     100
+    //   ).toFixed(1)}%`,
+    // );
   }
 
   /**

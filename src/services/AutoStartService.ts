@@ -94,87 +94,48 @@ class AutoStartService {
           // 📺 Charger les vraies données de la playlist depuis WatermelonDB
           const recentChannelPlaylistId = recentChannel.playlistId || 'default_playlist';
 
-          try {
-            // Charger les catégories depuis WatermelonDB
-            const WatermelonM3UService = (await import('./WatermelonM3UService')).default;
-            const categories = await WatermelonM3UService.getPlaylistCategories(recentChannelPlaylistId);
+          // 🚀 STRATÉGIE FAST-FIRST : Lancer immédiatement avec données minimales
+          const fastStartCategory = {
+            id: 'current',
+            name: recentChannel.channelData.group || 'Actuelle',
+            count: 1
+          };
 
-            if (categories && categories.length > 0) {
-              console.log(`📂 [AutoStartService] ${categories.length} catégories chargées depuis WatermelonDB`);
+          const minimalCategories = [{
+            id: 'current',
+            name: recentChannel.channelData.group || 'Actuelle',
+            count: 1
+          }];
 
-              // Trouver la catégorie de la chaîne ou utiliser la première
-              const channelCategory = recentChannel.channelData.group || recentChannel.channelData.category;
-              const initialCategory = categories.find(cat => cat.name === channelCategory) || categories[0];
-
-              // Charger toutes les chaînes de la catégorie initiale
-              let initialChannels = [recentChannel.channelData];
-              try {
-                const categoryChannels = await WatermelonM3UService.getChannelsByCategory(
-                  recentChannelPlaylistId,
-                  initialCategory.name
-                );
-                if (categoryChannels && categoryChannels.length > 0) {
-                  // 🔄 Convertir les objets WatermelonDB vers format Channel de l'app
-                  initialChannels = categoryChannels.map((ch: any) => ({
-                    id: ch.id,
-                    name: ch.name || 'Sans nom',
-                    logo: ch.logoUrl || ch.streamIcon || '', // WatermelonDB utilise logoUrl
-                    logoUrl: ch.logoUrl || ch.streamIcon || '',
-                    group: ch.groupTitle || ch.categoryName || 'Non classé',
-                    groupTitle: ch.groupTitle || ch.categoryName || 'Non classé',
-                    category: ch.groupTitle || ch.categoryName || 'Non classé',
-                    url: ch.streamUrl || '',
-                    streamUrl: ch.streamUrl || '',
-                    type: 'M3U' as const,
-                  }));
-                  console.log(`📺 [AutoStartService] ${categoryChannels.length} chaînes chargées pour catégorie "${initialCategory.name}"`);
-                }
-              } catch (channelError) {
-                console.warn(`⚠️ [AutoStartService] Erreur chargement chaînes catégorie, utilisation chaîne seule:`, channelError);
-              }
-
-              // Définir les données de navigation avec les vraies catégories
-              actions.setNavigationData({
-                playlistId: recentChannelPlaylistId,
-                playlistName: 'Playlist',
-                initialChannels: initialChannels,
-                initialCategory: initialCategory,
-                allCategories: categories,
-                useWatermelonDB: true,
-                playlistType: 'M3U'
-              });
-              console.log(`📺 [AutoStartService] NavigationData défini: ${categories.length} catégories, ${initialChannels.length} chaînes initiales`);
-            } else {
-              throw new Error('Pas de catégories trouvées');
-            }
-          } catch (error) {
-            console.warn(`⚠️ [AutoStartService] Erreur chargement catégories:`, error);
-            // Fallback: données minimales - ChannelPlayerScreen chargera les vraies catégories
-            actions.setNavigationData({
-              playlistId: recentChannelPlaylistId,
-              playlistName: 'Dernière chaîne',
-              initialChannels: [recentChannel.channelData],
-              initialCategory: {
-                id: 'all',
-                name: recentChannel.channelData.group || 'Toutes',
-                count: 1
-              },
-              allCategories: [{
-                id: 'all',
-                name: 'Toutes',
-                count: 1
-              }],
-              useWatermelonDB: true,
-              playlistType: 'M3U'
-            });
-            console.log(`📺 [AutoStartService] NavigationData fallback défini`);
-          }
+          // Définir les données de navigation minimales pour démarrage immédiat
+          actions.setNavigationData({
+            playlistId: recentChannelPlaylistId,
+            playlistName: 'Playlist',
+            initialChannels: [recentChannel.channelData], // 🚀 Uniquement la chaîne cible
+            initialCategory: fastStartCategory,
+            allCategories: minimalCategories,
+            useWatermelonDB: true,
+            playlistType: 'M3U'
+          });
 
           // 🎬 Marquer qu'on vient de l'autostart (pour masquer certains boutons Docker)
           actions.setFromAutoStart(true);
 
-          // Lancer la lecture en fullscreen (type décodeur TV)
+          // 🚀 LANCER IMMÉDIATEMENT la lecture
           actions.playChannel(recentChannel.channelData, true);
+
+          console.log(`⚡ [AutoStartService] Lecture lancée immédiatement`);
+
+          // 🔄 Charger les vraies données en ARRIÈRE-PLAN (non bloquant)
+          this.loadFullPlaylistData(recentChannelPlaylistId, recentChannel.channelData.group)
+            .then(fullData => {
+              // Mettre à jour la navigation quand les données sont prêtes
+              actions.setNavigationData(fullData);
+              console.log(`📊 [AutoStartService] Données complètes chargées en arrière-plan: ${fullData.allCategories.length} catégories`);
+            })
+            .catch(error => {
+              console.warn('⚠️ [AutoStartService] Erreur chargement arrière-plan:', error);
+            });
 
           console.log(`✅ [AutoStartService] Démarrage automatique réussi: ${recentChannel.channelData.name}`);
 
@@ -227,6 +188,58 @@ class AutoStartService {
   }
 
   /**
+   * Charge les données complètes de la playlist en arrière-plan
+   */
+  private async loadFullPlaylistData(playlistId: string, categoryName?: string): Promise<any> {
+    try {
+      const WatermelonM3UService = (await import('./WatermelonM3UService')).default;
+      const categories = await WatermelonM3UService.getPlaylistCategories(playlistId);
+
+      if (categories && categories.length > 0) {
+        const targetCategory = categories.find(cat => cat.name === categoryName) || categories[0];
+        let fullChannels: any[] = [];
+
+        try {
+          const categoryChannels = await WatermelonM3UService.getChannelsByCategory(playlistId, targetCategory.name);
+          if (categoryChannels && categoryChannels.length > 0) {
+            // 🔄 Convertir les objets WatermelonDB vers format Channel de l'app
+            fullChannels = categoryChannels.map((ch: any) => ({
+              id: ch.id,
+              name: ch.name || 'Sans nom',
+              logo: ch.logoUrl || ch.streamIcon || '',
+              logoUrl: ch.logoUrl || ch.streamIcon || '',
+              group: ch.groupTitle || ch.categoryName || 'Non classé',
+              groupTitle: ch.groupTitle || ch.categoryName || 'Non classé',
+              category: ch.groupTitle || ch.categoryName || 'Non classé',
+              url: ch.streamUrl || '',
+              streamUrl: ch.streamUrl || '',
+              type: 'M3U' as const,
+            }));
+          }
+        } catch (channelError) {
+          console.warn(`⚠️ [AutoStartService] Erreur chargement chaînes catégorie en arrière-plan:`, channelError);
+          // En cas d'erreur, on garde les catégories mais les chaînes restent vides
+        }
+
+        return {
+          playlistId,
+          playlistName: 'Playlist',
+          initialChannels: fullChannels,
+          initialCategory: targetCategory,
+          allCategories: categories,
+          useWatermelonDB: true,
+          playlistType: 'M3U'
+        };
+      } else {
+        throw new Error('Pas de catégories trouvées');
+      }
+    } catch (error) {
+      console.warn(`⚠️ [AutoStartService] Erreur chargement complet en arrière-plan:`, error);
+      throw error;
+    }
+  }
+
+  /**
    * Obtient des informations sur le prochain démarrage automatique
    */
   async getNextAutoStartInfo(): Promise<{
@@ -238,7 +251,7 @@ class AutoStartService {
     try {
       const settings = await videoSettingsService.loadSettings();
       const activeProfile = await ProfileService.getActiveProfile();
-      const recentChannels = await RecentChannelsService.getRecentChannels(activeProfile?.id, 1);
+      const recentChannels = await RecentChannelsService.getRecentChannels(activeProfile?.id || '', 1);
 
       return {
         enabled: settings.autoplay && !!activeProfile && recentChannels.length > 0,

@@ -3,6 +3,7 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <!-- Queries pour Android 11+ : Permet de vérifier les lecteurs externes installés -->
     <queries>
@@ -54,6 +55,10 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Permissions pour BackgroundFetch (synchronisation automatique) -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+
     <application
       android:name=".MainApplication"
       android:label="@string/app_name"
@@ -77,6 +82,13 @@
           android:name=".BackgroundAudioService"
           android:foregroundServiceType="mediaPlayback"
           android:exported="false" />
+
+      <!-- Service BackgroundFetch pour synchronisation automatique -->
+      <service
+          android:name="com.transistorsoft.rnbackgroundfetch.HeadlessTask"
+          android:exported="false"
+          android:foregroundServiceType="dataSync"
+          android:permission="android.permission.BIND_JOB_SERVICE" />
 
       <activity
         android:name=".MainActivity"

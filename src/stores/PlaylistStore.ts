@@ -76,9 +76,9 @@ export const usePlaylistStore = create<PlaylistStoreState>()((set, get) => ({
   // Action pour définir la playlist active
   selectPlaylist: (playlistId: string | null) => {
     set({selectedPlaylistId: playlistId});
-    console.log(
-      `🏪 PlaylistStore - Playlist active définie sur : ${playlistId}`,
-    );
+    // console.log(
+    //   `🏪 PlaylistStore - Playlist active définie sur : ${playlistId}`,
+    // );
   },
 
   // Action loadPlaylist - FLUX STRICT : reçoit les données déjà parsées
@@ -87,11 +87,11 @@ export const usePlaylistStore = create<PlaylistStoreState>()((set, get) => ({
     parsedChannels: Channel[],
     playlistName?: string,
   ) => {
-    console.log(
-      '🏪 PLAYLIST STORE - Réception données parsées:',
-      parsedChannels.length,
-      'chaînes',
-    );
+    // console.log(
+    //   '🏪 PLAYLIST STORE - Réception données parsées:',
+    //   parsedChannels.length,
+    //   'chaînes',
+    // );
 
     // 🚀 OPTIMISATION: Créer index par catégorie + compter en 1 seul passage
     const categoriesMap = new Map<string, number>();
@@ -120,21 +120,21 @@ export const usePlaylistStore = create<PlaylistStoreState>()((set, get) => ({
       })),
     ];
 
-    console.log(
-      '🏪 PLAYLIST STORE - AllCategories avant setState:',
-      allCategories,
-    );
-    console.log(
-      '🚀 OPTIMISATION - Index créé pour',
-      channelsByCategoryMap.size,
-      'catégories',
-    );
+    // console.log(
+    //   '🏪 PLAYLIST STORE - AllCategories avant setState:',
+    //   allCategories,
+    // );
+    // console.log(
+    //   '🚀 OPTIMISATION - Index créé pour',
+    //   channelsByCategoryMap.size,
+    //   'catégories',
+    // );
 
     // Sauvegarder la playlist pour persistance
     const playlistId = uri.split('/').pop() || 'playlist_' + Date.now();
 
     // Note: Sans persist, pas de sauvegarde AsyncStorage automatique
-    console.log('💾 Playlist chargée en mémoire:', playlistId);
+    // console.log('💾 Playlist chargée en mémoire:', playlistId);
 
     // Mettre à jour le state avec toutes les données + index
     set({
@@ -147,22 +147,22 @@ export const usePlaylistStore = create<PlaylistStoreState>()((set, get) => ({
 
     // Sélectionner la première catégorie si disponible
     if (allCategories.length > 0) {
-      console.log(
-        '🏪 PLAYLIST STORE - Sélection de la première catégorie:',
-        allCategories[0].name,
-      );
+      // console.log(
+      //   '🏪 PLAYLIST STORE - Sélection de la première catégorie:',
+      //   allCategories[0].name,
+      // );
       get().selectCategory(allCategories[0].name);
     }
   },
 
   // Action selectCategory - avec filtrage complet des chaînes
   selectCategory: (category: string) => {
-    console.log('🏪 PLAYLIST STORE - selectCategory appelée avec:', category);
+    // console.log('🏪 PLAYLIST STORE - selectCategory appelée avec:', category);
     const currentState = get();
 
     // Si pas de channels, pas de filtrage possible
     if (!currentState.channels || currentState.channels.length === 0) {
-      console.log('🏪 PLAYLIST STORE - Pas de chaînes à filtrer');
+      // console.log('🏪 PLAYLIST STORE - Pas de chaînes à filtrer');
       set({selectedCategory: category, currentPage: 0}); // 🚀 Reset page
       return;
     }
@@ -179,9 +179,9 @@ export const usePlaylistStore = create<PlaylistStoreState>()((set, get) => ({
       );
     }
 
-    console.log(
-      `🏪 PLAYLIST STORE - Filtrage terminé: ${filteredChannels.length} chaînes pour "${category}"`,
-    );
+    // console.log(
+    //   `🏪 PLAYLIST STORE - Filtrage terminé: ${filteredChannels.length} chaînes pour "${category}"`,
+    // );
 
     set({
       selectedCategory: category,

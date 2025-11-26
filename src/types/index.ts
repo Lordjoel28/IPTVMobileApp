@@ -51,6 +51,34 @@ export type RootStackParamList = {
     playlistName: string;
   };
   CategoriesSelection: {profileId: string};
+  // 🎬 Écrans Films et Séries
+  MoviesScreen: {
+    playlistId: string;
+    categories?: VodCategory[];
+  };
+  SeriesScreen: {
+    playlistId: string;
+    categories?: VodCategory[];
+  };
+  MovieDetailScreen: {
+    movie: VodMovie;
+    playlistId: string;
+  };
+  SeriesDetailScreen: {
+    series: VodSeries;
+    playlistId: string;
+  };
+  SeasonDetailScreen: {
+    season: VodSeason;
+    series: VodSeries;
+    playlistId: string;
+  };
+  EpisodePlayerScreen: {
+    episode: VodEpisode;
+    series: VodSeries;
+    season: VodSeason;
+    playlistId: string;
+  };
 };
 
 export type BottomTabParamList = {
@@ -79,6 +107,8 @@ export interface Channel {
   isHighlighted?: boolean;
   // 🎬 Propriété pour continuer la lecture depuis multiscreen
   seekTime?: number;
+  // 🎬 Type de contenu (live/movie/series)
+  contentType?: 'live' | 'movie' | 'series';
 }
 
 // Category Types
@@ -129,6 +159,18 @@ export interface Profile {
 
   // ========== Déverrouillage temporaire ==========
   temporaryUnlock?: TemporaryUnlock; // Déverrouillage temporaire actif
+
+  // ========== 🔒 Nouvelles options de sécurité avancées ==========
+  securitySettings?: {
+    // 🔐 Exiger le mot de passe pour accéder aux paramètres
+    requirePinForSettings?: boolean;
+
+    // 📋 Exiger une connexion modale pour la liste de lecture (playlist)
+    requireModalForPlaylist?: boolean;
+
+    // 👤 Exiger une connexion modale pour accéder au profil
+    requireModalForProfile?: boolean;
+  };
 }
 
 // Déverrouillage temporaire
@@ -509,6 +551,118 @@ export interface StorageAdapter {
 // Import et re-export IPTVTheme depuis styles
 // import type { IPTVTheme } from '../styles/themes';
 // export type { IPTVTheme };
+
+// 🎬 VOD Types - Films et Séries
+export interface VodMovie {
+  id: string;
+  movie_id: string;
+  name: string;
+  plot: string;
+  genre: string;
+  director: string;
+  cast: string;
+  release_date: string;
+  rating: string;
+  duration: string;
+  imdb_id?: string;
+  cover_url: string;
+  backdrop_url: string;
+  stream_url: string;
+  container_extension: string;
+  added: string;
+  category_id: string;
+  category_name: string;
+}
+
+export interface VodSeries {
+  id: string;
+  series_id: string;
+  stream_id?: string; // ID original de l'API Xtream
+  name: string;
+  plot: string;
+  genre: string;
+  director: string;
+  cast: string;
+  release_date: string;
+  rating: string;
+  imdb_id?: string;
+  cover_url: string;
+  backdrop_url: string;
+  youtube_trailer?: string;
+  episodes_count: number;
+  seasons_count: number;
+  last_updated: string;
+  category_id: string;
+  category_name: string;
+  added?: string; // Timestamp d'ajout pour tri "récemment ajouté"
+}
+
+export interface VodSeason {
+  id: string;
+  season_id: string;
+  series_id: string;
+  season_number: number;
+  name: string;
+  overview: string;
+  cover_url?: string;
+  episodes_count: number;
+  episodes: VodEpisode[];
+}
+
+export interface VodEpisode {
+  id: string;
+  episode_id: string;
+  season_id: string;
+  series_id: string;
+  episode_number: number;
+  name: string;
+  plot: string;
+  duration: string;
+  stream_url: string;
+  container_extension: string;
+  added: string;
+  air_date?: string;
+}
+
+export interface VodCategory {
+  id: string;
+  category_id: string;
+  category_name: string;
+  parent_id: number;
+  type: 'movie' | 'series';
+  count?: number;
+}
+
+// Types de navigation pour les films et séries
+export type VodScreenParamList = {
+  MoviesScreen: {
+    playlistId: string;
+    categories?: VodCategory[];
+  };
+  SeriesScreen: {
+    playlistId: string;
+    categories?: VodCategory[];
+  };
+  MovieDetailScreen: {
+    movie: VodMovie;
+    playlistId: string;
+  };
+  SeriesDetailScreen: {
+    series: VodSeries;
+    playlistId: string;
+  };
+  SeasonDetailScreen: {
+    season: VodSeason;
+    series: VodSeries;
+    playlistId: string;
+  };
+  EpisodePlayerScreen: {
+    episode: VodEpisode;
+    series: VodSeries;
+    season: VodSeason;
+    playlistId: string;
+  };
+};
 
 // Export all types (commentés car fichiers n'existent pas encore)
 // export type * from './navigation';

@@ -6,6 +6,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {XtreamChannel, XtreamCategory} from './StreamingXtreamService';
+import CompressionService from './CompressionService';
 
 // ================================
 // INTERFACES ET TYPES
@@ -304,7 +305,13 @@ class AsyncStorageCache {
         return null;
       }
 
-      const item: CacheItem = JSON.parse(stored);
+      // Décompresser si nécessaire
+      const item: CacheItem | null = await CompressionService.decompress(stored);
+
+      if (!item) {
+        this.misses++;
+        return null;
+      }
 
       // Check expiry
       if (item.expiry && Date.now() > item.expiry) {
@@ -316,7 +323,10 @@ class AsyncStorageCache {
       // Update access stats
       item.accessCount++;
       item.lastAccess = Date.now();
-      await AsyncStorage.setItem(storageKey, JSON.stringify(item));
+
+      // Recomprimer et sauvegarder les stats mises à jour
+      const compressed = await CompressionService.compress(item);
+      await AsyncStorage.setItem(storageKey, compressed);
 
       this.hits++;
       console.log(`🧠 L2 Cache HIT: ${key}`);
@@ -353,17 +363,21 @@ class AsyncStorageCache {
       };
 
       const storageKey = this.keyPrefix + key;
-      await AsyncStorage.setItem(storageKey, JSON.stringify(item));
 
-      // Update metadata
+      // Compresser avant de stocker
+      const compressed = await CompressionService.compress(item);
+      await AsyncStorage.setItem(storageKey, compressed);
+
+      // Update metadata (utiliser la taille compressée)
+      const compressedSize = compressed.length * 2; // UTF-16
       this.metadata.set(key, {
-        size: itemSize,
+        size: compressedSize,
         timestamp: Date.now(),
         priority,
       });
       await this.saveMetadata();
 
-      console.log(`🧠 L2 Cache SET: ${key} (${itemSize} bytes)`);
+      console.log(`🧠 L2 Cache SET: ${key} (${itemSize} → ${compressedSize} bytes, compression: ${((1 - compressedSize/itemSize) * 100).toFixed(1)}%)`);
       return true;
     } catch (error) {
       console.error('🧠 L2 Cache SET error:', error);

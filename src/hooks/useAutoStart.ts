@@ -113,7 +113,6 @@ export const useAutoStart = (
 
     // Ne pas déclencher si déjà fait ou désactivé
     if (hasTriggeredRef.current || disabled) {
-      console.log(`⏸️ [useAutoStart] Auto-start ${disabled ? 'désactivé' : 'déjà déclenché'} - Ignoré`);
       return;
     }
 

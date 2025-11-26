@@ -6,7 +6,7 @@
 import {appSchema, tableSchema} from '@nozbe/watermelondb';
 
 export default appSchema({
-  version: 6, // Migration v6: Ajout champs account_created_date et connection_info
+  version: 7, // Migration v7: Ajout tables VOD (movies, series, vod_categories)
   tables: [
     // Table des playlists
     tableSchema({
@@ -110,6 +110,71 @@ export default appSchema({
         {name: 'description', type: 'string', isOptional: true},
         {name: 'start_time', type: 'number', isIndexed: true},
         {name: 'stop_time', type: 'number'},
+        {name: 'created_at', type: 'number'},
+        {name: 'updated_at', type: 'number'},
+      ],
+    }),
+
+    // ===== TABLES VOD (Films & Séries) - Migration v7 =====
+
+    // Table des catégories VOD
+    tableSchema({
+      name: 'vod_categories',
+      columns: [
+        {name: 'playlist_id', type: 'string', isIndexed: true},
+        {name: 'category_id', type: 'string', isIndexed: true}, // ID Xtream
+        {name: 'category_name', type: 'string'},
+        {name: 'category_type', type: 'string'}, // 'movie' | 'series'
+        {name: 'parent_id', type: 'number', isOptional: true},
+        {name: 'created_at', type: 'number'},
+        {name: 'updated_at', type: 'number'},
+      ],
+    }),
+
+    // Table des films VOD - Optimisée pour 10K+ films
+    tableSchema({
+      name: 'vod_movies',
+      columns: [
+        {name: 'playlist_id', type: 'string', isIndexed: true},
+        {name: 'movie_id', type: 'string', isIndexed: true}, // ID Xtream
+        {name: 'category_id', type: 'string', isIndexed: true},
+        {name: 'name', type: 'string', isIndexed: true},
+        {name: 'stream_url', type: 'string'},
+        {name: 'cover_url', type: 'string', isOptional: true},
+        {name: 'rating', type: 'string', isOptional: true},
+        {name: 'duration', type: 'string', isOptional: true},
+        {name: 'genre', type: 'string', isOptional: true},
+        {name: 'release_date', type: 'string', isOptional: true},
+        {name: 'plot', type: 'string', isOptional: true},
+        {name: 'director', type: 'string', isOptional: true},
+        {name: 'cast', type: 'string', isOptional: true},
+        {name: 'added', type: 'string', isOptional: true}, // Timestamp ajout serveur
+        {name: 'container_extension', type: 'string', isOptional: true},
+        {name: 'created_at', type: 'number'},
+        {name: 'updated_at', type: 'number'},
+      ],
+    }),
+
+    // Table des séries VOD - Optimisée pour 5K+ séries
+    tableSchema({
+      name: 'vod_series',
+      columns: [
+        {name: 'playlist_id', type: 'string', isIndexed: true},
+        {name: 'series_id', type: 'string', isIndexed: true}, // ID Xtream
+        {name: 'category_id', type: 'string', isIndexed: true},
+        {name: 'name', type: 'string', isIndexed: true},
+        {name: 'cover_url', type: 'string', isOptional: true},
+        {name: 'backdrop_url', type: 'string', isOptional: true},
+        {name: 'rating', type: 'string', isOptional: true},
+        {name: 'genre', type: 'string', isOptional: true},
+        {name: 'release_date', type: 'string', isOptional: true},
+        {name: 'plot', type: 'string', isOptional: true},
+        {name: 'director', type: 'string', isOptional: true},
+        {name: 'cast', type: 'string', isOptional: true},
+        {name: 'episodes_count', type: 'number', isOptional: true},
+        {name: 'seasons_count', type: 'number', isOptional: true},
+        {name: 'added', type: 'string', isOptional: true},
+        {name: 'last_updated', type: 'string', isOptional: true},
         {name: 'created_at', type: 'number'},
         {name: 'updated_at', type: 'number'},
       ],

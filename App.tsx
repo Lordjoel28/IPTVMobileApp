@@ -6,8 +6,10 @@
 import React from 'react';
 import {useFastImageCache} from './src/hooks/useFastImageCache';
 import {useDatabaseInitialization} from './src/hooks/useDatabaseInitialization';
+import {useSyncInitialization} from './src/hooks/useSyncInitialization';
+import {usePlaylistSync} from './src/hooks/usePlaylistSync';
 
-// ✅ Masquer le warning WatermelonDB spécifique (trop verbeux pour l'utilisateur)
+// ✅ Masquer les warnings verbeux connus (non critiques pour l'utilisateur)
 const originalWarn = console.warn;
 console.warn = (...args) => {
   const message = args[0]?.toString?.() || '';
@@ -19,6 +21,17 @@ console.warn = (...args) => {
     message.includes('🍉')
   ) {
     return; // Ne pas afficher ce warning spécifique
+  }
+
+  // Masquer le warning "Excessive number of pending callbacks" (problème connu React Native)
+  // Ce warning apparaît avec les animations intensives mais n'affecte pas les performances
+  if (message.includes('Excessive number of pending callbacks')) {
+    return; // Warning connu de React Native, non critique
+  }
+
+  // Masquer le warning ProgressBarAndroid deprecated (remplacement en cours)
+  if (message.includes('ProgressBarAndroid has been extracted from react-native')) {
+    return; // Component deprecated, utilise custom progress bar
   }
 
   // Garder tous les autres warnings
@@ -54,7 +67,7 @@ console.log('🗃️ [App] Database index service initialized:', !!databaseIndex
 import LoadingOverlay from './src/components/LoadingOverlay';
 import NotificationToast from './src/components/NotificationToast';
 import GlobalVideoPlayer from './src/components/GlobalVideoPlayer';
-import SplashScreen from './src/screens/SplashScreen';
+// import SplashScreen from './src/screens/SplashScreen'; // TODO: Implémenter SplashScreen
 import {ThemeProvider} from './src/contexts/ThemeContext';
 import {AlertProvider} from './src/contexts/AlertContext';
 
@@ -65,6 +78,7 @@ import ChannelsScreen from './src/screens/ChannelsScreen';
 import ChannelPlayerScreen from './src/screens/ChannelPlayerScreen';
 import FinalSearchScreenWrapper from './src/screens/FinalSearchScreenWrapper';
 import SettingsScreen from './src/screens/SettingsScreen';
+import AutoSyncSettingsScreen from './src/screens/AutoSyncSettingsScreen';
 import VideoPlayerSettingsScreen from './src/screens/VideoPlayerSettingsScreen';
 import TVGuideSettingsScreen from './src/screens/TVGuideSettingsScreen';
 import ThemeSettingsScreen from './src/screens/ThemeSettingsScreen';
@@ -72,14 +86,24 @@ import PlayerSettingsScreen from './src/screens/PlayerSettingsScreen';
 import LanguageSettingsScreen from './src/screens/LanguageSettingsScreen';
 import PerformanceSettingsScreen from './src/screens/PerformanceSettingsScreen';
 import AccountScreen from './src/screens/AccountScreen';
+import ProfileStartupSettings from './src/screens/ProfileStartupSettings';
+import InterfaceSettingsScreen from './src/screens/InterfaceSettingsScreen';
 import AccountInfoScreen from './src/screens/AccountInfoScreen';
 import ParentalControlScreen from './src/screens/ParentalControlScreen';
+import NetworkInfoScreen from './src/screens/NetworkInfoScreen';
+import SpeedTestScreen from './src/screens/SpeedTestScreen';
 import CategoriesSelectionScreen from './src/screens/CategoriesSelectionScreen';
 import TimeRestrictionsScreen from './src/screens/TimeRestrictionsScreen';
 import EPGManualSourcesScreen from './src/screens/EPGManualSourcesScreen';
 import EPGPlaylistAssignmentScreen from './src/screens/EPGPlaylistAssignmentScreen';
 import AddProfileScreen from './src/screens/AddProfileScreen';
 import UserProfileScreen from './src/screens/UserProfileScreen';
+
+// 🎬 Écrans Films et Séries VOD
+import MoviesScreen from './src/screens/vod/MoviesScreen';
+import SeriesScreen from './src/screens/vod/SeriesScreen';
+import MovieDetailScreen from './src/screens/vod/MovieDetailScreen';
+import SeriesDetailScreen from './src/screens/vod/SeriesDetailScreen';
 
 // Types navigation
 import type {Channel, Profile} from './src/types';
@@ -112,20 +136,42 @@ export type RootStackParamList = {
     playlistType?: string;
   };
   Settings: undefined;
+  AutoSyncSettings: undefined;
   VideoPlayerSettings: undefined;
   TVGuideSettings: undefined;
   ThemeSettings: undefined;
   PlayerSettings: undefined;
   LanguageSettings: undefined;
+  PerformanceSettings: undefined;
+  SpeedTest: undefined;
   Account: undefined;
   AccountInfo: undefined;
-    AddProfile: undefined;
+  ProfileStartupSettings: undefined;
+  InterfaceSettings: undefined;
+  AddProfile: undefined;
   UserProfile: { profile: Profile };
   ParentalControl: undefined;
   CategoriesSelection: {profileId: string};
   TimeRestrictions: {profileId: string};
   EPGManualSources: undefined;
   EPGPlaylistAssignment: undefined;
+  // 🎬 Écrans Films et Séries VOD
+  MoviesScreen: {
+    playlistId: string;
+    categories?: any[];
+  };
+  SeriesScreen: {
+    playlistId: string;
+    categories?: any[];
+  };
+  MovieDetailScreen: {
+    movie: any;
+    playlistId: string;
+  };
+  SeriesDetailScreen: {
+    series: any;
+    playlistId: string;
+  };
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -139,13 +185,17 @@ const Stack = createStackNavigator<RootStackParamList>();
  * - Overlays globaux
  */
 const App: React.FC = () => {
-  console.log('📍 [DEBUG] App.tsx loaded with GestureHandler support');
-
   // Configuration cache FastImage au démarrage
   useFastImageCache();
 
   // Initialisation des index de base de données en arrière-plan
   useDatabaseInitialization();
+
+  // Initialisation du système de synchronisation professionnelle
+  useSyncInitialization();
+
+  // Écouter les événements de synchronisation pour rafraîchir le store
+  usePlaylistSync();
 
   // La persistance est maintenant gérée automatiquement par le store Zustand.
   // L'état (y compris la playlist active) est restauré au démarrage de l'application.
@@ -227,7 +277,46 @@ const App: React.FC = () => {
                     }),
                   }}
                 />
+                {/* 🎬 Écrans Films et Séries VOD */}
+                <Stack.Screen
+                  name="MoviesScreen"
+                  component={MoviesScreen}
+                  options={{
+                    headerShown: false,
+                    gestureEnabled: true,
+                  }}
+                />
+                <Stack.Screen
+                  name="SeriesScreen"
+                  component={SeriesScreen}
+                  options={{
+                    headerShown: false,
+                    gestureEnabled: true,
+                  }}
+                />
+                <Stack.Screen
+                  name="MovieDetailScreen"
+                  component={MovieDetailScreen}
+                  options={{
+                    headerShown: false,
+                    gestureEnabled: true,
+                    presentation: 'modal',
+                  }}
+                />
+                <Stack.Screen
+                  name="SeriesDetailScreen"
+                  component={SeriesDetailScreen}
+                  options={{
+                    headerShown: false,
+                    gestureEnabled: true,
+                    presentation: 'modal',
+                  }}
+                />
                 <Stack.Screen name="Settings" component={SettingsScreen} />
+                <Stack.Screen
+                  name="AutoSyncSettings"
+                  component={AutoSyncSettingsScreen}
+                />
                 <Stack.Screen
                   name="VideoPlayerSettings"
                   component={VideoPlayerSettingsScreen}
@@ -245,6 +334,11 @@ const App: React.FC = () => {
                   component={PerformanceSettingsScreen}
                 />
                 <Stack.Screen
+                  name="SpeedTest"
+                  component={SpeedTestScreen}
+                  options={{headerShown: false}}
+                />
+                <Stack.Screen
                   name="PlayerSettings"
                   component={PlayerSettingsScreen}
                 />
@@ -255,6 +349,14 @@ const App: React.FC = () => {
                 <Stack.Screen
                   name="Account"
                   component={AccountScreen}
+                />
+                <Stack.Screen
+                  name="ProfileStartupSettings"
+                  component={ProfileStartupSettings}
+                />
+                <Stack.Screen
+                  name="InterfaceSettings"
+                  component={InterfaceSettingsScreen}
                 />
                 <Stack.Screen
                   name="AccountInfo"

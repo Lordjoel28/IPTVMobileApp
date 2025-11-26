@@ -7,7 +7,7 @@ import LoadingOverlay from './src/components/LoadingOverlay';
 import NotificationToast from './src/components/NotificationToast';
 
 import App_IPTV_SMARTERS from './App_IPTV_SMARTERS';
-import PlaylistsScreen from './src/screens/PlaylistsScreen';
+import PlaylistsScreenWithPin from './src/components/PlaylistsScreenWithPin';
 
 const Tab = createBottomTabNavigator();
 
@@ -53,7 +53,7 @@ const TabNavigator = () => {
 
         <Tab.Screen
           name="Playlists"
-          component={PlaylistsScreen}
+          component={PlaylistsScreenWithPin}
           options={{
             tabBarIcon: ({color, size}) => (
               <Icon name="playlist-play" color={color} size={size} />

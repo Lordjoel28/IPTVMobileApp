@@ -22,6 +22,7 @@ import SystemNavigationBar from 'react-native-system-navigation-bar';
 
 import {useTheme, useThemeColors, useIsDark} from '../contexts/ThemeContext';
 import {useI18n} from '../hooks/useI18n';
+import {useUISettings} from '../stores/UIStore';
 import {availableThemes, getThemesList} from '../themes/themeConfig';
 import ThemePreviewCard from '../components/ThemePreviewCard';
 import ThemeQuickActions from '../components/ThemeQuickActions';
@@ -36,6 +37,7 @@ const ThemeSettingsScreen: React.FC = () => {
   const {currentTheme, setTheme, isSystemTheme} = useTheme();
   const colors = useThemeColors();
   const isDark = useIsDark();
+  const { getScaledTextSize } = useUISettings();
 
   // Nouveau système i18n avec namespaces themes, profiles et common
   const {t: tThemes} = useI18n('themes');
@@ -63,6 +65,7 @@ const ThemeSettingsScreen: React.FC = () => {
 
   useEffect(() => {
     SystemNavigationBar.immersive();
+    console.log(`🎨 [ThemeSettings] Text scale: ${getScaledTextSize(20)}`);
 
     return () => {
       SystemNavigationBar.navigationShow();
@@ -103,7 +106,7 @@ const ThemeSettingsScreen: React.FC = () => {
         </TouchableOpacity>
 
         <View style={styles.headerContent}>
-          <Text style={[styles.headerTitle, {color: colors.text.primary}]}>
+          <Text style={[styles.headerTitle, {color: colors.text.primary, fontSize: getScaledTextSize(22)}]}>
             {tThemes('themes').toUpperCase()}
           </Text>
           <View style={styles.currentThemeInfo}>
@@ -114,7 +117,7 @@ const ThemeSettingsScreen: React.FC = () => {
               ]}
             />
             <Text
-              style={[styles.currentThemeText, {color: colors.text.secondary}]}>
+              style={[styles.currentThemeText, {color: colors.text.secondary, fontSize: getScaledTextSize(14)}]}>
               {getTranslatedThemeName(currentTheme.id)} {isSystemTheme ? `(${tCommon('auto')})` : ''}
             </Text>
           </View>
@@ -128,7 +131,7 @@ const ThemeSettingsScreen: React.FC = () => {
         
         {/* Section Actions Rapides - Maintenant en haut */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, {color: colors.text.primary}]}>
+          <Text style={[styles.sectionTitle, {color: colors.text.primary, fontSize: getScaledTextSize(18)}]}>
             {tThemes('quickActions')}
           </Text>
           <ThemeQuickActions style={styles.quickActions} />
@@ -136,11 +139,11 @@ const ThemeSettingsScreen: React.FC = () => {
 
         {/* Section Sélection des Thèmes */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, {color: colors.text.primary}]}>
+          <Text style={[styles.sectionTitle, {color: colors.text.primary, fontSize: getScaledTextSize(18)}]}>
             {tProfiles('chooseTheme')}
           </Text>
           <Text
-            style={[styles.sectionSubtitle, {color: colors.text.secondary}]}>
+            style={[styles.sectionSubtitle, {color: colors.text.secondary, fontSize: getScaledTextSize(13)}]}>
             {tThemes('longPressPreview')}
           </Text>
 
@@ -166,7 +169,7 @@ const ThemeSettingsScreen: React.FC = () => {
               {backgroundColor: colors.surface.secondary},
             ]}>
             <Icon name="info-outline" size={20} color={colors.accent.info} />
-            <Text style={[styles.infoText, {color: colors.text.secondary}]}>
+            <Text style={[styles.infoText, {color: colors.text.secondary, fontSize: getScaledTextSize(13)}]}>
               {tThemes('themeAppliesInstantly')}
             </Text>
           </View>

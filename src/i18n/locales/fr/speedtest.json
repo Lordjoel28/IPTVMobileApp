@@ -1,0 +1,16 @@
+{
+  "title": "Test de rapidité",
+  "ping": "LATENCE",
+  "download": "TÉLÉCHARGEMENT",
+  "upload": "ENVOI",
+  "startTest": "Commencez à tester",
+  "stopTest": "Arrêter le test",
+  "restartTest": "Redémarrer le test",
+  "testing": "Test en cours...",
+  "testingPing": "Test de la latence...",
+  "testingDownload": "Test du débit descendant...",
+  "testingUpload": "Test du débit montant...",
+  "completed": "Test terminé",
+  "ms": "ms",
+  "mbps": "Mbps"
+}

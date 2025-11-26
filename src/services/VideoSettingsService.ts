@@ -77,7 +77,7 @@ class VideoSettingsService {
    */
   private getDefaultSettings(): VideoSettings {
     return {
-      autoplay: true,
+      autoplay: false,
       rememberPosition: true,
       backgroundPlay: false,
       playbackSpeed: 1.0,

@@ -10,7 +10,8 @@
  * @ts-nocheck
  */
 
-import React, {useState, useEffect, useCallback, useRef} from 'react';
+import React from 'react';
+import {useState, useEffect, useCallback, useRef} from 'react';
 import {
   View,
   Text,
@@ -22,6 +23,7 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import {useThemeColors} from '../contexts/ThemeContext';
+import {useUISettings} from '../stores/UIStore';
 import {
   FullEPGData,
   EPGChannel,
@@ -68,7 +70,10 @@ const EPGCompact: React.FC<EPGCompactProps> = ({
   playlistMetadata,
 }) => {
   const colors = useThemeColors();
+  const { getEpgAlpha, getScaledTextSize } = useUISettings();
   const styles = createStyles(colors);
+
+  console.log(`🎨 [EPGCompact] EPG alpha: ${getEpgAlpha()}, Text scale: ${getScaledTextSize(14)}`);
 
   // Composant pour afficher une icône avec texte
   const IconText: React.FC<{
@@ -1067,14 +1072,14 @@ const EPGCompact: React.FC<EPGCompactProps> = ({
     return (
       <View style={[styles.container, height ? {height} : {flex: 1}]}>
         <View style={styles.emptyState}>
-          <Text style={styles.emptyText}>Sélectionnez une chaîne</Text>
+          <Text style={[styles.emptyText, { fontSize: getScaledTextSize(13) }]}>Sélectionnez une chaîne</Text>
         </View>
       </View>
     );
   }
 
   return (
-    <View style={[styles.container, height ? {height} : {flex: 1}]}>
+    <View style={[styles.container, { backgroundColor: getEpgAlpha() }, height ? {height} : {flex: 1}]}>
       {programs.length > 0 ? (
         <ScrollView
           showsVerticalScrollIndicator={false}
@@ -1089,7 +1094,7 @@ const EPGCompact: React.FC<EPGCompactProps> = ({
                 key={`live-${program.id}`}
                 style={styles.currentSectionCompact}>
                 <View style={styles.sectionHeaderWithProgress}>
-                  <Text style={styles.sectionHeader}>MAINTENANT</Text>
+                  <Text style={[styles.sectionHeader, { fontSize: getScaledTextSize(11) }]}>MAINTENANT</Text>
                   {/* Barre de progression en haut - TEMPS RÉEL */}
                   {program.isLive && (
                     <View style={styles.progressBarContainerTop}>
@@ -1105,7 +1110,7 @@ const EPGCompact: React.FC<EPGCompactProps> = ({
                           ]}
                         />
                       </View>
-                      <Text style={styles.progressPercentageSmall}>
+                      <Text style={[styles.progressPercentageSmall, { fontSize: getScaledTextSize(8) }]}>
                         {Math.round(calculateLiveProgress(program))}%
                       </Text>
                     </View>
@@ -1113,17 +1118,17 @@ const EPGCompact: React.FC<EPGCompactProps> = ({
                 </View>
                 <View style={styles.programLineCompact}>
                   <View style={styles.programTimeRange}>
-                    <Text style={styles.programTimeCompact}>
+                    <Text style={[styles.programTimeCompact, { fontSize: getScaledTextSize(11) }]}>
                       {formatTime(program.startTime)}
                     </Text>
-                    <Text style={styles.programTimeEnd}>
+                    <Text style={[styles.programTimeEnd, { fontSize: getScaledTextSize(9) }]}>
                       {formatTime(program.endTime)}
                     </Text>
                   </View>
                   <View style={styles.programInfoExpanded}>
                     <View style={styles.titleWithIndicator}>
                       <Text
-                        style={styles.programNameExpanded}
+                        style={[styles.programNameExpanded, { fontSize: getScaledTextSize(13) }]}
                         numberOfLines={2}>
                         {program.title}
                       </Text>
@@ -1132,7 +1137,7 @@ const EPGCompact: React.FC<EPGCompactProps> = ({
                   </View>
                 </View>
                 {program.description && (
-                  <Text style={styles.programSubtitleCompact} numberOfLines={3}>
+                  <Text style={[styles.programSubtitleCompact, { fontSize: getScaledTextSize(11) }]} numberOfLines={3}>
                     {program.description}
                   </Text>
                 )}
@@ -1142,7 +1147,7 @@ const EPGCompact: React.FC<EPGCompactProps> = ({
           {/* Section ENSUITE */}
           {programs.filter(p => !p.isLive).length > 0 && (
             <View style={styles.upcomingSection}>
-              <Text style={styles.sectionHeader}>ENSUITE</Text>
+              <Text style={[styles.sectionHeader, { fontSize: getScaledTextSize(11) }]}>ENSUITE</Text>
               {programs
                 .filter(p => !p.isLive)
                 .slice(0, 4)
@@ -1152,20 +1157,20 @@ const EPGCompact: React.FC<EPGCompactProps> = ({
                     style={styles.upcomingProgram}>
                     <View style={styles.upcomingHeader}>
                       <View style={styles.upcomingTimeRange}>
-                        <Text style={styles.programTime}>
+                        <Text style={[styles.programTime, { fontSize: getScaledTextSize(12) }]}>
                           {formatTime(program.startTime)}
                         </Text>
-                        <Text style={styles.programTimeEnd}>
+                        <Text style={[styles.programTimeEnd, { fontSize: getScaledTextSize(9) }]}>
                           {formatTime(program.endTime)}
                         </Text>
                       </View>
-                      <Text style={styles.programName} numberOfLines={1}>
+                      <Text style={[styles.programName, { fontSize: getScaledTextSize(14) }]} numberOfLines={1}>
                         {program.title}
                       </Text>
                     </View>
                     {program.description && (
                       <Text
-                        style={styles.upcomingDescription}
+                        style={[styles.upcomingDescription, { fontSize: getScaledTextSize(11) }]}
                         numberOfLines={2}>
                         {program.description}
                       </Text>
@@ -1180,7 +1185,7 @@ const EPGCompact: React.FC<EPGCompactProps> = ({
           {/* 🚀 Interface de chargement simple */}
           {isLoadingEPG ? (
             <View style={styles.loadingContainer}>
-              <Text style={styles.loadingText}>Chargement du Guide TV</Text>
+              <Text style={[styles.loadingText, { fontSize: getScaledTextSize(13) }]}>Chargement du Guide TV</Text>
               <View style={styles.progressContainer}>
                 <View style={styles.progressBarLoading}>
                   <View
@@ -1190,7 +1195,7 @@ const EPGCompact: React.FC<EPGCompactProps> = ({
                     ]}
                   />
                 </View>
-                <Text style={styles.progressText}>{loadingProgress}%</Text>
+                <Text style={[styles.progressText, { fontSize: getScaledTextSize(11) }]}>{loadingProgress}%</Text>
               </View>
             </View>
           ) : (
@@ -1206,7 +1211,7 @@ const EPGCompact: React.FC<EPGCompactProps> = ({
                     color="#FF9500"
                     style={styles.warningIcon}
                   />
-                  <Text style={styles.warningText}>
+                  <Text style={[styles.warningText, { fontSize: getScaledTextSize(12) }]}>
                     Les données EPG peuvent être incorrectes ou obsolètes.
                     {'\n'}Vérifiez avec votre fournisseur IPTV.
                   </Text>

@@ -11,6 +11,7 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import FastImage from 'react-native-fast-image';
 import type { Channel } from '../types';
 import { EPGData } from '../services/EPGHelper';
+import {useUISettings} from '../stores/UIStore';
 
 interface RecentChannel {
   id: string;
@@ -76,6 +77,10 @@ export const DockerBar: React.FC<DockerBarProps> = ({
   onScrollBegin,
   onScrollEnd,
 }) => {
+  const { getScaledTextSize } = useUISettings();
+
+  console.log(`🎨 [DockerBar] Text scale: ${getScaledTextSize(14)}`);
+
   // 🐛 DEBUG: Logs d'état du composant
   React.useEffect(() => {
     console.log('🔍 [DockerBar] État:', {
@@ -131,7 +136,7 @@ export const DockerBar: React.FC<DockerBarProps> = ({
             />
           )}
           <View style={styles.infoBarDetails}>
-            <Text style={styles.infoBarProgramTitle} numberOfLines={1}>
+            <Text style={[styles.infoBarProgramTitle, { fontSize: getScaledTextSize(14) }]} numberOfLines={1}>
               {epgData?.currentProgram?.title || "Pas d'information"}
             </Text>
             <View
@@ -140,18 +145,18 @@ export const DockerBar: React.FC<DockerBarProps> = ({
                 alignItems: 'center',
                 marginVertical: 4,
               }}>
-              <Text style={styles.infoBarProgramTime}>
+              <Text style={[styles.infoBarProgramTime, { fontSize: getScaledTextSize(12) }]}>
                 {epgData
                   ? `${epgData.programStartTime} - ${epgData.programEndTime}`
                   : "Pas d'information"}
               </Text>
               {epgData && (
-                <Text style={styles.infoBarRemainingTime}>
+                <Text style={[styles.infoBarRemainingTime, { fontSize: getScaledTextSize(10) }]}>
                   {epgData.remainingMinutes} min
                 </Text>
               )}
             </View>
-            <Text style={styles.infoBarNextProgram} numberOfLines={1}>
+            <Text style={[styles.infoBarNextProgram, { fontSize: getScaledTextSize(12) }]} numberOfLines={1}>
               À suivre: {epgData?.nextProgram?.title || "Pas d'information"}
             </Text>
           </View>
@@ -203,7 +208,7 @@ export const DockerBar: React.FC<DockerBarProps> = ({
               }}>
               <View style={styles.recentChannelPreview}>
                 <Icon name="live-tv" size={28} color="#fff" />
-                <Text style={styles.dockerButtonTextModern}>Chaînes</Text>
+                <Text style={[styles.dockerButtonTextModern, { fontSize: getScaledTextSize(12) }]}>Chaînes</Text>
               </View>
             </TouchableOpacity>
           )}
@@ -218,7 +223,7 @@ export const DockerBar: React.FC<DockerBarProps> = ({
               }}>
               <View style={styles.recentChannelPreview}>
                 <Icon name="view-comfy" size={28} color="#fff" />
-                <Text style={styles.dockerButtonTextModern}>Multi-écran</Text>
+                <Text style={[styles.dockerButtonTextModern, { fontSize: getScaledTextSize(12) }]}>Multi-écran</Text>
               </View>
             </TouchableOpacity>
           )}
@@ -254,7 +259,7 @@ export const DockerBar: React.FC<DockerBarProps> = ({
                     />
                   ) : (
                     <View style={styles.logoFallback}>
-                      <Text style={styles.logoFallbackText}>
+                      <Text style={[styles.logoFallbackText, { fontSize: getScaledTextSize(8) }]}>
                         {(recentChannel.name || 'CH').substring(0, 2)}
                       </Text>
                     </View>
@@ -271,7 +276,7 @@ export const DockerBar: React.FC<DockerBarProps> = ({
               onPress={onClearRecentChannels}>
               <View style={styles.recentChannelPreview}>
                 <Icon name="clear-all" size={24} color="#fff" />
-                <Text style={styles.dockerButtonTextModern}>Effacer</Text>
+                <Text style={[styles.dockerButtonTextModern, { fontSize: getScaledTextSize(12) }]}>Effacer</Text>
               </View>
             </TouchableOpacity>
           )}

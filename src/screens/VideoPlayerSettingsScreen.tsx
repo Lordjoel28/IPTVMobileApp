@@ -1,4 +1,5 @@
-import React, {useEffect, useState} from 'react';
+import React from 'react';
+import {useEffect, useState} from 'react';
 import {
   View,
   Text,
@@ -17,6 +18,7 @@ import type {RootStackParamList} from '../../App';
 import { videoSettingsService } from '../services/VideoSettingsService';
 import type { VideoSettings } from '../services/VideoSettingsService';
 import {useI18n} from '../hooks/useI18n';
+import {useUISettings} from '../stores/UIStore';
 
 // L'interface est maintenant importée depuis VideoSettingsService
 
@@ -28,6 +30,9 @@ const VideoPlayerSettingsScreen: React.FC = () => {
   const isDark = useIsDark();
   const {t: tSettings} = useI18n('settings');
   const {t: tCommon} = useI18n('common');
+  const { getScaledTextSize } = useUISettings();
+
+  console.log(`🎨 [VideoPlayerSettingsScreen] Text scale: ${getScaledTextSize(16)}`);
   const [settings, setSettings] = useState<VideoSettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -354,10 +359,11 @@ const VideoPlayerSettingsScreen: React.FC = () => {
   };
 
   
+  
   if (isLoading || !settings) {
     return (
       <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>
+        <Text style={[styles.loadingText, { fontSize: getScaledTextSize(16) }]}>
           {isLoading ? `🔄 ${tCommon('loadingSettings')}` : `❌ ${tCommon('loadingError')}`}
         </Text>
       </View>
@@ -373,18 +379,18 @@ const VideoPlayerSettingsScreen: React.FC = () => {
           onPress={() => navigation.goBack()}>
           <Icon name="arrow-back" size={24} color={safeColors.text.primary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{tSettings('videoPlayerSettings')}</Text>
+        <Text style={[styles.headerTitle, { fontSize: getScaledTextSize(20) }]}>{tSettings('videoPlayerSettings')}</Text>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Section Lecture */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🎬 {tSettings('playbackSettings')}</Text>
+          <Text style={[styles.sectionTitle, { fontSize: getScaledTextSize(18) }]}>🎬 {tSettings('playbackSettings')}</Text>
 
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>{tSettings('autoplayLabel')}</Text>
-              <Text style={styles.settingDescription}>
+              <Text style={[styles.settingLabel, { fontSize: getScaledTextSize(16) }]}>{tSettings('autoplayLabel')}</Text>
+              <Text style={[styles.settingDescription, { fontSize: getScaledTextSize(14) }]}>
                 {tSettings('autoplayDesc')}
               </Text>
             </View>
@@ -398,8 +404,8 @@ const VideoPlayerSettingsScreen: React.FC = () => {
 
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>{tSettings('rememberPositionLabel')}</Text>
-              <Text style={styles.settingDescription}>
+              <Text style={[styles.settingLabel, { fontSize: getScaledTextSize(16) }]}>{tSettings('rememberPositionLabel')}</Text>
+              <Text style={[styles.settingDescription, { fontSize: getScaledTextSize(14) }]}>
                 {tSettings('rememberPositionDesc')}
               </Text>
             </View>
@@ -414,8 +420,8 @@ const VideoPlayerSettingsScreen: React.FC = () => {
           {/* Vitesse de lecture */}
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>⚡ {tSettings('playbackSpeedLabel')}</Text>
-              <Text style={styles.settingDescription}>
+              <Text style={[styles.settingLabel, { fontSize: getScaledTextSize(16) }]}>⚡ {tSettings('playbackSpeedLabel')}</Text>
+              <Text style={[styles.settingDescription, { fontSize: getScaledTextSize(14) }]}>
                 {tCommon('currently')}: {settings.playbackSpeed}x ({tSettings('playbackSpeedDesc')})
               </Text>
             </View>
@@ -446,8 +452,8 @@ const VideoPlayerSettingsScreen: React.FC = () => {
           {/* Lecture en arrière-plan */}
           <View style={[styles.settingRow, { borderBottomWidth: 0 }]}>
             <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>🎵 {tSettings('backgroundPlayLabel')}</Text>
-              <Text style={styles.settingDescription}>
+              <Text style={[styles.settingLabel, { fontSize: getScaledTextSize(16) }]}>🎵 {tSettings('backgroundPlayLabel')}</Text>
+              <Text style={[styles.settingDescription, { fontSize: getScaledTextSize(14) }]}>
                 {tSettings('backgroundPlayDesc')}
               </Text>
             </View>
@@ -460,15 +466,15 @@ const VideoPlayerSettingsScreen: React.FC = () => {
           </View>
         </View>
 
-        
+
         {/* Section Réseau */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🌐 {tSettings('networkSettings')}</Text>
+          <Text style={[styles.sectionTitle, { fontSize: getScaledTextSize(18) }]}>🌐 {tSettings('networkSettings')}</Text>
 
           <View style={[styles.settingRow, { borderBottomWidth: 0 }]}>
             <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>{tSettings('networkTimeoutLabel')}</Text>
-              <Text style={styles.settingDescription}>
+              <Text style={[styles.settingLabel, { fontSize: getScaledTextSize(16) }]}>{tSettings('networkTimeoutLabel')}</Text>
+              <Text style={[styles.settingDescription, { fontSize: getScaledTextSize(14) }]}>
                 {tSettings('networkTimeoutDesc')}: {settings.networkTimeout}s
               </Text>
             </View>
@@ -498,13 +504,13 @@ const VideoPlayerSettingsScreen: React.FC = () => {
 
         {/* Section Interface */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🎨 {tSettings('userInterface')}</Text>
+          <Text style={[styles.sectionTitle, { fontSize: getScaledTextSize(18) }]}>🎨 {tSettings('userInterface')}</Text>
 
           {/* Format heure */}
           <View style={[styles.settingRow, { borderBottomWidth: 0 }]}>
             <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel}>{tSettings('timeFormatLabel')}</Text>
-              <Text style={styles.settingDescription}>
+              <Text style={[styles.settingLabel, { fontSize: getScaledTextSize(16) }]}>{tSettings('timeFormatLabel')}</Text>
+              <Text style={[styles.settingDescription, { fontSize: getScaledTextSize(14) }]}>
                 {tSettings('timeFormatDesc')}
               </Text>
             </View>
@@ -529,7 +535,7 @@ const VideoPlayerSettingsScreen: React.FC = () => {
                 ]}>
                 {tSettings('twelveHours')}
               </Text>
-              <Text style={styles.timeFormatButtonDescription}>
+              <Text style={[styles.timeFormatButtonDescription, { fontSize: getScaledTextSize(12) }]}>
                 {tSettings('amPm')}
               </Text>
             </TouchableOpacity>
@@ -552,7 +558,7 @@ const VideoPlayerSettingsScreen: React.FC = () => {
                 ]}>
                 {tSettings('twentyFourHours')}
               </Text>
-              <Text style={styles.timeFormatButtonDescription}>
+              <Text style={[styles.timeFormatButtonDescription, { fontSize: getScaledTextSize(12) }]}>
                 {tCommon('standard')}
               </Text>
             </TouchableOpacity>

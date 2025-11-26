@@ -3,7 +3,8 @@
  * Wrapper pour App_IPTV_SMARTERS avec navigation React Navigation
  */
 
-import React, {useRef, useEffect, useState} from 'react';
+import React from 'react';
+import {useRef, useEffect, useState} from 'react';
 import {
   View,
   Text,
@@ -25,6 +26,7 @@ import type {Channel} from '../types';
 import {useNavigation} from '@react-navigation/native';
 import type {StackNavigationProp} from '@react-navigation/stack';
 import type {RootStackParamList} from '../types';
+import {useUISettings} from '../stores/UIStore';
 
 // Import du service IPTV
 import {usePlaylistStore} from '../stores/PlaylistStore';
@@ -60,6 +62,9 @@ const bottomRowCards = [
 const HomeScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const {loadPlaylist} = usePlaylistStore();
+  const { getScaledTextSize } = useUISettings();
+
+  console.log(`🎨 [HomeScreen] Text scale: ${getScaledTextSize(20)}`);
 
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showVideoPlayer, setShowVideoPlayer] = useState(false);
@@ -395,10 +400,107 @@ const HomeScreen: React.FC = () => {
     setShowConnectionModal(false);
   };
 
-  // Handler pour la connexion Xtream Codes
+  // Handler pour la connexion Xtream Codes - STYLE TIVIMATE/IPTV SMARTERS PRO
   const handleXtreamConnection = async (credentials: any) => {
     console.log('🔐 Connexion Xtream avec:', credentials);
     setShowXtreamModal(false);
+
+    try {
+      // 1. Vérifier la connexion et récupérer les infos du compte
+      console.log('🔍 Vérification des credentials Xtream...');
+      const WatermelonXtreamService = (await import('../services/WatermelonXtreamService')).default;
+      const accountInfo = await WatermelonXtreamService.getAccountInfo(credentials);
+      console.log('✅ Compte Xtream validé:', accountInfo.username);
+
+      // 2. Créer la playlist dans WatermelonDB
+      console.log('💾 Création de la playlist Xtream...');
+      const database = (await import('../database')).default;
+      const playlist = await database.write(async () => {
+        return await database.get('playlists').create((p: any) => {
+          p.name = accountInfo.username || 'Xtream Playlist';
+          p.type = 'XTREAM';
+          p.server = credentials.url;
+          p.username = credentials.username;
+          p.password = credentials.password;
+          p.dateAdded = Date.now();
+          p.expirationDate = accountInfo.exp_date || '';
+          p.channelsCount = 0; // Sera mis à jour après
+          p.status = accountInfo.status === 'Active' ? 'active' : 'expired';
+          p.isActive = accountInfo.status === 'Active';
+          p.createdAt = Date.now();
+          p.updatedAt = Date.now();
+        });
+      });
+
+      console.log('✅ Playlist créée:', playlist.id);
+
+      // 3. 🚀 PRÉCHARGER LES DONNÉES VOD (COMME TIVIMATE/IPTV SMARTERS PRO)
+      console.log('🚀 Préchargement des données VOD (style TiviMate)...');
+      const VODCacheService = (await import('../services/VODCacheService')).default;
+
+      // Afficher un indicateur de progression (optionnel)
+      Alert.alert(
+        'Synchronisation en cours...',
+        'Téléchargement des films et séries. Cela peut prendre quelques instants.',
+        [],
+        {cancelable: false},
+      );
+
+      const vodStats = await VODCacheService.preloadPlaylistVOD(
+        playlist.id,
+        credentials,
+        (stage, progress) => {
+          console.log(`📊 [${progress}%] ${stage}`);
+        },
+      );
+
+      console.log(`✅ VOD préchargé: ${vodStats.moviesCount} films, ${vodStats.seriesCount} séries`);
+
+      // 4. Charger les chaînes live TV
+      console.log('📺 Chargement des chaînes live...');
+      const channels = await WatermelonXtreamService.getChannelsFromXtream(credentials);
+
+      // Sauvegarder les chaînes dans WatermelonDB
+      await WatermelonXtreamService.saveChannelsToDatabase(playlist.id, channels);
+
+      // Mettre à jour le compteur de chaînes
+      await database.write(async () => {
+        await playlist.update((p: any) => {
+          p.channelsCount = channels.length;
+          p.updatedAt = Date.now();
+        });
+      });
+
+      console.log(`✅ ${channels.length} chaînes sauvegardées`);
+
+      // 5. Fermer l'alert et afficher le succès
+      Alert.alert(
+        '✅ Connexion réussie!',
+        `Playlist ajoutée avec succès!\n\n` +
+          `📺 ${channels.length} chaînes\n` +
+          `🎬 ${vodStats.moviesCount} films\n` +
+          `📺 ${vodStats.seriesCount} séries\n\n` +
+          `Les données sont maintenant en cache pour un chargement instantané!`,
+        [
+          {
+            text: 'Voir les chaînes',
+            onPress: () => {
+              navigation.navigate('ChannelsScreen', {
+                playlistId: playlist.id,
+                channelsCount: channels.length,
+                playlistType: 'XTREAM',
+              });
+            },
+          },
+        ],
+      );
+    } catch (error: any) {
+      console.error('❌ Erreur connexion Xtream:', error);
+      Alert.alert(
+        'Erreur de connexion',
+        error.message || 'Impossible de se connecter au serveur Xtream Codes. Vérifiez vos informations.',
+      );
+    }
   };
 
   // Handler pour la connexion M3U URL - NAVIGATION VERS CHANNELLIST
@@ -541,9 +643,9 @@ const HomeScreen: React.FC = () => {
             <View style={styles.logoIcon}>
               <Icon name="tv" size={24} color="#FFFFFF" />
             </View>
-            <Text style={styles.logoText}>IPTV SMARTERS</Text>
+            <Text style={[styles.logoText, { fontSize: getScaledTextSize(24) }]}>IPTV SMARTERS</Text>
           </View>
-          <Text style={styles.timeText}>
+          <Text style={[styles.timeText, { fontSize: getScaledTextSize(16) }]}>
             {currentTime.toLocaleString('fr-FR', {
               hour: '2-digit',
               minute: '2-digit',
@@ -562,7 +664,7 @@ const HomeScreen: React.FC = () => {
               Alert.alert('DEBUG', '🔍 RECHERCHE CLIQUÉ!');
             }}>
             <Icon name="search" size={24} color="#FFFFFF" />
-            <Text style={styles.headerButtonText}>Main Recherche</Text>
+            <Text style={[styles.headerButtonText, { fontSize: getScaledTextSize(14) }]}>Main Recherche</Text>
           </TouchableOpacity>
           </View>
       </View>
@@ -613,8 +715,8 @@ const HomeScreen: React.FC = () => {
                   <View style={styles.premiumIconWrapper}>
                     <Image source={iconMap.tv} style={styles.iconImageLg} />
                   </View>
-                  <Text style={styles.modernTvTitle}>TV EN DIRECT</Text>
-                  <Text style={styles.modernSubtitle}>Streaming Live</Text>
+                  <Text style={[styles.modernTvTitle, { fontSize: getScaledTextSize(18) }]}>TV EN DIRECT</Text>
+                  <Text style={[styles.modernSubtitle, { fontSize: getScaledTextSize(12) }]}>Streaming Live</Text>
                 </View>
               </TouchableOpacity>
             </View>
@@ -626,8 +728,13 @@ const HomeScreen: React.FC = () => {
                 <TouchableOpacity
                   style={styles.cardFilms}
                   onPress={() => {
-                    console.log('🎬 Films CLICKED!');
-                    Alert.alert('TEST CARTE', '🎬 FILMS CLIQUÉ! ✅');
+                    console.log('🎬 Films CLICKED! - Navigation vers MoviesScreen');
+                    const {selectedPlaylistId} = usePlaylistStore.getState();
+                    if (selectedPlaylistId) {
+                      navigation.navigate('MoviesScreen', {playlistId: selectedPlaylistId});
+                    } else {
+                      Alert.alert('Aucune playlist', 'Veuillez d\'abord importer une playlist Xtream Codes');
+                    }
                   }}
                   activeOpacity={0.8}>
                   <LinearGradient
@@ -671,7 +778,7 @@ const HomeScreen: React.FC = () => {
                         style={styles.iconImageMd}
                       />
                     </View>
-                    <Text style={styles.modernCardTitle}>FILMS</Text>
+                    <Text style={[styles.modernCardTitle, { fontSize: getScaledTextSize(16) }]}>FILMS</Text>
                   </View>
                 </TouchableOpacity>
               </View>
@@ -680,8 +787,13 @@ const HomeScreen: React.FC = () => {
                 <TouchableOpacity
                   style={styles.cardSeries}
                   onPress={() => {
-                    console.log('📺 Series CLICKED!');
-                    Alert.alert('TEST CARTE', '📺 SERIES CLIQUÉ! ✅');
+                    console.log('📺 Series CLICKED! - Navigation vers SeriesScreen');
+                    const {selectedPlaylistId} = usePlaylistStore.getState();
+                    if (selectedPlaylistId) {
+                      navigation.navigate('SeriesScreen', {playlistId: selectedPlaylistId});
+                    } else {
+                      Alert.alert('Aucune playlist', 'Veuillez d\'abord importer une playlist Xtream Codes');
+                    }
                   }}
                   activeOpacity={0.8}>
                   <LinearGradient
@@ -725,7 +837,7 @@ const HomeScreen: React.FC = () => {
                         style={styles.iconImageMd}
                       />
                     </View>
-                    <Text style={styles.modernCardTitle}>SERIES</Text>
+                    <Text style={[styles.modernCardTitle, { fontSize: getScaledTextSize(16) }]}>SERIES</Text>
                   </View>
                 </TouchableOpacity>
               </View>
@@ -780,7 +892,7 @@ const HomeScreen: React.FC = () => {
                           style={[styles.iconImageSm, styles.liquidGlassIcon]}
                         />
                       </View>
-                      <Text style={styles.modernSmallTitle}>{card.title}</Text>
+                      <Text style={[styles.modernSmallTitle, { fontSize: getScaledTextSize(10) }]}>{card.title}</Text>
                       <Text style={styles.modernSmallSubtitle}>
                         {card.subtitle}
                       </Text>

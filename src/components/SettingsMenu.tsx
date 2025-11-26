@@ -10,6 +10,7 @@ import Animated from 'react-native-reanimated';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import type { ZoomMode, BufferMode } from '../hooks/useVideoSettings';
 import {useI18n} from '../hooks/useI18n';
+import {useUISettings} from '../stores/UIStore';
 
 // Types pour les pistes
 export interface VideoTrack {
@@ -148,6 +149,10 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
 }) => {
   const {t: tCommon} = useI18n('common');
   const {t: tPlayer} = useI18n('player');
+  const { getMenuAlpha, getScaledTextSize } = useUISettings();
+
+  console.log(`🎨 [SettingsMenu] Menu alpha: ${getMenuAlpha()}, Text scale: ${getScaledTextSize(16)}`);
+
   if (!showSettingsMenu) {
     return null;
   }
@@ -201,7 +206,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
 
       {/* Menu principal - Toujours visible */}
       <Animated.View
-        style={[styles.settingsMenu, settingsMenuAnimatedStyle]}
+        style={[styles.settingsMenu, { backgroundColor: getMenuAlpha() }, settingsMenuAnimatedStyle]}
         pointerEvents="auto"
         onStartShouldSetResponder={() => true}>
         <ScrollView
@@ -215,7 +220,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
             ]}
             onPress={() => onOpenSubMenu('video')}>
             <Icon name="tune" size={22} color="white" />
-            <Text style={styles.settingsMenuText}>{tPlayer('videoTrack')}</Text>
+            <Text style={[styles.settingsMenuText, { fontSize: getScaledTextSize(16) }]}>{tPlayer('videoTrack')}</Text>
             <Icon name="chevron-left" size={20} color="white" />
           </TouchableOpacity>
 
@@ -226,7 +231,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
             ]}
             onPress={() => onOpenSubMenu('audio')}>
             <Icon name="surround-sound" size={22} color="white" />
-            <Text style={styles.settingsMenuText}>{tPlayer('audioTrack')}</Text>
+            <Text style={[styles.settingsMenuText, { fontSize: getScaledTextSize(16) }]}>{tPlayer('audioTrack')}</Text>
             <Icon name="chevron-left" size={20} color="white" />
           </TouchableOpacity>
 
@@ -237,7 +242,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
             ]}
             onPress={() => onOpenSubMenu('subtitles')}>
             <Icon name="subtitles" size={22} color="white" />
-            <Text style={styles.settingsMenuText}>{tPlayer('subtitles')}</Text>
+            <Text style={[styles.settingsMenuText, { fontSize: getScaledTextSize(16) }]}>{tPlayer('subtitles')}</Text>
             <Icon name="chevron-left" size={20} color="white" />
           </TouchableOpacity>
 
@@ -248,8 +253,8 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
             ]}
             onPress={() => onOpenSubMenu('display')}>
             <Icon name="aspect-ratio" size={22} color="white" />
-            <Text style={styles.settingsMenuText}>{tPlayer('displayMode')}</Text>
-            <Text style={styles.settingsMenuActiveText}>
+            <Text style={[styles.settingsMenuText, { fontSize: getScaledTextSize(16) }]}>{tPlayer('displayMode')}</Text>
+            <Text style={[styles.settingsMenuActiveText, { fontSize: getScaledTextSize(14) }]}>
               {getZoomModeLabel(zoomMode)}
             </Text>
             <Icon name="chevron-left" size={20} color="white" />
@@ -262,8 +267,8 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
             ]}
             onPress={() => onOpenSubMenu('buffer')}>
             <Icon name="settings-ethernet" size={22} color="white" />
-            <Text style={styles.settingsMenuText}>{tPlayer('bufferControl')}</Text>
-            <Text style={styles.settingsMenuActiveText}>
+            <Text style={[styles.settingsMenuText, { fontSize: getScaledTextSize(16) }]}>{tPlayer('bufferControl')}</Text>
+            <Text style={[styles.settingsMenuActiveText, { fontSize: getScaledTextSize(14) }]}>
               {getBufferModeLabel(bufferMode)}
             </Text>
             <Icon name="chevron-left" size={20} color="white" />
@@ -276,9 +281,9 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
             ]}
             onPress={() => onOpenSubMenu('sleeptimer')}>
             <Icon name="schedule" size={22} color="white" />
-            <Text style={styles.settingsMenuText}>{tPlayer('sleepTimer')}</Text>
+            <Text style={[styles.settingsMenuText, { fontSize: getScaledTextSize(16) }]}>{tPlayer('sleepTimer')}</Text>
             {sleepTimer && (
-              <Text style={styles.settingsMenuActiveText}>{sleepTimer} min</Text>
+              <Text style={[styles.settingsMenuActiveText, { fontSize: getScaledTextSize(14) }]}>{sleepTimer} min</Text>
             )}
             <Icon name="chevron-left" size={20} color="white" />
           </TouchableOpacity>
@@ -288,11 +293,11 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
       {/* Sous-menu */}
       {activeSubMenu && (
         <Animated.View
-          style={[styles.subMenuContent, subMenuAnimatedStyle]}
+          style={[styles.subMenuContent, { backgroundColor: getMenuAlpha() }, subMenuAnimatedStyle]}
           pointerEvents="auto"
           onStartShouldSetResponder={() => true}>
           <View style={styles.subMenuHeader}>
-            <Text style={styles.subMenuTitle}>
+            <Text style={[styles.subMenuTitle, { fontSize: getScaledTextSize(18) }]}>
               {activeSubMenu === 'video' && tPlayer('videoTrack')}
               {activeSubMenu === 'audio' && tPlayer('audioTrack')}
               {activeSubMenu === 'subtitles' && tPlayer('subtitles')}
@@ -320,7 +325,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
                       onSleepTimerChange(duration);
                       // Le sous-menu reste ouvert pour permettre d'autres ajustements
                     }}>
-                    <Text style={styles.subMenuText}>
+                    <Text style={[styles.subMenuText, { fontSize: getScaledTextSize(13) }]}>
                       {duration === null ? tCommon('disabled') : `${duration} minutes`}
                     </Text>
                     {sleepTimer === duration && (
@@ -335,7 +340,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
             {activeSubMenu === 'video' && (
               <View>
                 <View style={styles.subMenuSection}>
-                  <Text style={styles.subMenuSectionTitle}>
+                  <Text style={[styles.subMenuSectionTitle, { fontSize: getScaledTextSize(13) }]}>
                     {tPlayer('videoQuality')}{' '}
                     {availableVideoTracks.length > 0 &&
                       `(${availableVideoTracks.length} ${tCommon('available')})`}
@@ -351,7 +356,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
                       onVideoQualityChange('auto');
                       console.log('📹 [Video] ✅ Qualité changée: Automatique');
                     }}>
-                    <Text style={styles.subMenuText}>
+                    <Text style={[styles.subMenuText, { fontSize: getScaledTextSize(13) }]}>
                       {tCommon('automatic')} (Adaptative)
                     </Text>
                     {selectedVideoQuality === 'auto' && (
@@ -420,7 +425,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
                               }
                             }}>
                             <View>
-                              <Text style={styles.subMenuText}>
+                              <Text style={[styles.subMenuText, { fontSize: getScaledTextSize(13) }]}>
                                 {resolution} ({quality})
                               </Text>
                               <Text style={[
@@ -455,7 +460,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
             {activeSubMenu === 'audio' && (
               <View>
                 <View style={styles.subMenuSection}>
-                  <Text style={styles.subMenuSectionTitle}>
+                  <Text style={[styles.subMenuSectionTitle, { fontSize: getScaledTextSize(13) }]}>
                     {tPlayer('audioTracksAvailable')}{' '}
                     {availableAudioTracks.length > 0 &&
                       `(${availableAudioTracks.length})`}
@@ -471,7 +476,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
                       onAudioTrackChange(0);
                       console.log('🔇 [Audio] Piste audio désactivée');
                     }}>
-                    <Text style={styles.subMenuText}>{tCommon('disabled')}</Text>
+                    <Text style={[styles.subMenuText, { fontSize: getScaledTextSize(13) }]}>{tCommon('disabled')}</Text>
                     {selectedAudioTrack === 0 && (
                       <Icon name="check" size={18} color="#1976d2" />
                     )}
@@ -513,7 +518,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
                               },
                             );
                           }}>
-                          <Text style={styles.subMenuText}>{label}</Text>
+                          <Text style={[styles.subMenuText, { fontSize: getScaledTextSize(13) }]}>{label}</Text>
                           {isSelected && (
                             <Icon name="check" size={18} color="#1976d2" />
                           )}
@@ -529,7 +534,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
 
                 {/* Contrôle du délai audio */}
                 <View style={styles.subMenuSection}>
-                  <Text style={styles.subMenuSectionTitle}>{tPlayer('audioDelay')}</Text>
+                  <Text style={[styles.subMenuSectionTitle, { fontSize: getScaledTextSize(13) }]}>{tPlayer('audioDelay')}</Text>
 
                   <View style={styles.audioDelayContainer}>
                     <TouchableOpacity
@@ -542,7 +547,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
                       <Icon name="remove" size={24} color="white" />
                     </TouchableOpacity>
 
-                    <Text style={styles.audioDelayText}>
+                    <Text style={[styles.audioDelayText, { fontSize: getScaledTextSize(18) }]}>
                       {audioDelay > 0 ? `+${audioDelay}` : audioDelay} ms
                     </Text>
 
@@ -564,7 +569,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
             {activeSubMenu === 'subtitles' && (
               <View>
                 <View style={styles.subMenuSection}>
-                  <Text style={styles.subMenuSectionTitle}>
+                  <Text style={[styles.subMenuSectionTitle, { fontSize: getScaledTextSize(13) }]}>
                     {tPlayer('subtitlesAvailable')}{' '}
                     {availableSubtitleTracks.length > 0 &&
                       `(${availableSubtitleTracks.length})`}
@@ -580,7 +585,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
                       onSubtitleTrackChange(0);
                       console.log('🚫 [Subtitles] Sous-titres désactivés');
                     }}>
-                    <Text style={styles.subMenuText}>{tCommon('disabled')}</Text>
+                    <Text style={[styles.subMenuText, { fontSize: getScaledTextSize(13) }]}>{tCommon('disabled')}</Text>
                     {selectedSubtitleTrack === 0 && (
                       <Icon name="check" size={18} color="#1976d2" />
                     )}
@@ -621,7 +626,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
                               },
                             );
                           }}>
-                          <Text style={styles.subMenuText}>{label}</Text>
+                          <Text style={[styles.subMenuText, { fontSize: getScaledTextSize(13) }]}>{label}</Text>
                           {isSelected && (
                             <Icon name="check" size={18} color="#1976d2" />
                           )}
@@ -637,7 +642,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
 
                 {/* Contrôle du délai des sous-titres */}
                 <View style={styles.subMenuSection}>
-                  <Text style={styles.subMenuSectionTitle}>{tPlayer('subtitleDelay')}</Text>
+                  <Text style={[styles.subMenuSectionTitle, { fontSize: getScaledTextSize(13) }]}>{tPlayer('subtitleDelay')}</Text>
 
                   <View style={styles.audioDelayContainer}>
                     <TouchableOpacity
@@ -650,7 +655,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
                       <Icon name="remove" size={24} color="white" />
                     </TouchableOpacity>
 
-                    <Text style={styles.audioDelayText}>
+                    <Text style={[styles.audioDelayText, { fontSize: getScaledTextSize(18) }]}>
                       {subtitleDelay > 0 ? `+${subtitleDelay}` : subtitleDelay} ms
                     </Text>
 
@@ -668,7 +673,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
 
                 {/* Taille des sous-titres */}
                 <View style={styles.subMenuSection}>
-                  <Text style={styles.subMenuSectionTitle}>{tPlayer('subtitleSize')}</Text>
+                  <Text style={[styles.subMenuSectionTitle, { fontSize: getScaledTextSize(13) }]}>{tPlayer('subtitleSize')}</Text>
 
                   {[
                     { key: 'small', label: tCommon('small') },
@@ -686,7 +691,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
                         onSubtitleSizeChange(size.key);
                         console.log(`📝 [Subtitles] Taille: ${size.label}`);
                       }}>
-                      <Text style={styles.subMenuText}>{size.label}</Text>
+                      <Text style={[styles.subMenuText, { fontSize: getScaledTextSize(13) }]}>{size.label}</Text>
                       {subtitleSize === size.key && (
                         <Icon name="check" size={18} color="#1976d2" />
                       )}
@@ -711,7 +716,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
                         onZoomModeChange(mode);
                         console.log(`📐 [Display] Mode changé: ${mode}`);
                       }}>
-                      <Text style={styles.subMenuText}>
+                      <Text style={[styles.subMenuText, { fontSize: getScaledTextSize(13) }]}>
                         {getZoomModeLabel(mode)}
                       </Text>
                       {zoomMode === mode && (
@@ -737,7 +742,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
                       onBufferModeChange(mode);
                       console.log(`🌐 [Buffer] Mode changé: ${mode}`);
                     }}>
-                    <Text style={styles.subMenuText}>
+                    <Text style={[styles.subMenuText, { fontSize: getScaledTextSize(13) }]}>
                       {getBufferModeLabel(mode)}
                     </Text>
                     {bufferMode === mode && (
@@ -773,8 +778,8 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     minWidth: 280,
     maxWidth: 320,
-    zIndex: 100000,
-    elevation: 8,
+    zIndex: 999999,
+    elevation: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,

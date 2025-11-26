@@ -16,6 +16,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import {BlurView} from '@react-native-community/blur';
 // AppContext removed - using UIStore instead
 import {useUIStore} from '../stores/UIStore';
+import {useI18n} from '../hooks/useI18n';
 
 const {width, height} = Dimensions.get('window');
 
@@ -23,6 +24,24 @@ const LoadingOverlay: React.FC = () => {
   // Replaced AppContext with UIStore
   const {loading} = useUIStore();
   const {visible, title, subtitle, progress} = loading;
+  const {t} = useI18n('settings');
+
+  // Traduire le message si c'est une clé i18n
+  const translateMessage = (message: string): string => {
+    if (!message) return message;
+
+    // Format "settings:keyName"
+    if (message.startsWith('settings:')) {
+      const key = message.replace('settings:', '');
+      return t(key);
+    }
+
+    // Sinon retourner tel quel
+    return message;
+  };
+
+  const translatedTitle = translateMessage(title);
+  const translatedSubtitle = subtitle ? translateMessage(subtitle) : subtitle;
   const opacity = useRef(new Animated.Value(0)).current;
   const scale = useRef(new Animated.Value(0.8)).current;
   const rotateValue = useRef(new Animated.Value(0)).current;
@@ -34,10 +53,13 @@ const LoadingOverlay: React.FC = () => {
   const rotateAnimation = useRef<Animated.CompositeAnimation>();
   const pulseAnimation = useRef<Animated.CompositeAnimation>();
   const dotsAnimation = useRef<Animated.CompositeAnimation>();
+  const isMountedRef = useRef(true);
 
   useEffect(() => {
     if (visible) {
       hasAnimatedOut.current = false;
+      isMountedRef.current = true;
+
       // Animation d'entrée
       Animated.parallel([
         Animated.timing(opacity, {
@@ -55,6 +77,8 @@ const LoadingOverlay: React.FC = () => {
 
       // Animation de rotation continue
       const startRotate = () => {
+        if (!isMountedRef.current) return;
+
         rotateValue.setValue(0);
         rotateAnimation.current = Animated.timing(rotateValue, {
           toValue: 1,
@@ -62,7 +86,7 @@ const LoadingOverlay: React.FC = () => {
           useNativeDriver: true,
         });
         rotateAnimation.current.start(({finished}) => {
-          if (finished && visible) {
+          if (finished && isMountedRef.current) {
             startRotate();
           }
         });
@@ -71,6 +95,8 @@ const LoadingOverlay: React.FC = () => {
 
       // Animation de pulsation
       const startPulse = () => {
+        if (!isMountedRef.current) return;
+
         pulseAnimation.current = Animated.sequence([
           Animated.timing(pulseValue, {
             toValue: 1.1,
@@ -84,7 +110,7 @@ const LoadingOverlay: React.FC = () => {
           }),
         ]);
         pulseAnimation.current.start(({finished}) => {
-          if (finished && visible) {
+          if (finished && isMountedRef.current) {
             startPulse();
           }
         });
@@ -93,13 +119,15 @@ const LoadingOverlay: React.FC = () => {
 
       // Animation des points
       const startDots = () => {
+        if (!isMountedRef.current) return;
+
         dotsAnimation.current = Animated.timing(dotsValue, {
           toValue: 1,
           duration: 1500,
           useNativeDriver: false,
         });
         dotsAnimation.current.start(({finished}) => {
-          if (finished && visible) {
+          if (finished && isMountedRef.current) {
             dotsValue.setValue(0);
             startDots();
           }
@@ -107,6 +135,23 @@ const LoadingOverlay: React.FC = () => {
       };
       startDots();
     } else {
+      // Marquer comme non monté pour stopper les boucles
+      isMountedRef.current = false;
+
+      // Arrêter IMMÉDIATEMENT toutes les animations AVANT la sortie
+      rotateValue.stopAnimation();
+      pulseValue.stopAnimation();
+      dotsValue.stopAnimation();
+      if (rotateAnimation.current) {
+        rotateAnimation.current.stop();
+      }
+      if (pulseAnimation.current) {
+        pulseAnimation.current.stop();
+      }
+      if (dotsAnimation.current) {
+        dotsAnimation.current.stop();
+      }
+
       // Animation de sortie
       Animated.parallel([
         Animated.timing(opacity, {
@@ -122,20 +167,17 @@ const LoadingOverlay: React.FC = () => {
       ]).start(() => {
         hasAnimatedOut.current = true;
       });
-
-      // Arrêter toutes les animations
-      if (rotateAnimation.current) {
-        rotateAnimation.current.stop();
-      }
-      if (pulseAnimation.current) {
-        pulseAnimation.current.stop();
-      }
-      if (dotsAnimation.current) {
-        dotsAnimation.current.stop();
-      }
     }
 
     return () => {
+      // Cleanup au démontage
+      isMountedRef.current = false;
+      rotateValue.stopAnimation();
+      pulseValue.stopAnimation();
+      dotsValue.stopAnimation();
+      opacity.stopAnimation();
+      scale.stopAnimation();
+
       if (rotateAnimation.current) {
         rotateAnimation.current.stop();
       }
@@ -212,12 +254,12 @@ const LoadingOverlay: React.FC = () => {
               </Animated.View>
 
               {/* Texte principal sobre */}
-              <Text style={styles.title}>{title}</Text>
+              <Text style={styles.title}>{translatedTitle}</Text>
 
               {/* Sous-titre avec points animés */}
-              {subtitle && (
+              {translatedSubtitle && (
                 <View style={styles.subtitleContainer}>
-                  <Text style={styles.subtitle}>{subtitle}</Text>
+                  <Text style={styles.subtitle}>{translatedSubtitle}</Text>
                   <Animated.Text style={[styles.dots, {opacity: dotsOpacity}]}>
                     ...
                   </Animated.Text>

@@ -81,5 +81,93 @@ export default schemaMigrations({
         },
       ],
     },
+
+    // Migration 6→7: Ajout tables VOD (Films & Séries) pour stockage local massif
+    {
+      toVersion: 7,
+      steps: [
+        // Créer la table des catégories VOD
+        createTable({
+          name: 'vod_categories',
+          columns: [
+            {name: 'playlist_id', type: 'string', isIndexed: true},
+            {name: 'category_id', type: 'string', isIndexed: true},
+            {name: 'category_name', type: 'string'},
+            {name: 'category_type', type: 'string'},
+            {name: 'parent_id', type: 'number', isOptional: true},
+            {name: 'created_at', type: 'number'},
+            {name: 'updated_at', type: 'number'},
+          ],
+        }),
+
+        // Créer la table des films VOD
+        createTable({
+          name: 'vod_movies',
+          columns: [
+            {name: 'playlist_id', type: 'string', isIndexed: true},
+            {name: 'movie_id', type: 'string', isIndexed: true},
+            {name: 'category_id', type: 'string', isIndexed: true},
+            {name: 'name', type: 'string', isIndexed: true},
+            {name: 'stream_url', type: 'string'},
+            {name: 'cover_url', type: 'string', isOptional: true},
+            {name: 'rating', type: 'string', isOptional: true},
+            {name: 'duration', type: 'string', isOptional: true},
+            {name: 'genre', type: 'string', isOptional: true},
+            {name: 'release_date', type: 'string', isOptional: true},
+            {name: 'plot', type: 'string', isOptional: true},
+            {name: 'director', type: 'string', isOptional: true},
+            {name: 'cast', type: 'string', isOptional: true},
+            {name: 'added', type: 'string', isOptional: true},
+            {name: 'container_extension', type: 'string', isOptional: true},
+            {name: 'created_at', type: 'number'},
+            {name: 'updated_at', type: 'number'},
+          ],
+        }),
+
+        // Créer la table des séries VOD
+        createTable({
+          name: 'vod_series',
+          columns: [
+            {name: 'playlist_id', type: 'string', isIndexed: true},
+            {name: 'series_id', type: 'string', isIndexed: true},
+            {name: 'category_id', type: 'string', isIndexed: true},
+            {name: 'name', type: 'string', isIndexed: true},
+            {name: 'cover_url', type: 'string', isOptional: true},
+            {name: 'backdrop_url', type: 'string', isOptional: true},
+            {name: 'rating', type: 'string', isOptional: true},
+            {name: 'genre', type: 'string', isOptional: true},
+            {name: 'release_date', type: 'string', isOptional: true},
+            {name: 'plot', type: 'string', isOptional: true},
+            {name: 'director', type: 'string', isOptional: true},
+            {name: 'cast', type: 'string', isOptional: true},
+            {name: 'episodes_count', type: 'number', isOptional: true},
+            {name: 'seasons_count', type: 'number', isOptional: true},
+            {name: 'added', type: 'string', isOptional: true},
+            {name: 'last_updated', type: 'string', isOptional: true},
+            {name: 'created_at', type: 'number'},
+            {name: 'updated_at', type: 'number'},
+          ],
+        }),
+
+        // Créer les index pour optimiser les requêtes VOD
+        {
+          type: 'sql',
+          sql: `
+            -- 🎬 Index optimisés pour les films VOD
+            CREATE INDEX IF NOT EXISTS idx_vod_movies_playlist_category ON vod_movies(playlist_id, category_id);
+            CREATE INDEX IF NOT EXISTS idx_vod_movies_name ON vod_movies(name);
+            CREATE INDEX IF NOT EXISTS idx_vod_movies_added ON vod_movies(added);
+
+            -- 📺 Index optimisés pour les séries VOD
+            CREATE INDEX IF NOT EXISTS idx_vod_series_playlist_category ON vod_series(playlist_id, category_id);
+            CREATE INDEX IF NOT EXISTS idx_vod_series_name ON vod_series(name);
+            CREATE INDEX IF NOT EXISTS idx_vod_series_added ON vod_series(added);
+
+            -- 📁 Index pour les catégories VOD
+            CREATE INDEX IF NOT EXISTS idx_vod_categories_playlist_type ON vod_categories(playlist_id, category_type);
+          `,
+        },
+      ],
+    },
   ],
 });

@@ -1,0 +1,16 @@
+{
+  "title": "Speed Test",
+  "ping": "PING",
+  "download": "DOWNLOAD",
+  "upload": "UPLOAD",
+  "startTest": "Start Testing",
+  "stopTest": "Stop Test",
+  "restartTest": "Restart Test",
+  "testing": "Testing...",
+  "testingPing": "Testing ping...",
+  "testingDownload": "Testing download speed...",
+  "testingUpload": "Testing upload speed...",
+  "completed": "Test completed",
+  "ms": "ms",
+  "mbps": "Mbps"
+}

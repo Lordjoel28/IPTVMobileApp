@@ -53,5 +53,18 @@
   "parentalPinRequired": "PIN parental requis pour changer de profil",
   "visibleGroups": "Groupes visibles",
   "selectVisibleCategories": "Sélectionnez les catégories visibles pour ce profil.",
-  "selectVisibleCategoriesDesc": "Si aucune n'est sélectionnée, toutes seront visibles."
+  "selectVisibleCategoriesDesc": "Si aucune n'est sélectionnée, toutes seront visibles.",
+  "securitySettings": "Paramètres de sécurité",
+  "securitySettingsDescription": "Configurez les options de sécurité avancées pour ce profil",
+  "requirePinForSettings": "Exiger le PIN pour les paramètres",
+  "requirePinForSettingsDesc": "Demander le PIN parental pour accéder aux paramètres de l'application",
+  "requirePinForProfile": "Exiger le PIN pour les profils",
+  "requirePinForProfileDesc": "Demander le PIN parental pour accéder à la gestion des profils",
+  "requirePinForPlaylist": "Exiger le PIN pour les playlists",
+  "requirePinForPlaylistDesc": "Demander le PIN parental pour accéder à la liste des playlists",
+  "confirmSecurityChange": "Confirmer le changement de sécurité",
+  "enableSecuritySetting": "Activer",
+  "disableSecuritySetting": "Désactiver",
+  "securitySettingUpdated": "Paramètre de sécurité mis à jour",
+  "securitySettingUpdateFailed": "Échec de la mise à jour du paramètre de sécurité"
 }

@@ -804,6 +804,7 @@ const GlobalVideoPlayer: React.FC = () => {
   // 🔧 Utiliser le hook pour accéder aux paramètres vidéo
   const videoPlayerSettings = useVideoPlayerSettings();
 
+  
   // 🎯 LIFECYCLE: Gestion arrière-plan avec paramètre utilisateur
   useEffect(() => {
     const subscription = AppState.addEventListener('change', nextAppState => {
@@ -1015,8 +1016,11 @@ const GlobalVideoPlayer: React.FC = () => {
   // Synchroniser l'opacité avec l'état showSettingsMenu
   React.useEffect(() => {
     console.log('🔧 [Settings] useEffect - showSettingsMenu:', showSettingsMenu);
+    console.log('🔧 [Settings] Opacité avant animation:', settingsMenuOpacity.value);
     settingsMenuOpacity.value = withTiming(showSettingsMenu ? 1 : 0, {
       duration: 200,
+    }, (finished) => {
+      console.log('🔧 [Settings] Animation terminée, finished:', finished, 'opacité finale:', settingsMenuOpacity.value);
     });
   }, [showSettingsMenu]);
 
@@ -1048,6 +1052,22 @@ const GlobalVideoPlayer: React.FC = () => {
     React.useState<boolean>(false);
   const [selectedSubtitleTrack, setSelectedSubtitleTrack] =
     React.useState<number | null>(0);
+
+  // 🔄 Réinitialiser les pistes lors du changement de chaîne/film/série
+  React.useEffect(() => {
+    if (channel) {
+      console.log(`🔄 [Tracks] Changement de contenu: ${channel.name} (contentType: ${channel.contentType || 'live'})`);
+      console.log('🔄 [Tracks] Réinitialisation des pistes audio et sous-titres');
+
+      // Réinitialiser les états des pistes
+      setSelectedAudioTrack(1); // Réinitialiser à la piste audio 1
+      setSelectedSubtitleTrack(0); // Réinitialiser les sous-titres (désactivés)
+      setAvailableAudioTracks([]); // Vider les pistes disponibles (seront remplies lors du onLoad)
+      setAvailableTextTracks([]); // Vider les sous-titres disponibles (seront remplis lors du onLoad)
+      setSelectedVideoQuality('auto'); // Réinitialiser la qualité vidéo
+      setAvailableVideoTracks([]); // Vider les pistes vidéo
+    }
+  }, [channel?.id, channel?.url]); // Déclencher quand la chaîne/film/série change
   const [subtitleSize, setSubtitleSize] = React.useState<string>('normal');
   const [subtitleDelay, setSubtitleDelay] = React.useState<number>(0); // en ms
 
@@ -1333,13 +1353,13 @@ const GlobalVideoPlayer: React.FC = () => {
       }
 
       const limitedChannels = filteredChannels.slice(0, 20);
-      console.log(
-        `✅ [GlobalVideoPlayer] Store → Docker: ${filteredChannels.length} chaînes récentes → affichage de ${limitedChannels.length} (limite 20)`,
-      );
-      console.log(
-        '📋 [GlobalVideoPlayer] Noms des chaînes:',
-        limitedChannels.map(ch => ch.name).join(', '),
-      );
+      // console.log(
+      //   `✅ [GlobalVideoPlayer] Store → Docker: ${filteredChannels.length} chaînes récentes → affichage de ${limitedChannels.length} (limite 20)`,
+      // );
+      // console.log(
+      //   '📋 [GlobalVideoPlayer] Noms des chaînes:',
+      //   limitedChannels.map(ch => ch.name).join(', '),
+      // );
       return limitedChannels.map((ch, index) => ({
         ...ch,
         // Assurer un ID unique
@@ -1881,8 +1901,10 @@ const GlobalVideoPlayer: React.FC = () => {
 
   // Style animé pour le menu paramètres
   const settingsMenuAnimatedStyle = useAnimatedStyle(() => {
+    const opacity = settingsMenuOpacity.value;
+    console.log('🔧 [Settings] Style animé - opacité actuelle:', opacity);
     return {
-      opacity: settingsMenuOpacity.value,
+      opacity: opacity,
     };
   });
 
@@ -2396,6 +2418,7 @@ const GlobalVideoPlayer: React.FC = () => {
         </>
       ) : null}
 
+      {/* 🏷️ Indicateur de format de streaming - overlay principal */}
       <View style={StyleSheet.absoluteFill}>
         {isLoading && (
           <View style={styles.overlay}>
@@ -2439,14 +2462,22 @@ const GlobalVideoPlayer: React.FC = () => {
                 isScreenLocked={videoSettings.isScreenLocked}
                 isFromMultiScreen={isFromMultiScreen}
                 showSettingsMenu={showSettingsMenu}
+                isFromAutoStart={isFromAutoStart}
                 isPaused={isPaused}
                 onBackPress={handleBackPress}
                 onFavoriteToggle={handleFavoriteToggle}
                 onLockToggle={() => videoSettings.toggleScreenLock()}
                 onSettingsToggle={() => {
+                  // 🚫 Désactiver les settings seulement pendant le vrai autostart live (pas pour films/séries)
+                  if (isFromAutoStart && (!channel?.contentType || channel.contentType === 'live')) {
+                    console.log('🚫 [Settings] Désactivé pendant l\'autostart des chaînes live');
+                    return;
+                  }
                   console.log(
                     '🐛 [Settings] Toggle - État actuel:',
                     showSettingsMenu,
+                    'contentType:',
+                    channel?.contentType || 'live',
                   );
                   setShowSettingsMenu(!showSettingsMenu);
                   console.log('🐛 [Settings] Nouvel état:', !showSettingsMenu);
@@ -2458,16 +2489,18 @@ const GlobalVideoPlayer: React.FC = () => {
               />
             </Animated.View>
 
-            {/* 🎯 DOCKER TIVIMATE - Enveloppé pour gérer les pointerEvents */}
-            <Animated.View
-              style={[
-                styles.dockerOverlay,
-                dockerAnimatedStyle,
-                {
-                  pointerEvents: dockerControls.isVisible ? 'box-none' : 'none',
-                },
-              ]}>
-              <DockerBar
+            {/* 🎯 DOCKER TIVIMATE - Seulement pour les chaînes live (pas films/séries) */}
+            {console.log(`🐳 [Docker] contentType: ${channel?.contentType || 'live'}, afficher docker: ${!channel?.contentType || channel.contentType === 'live'}`) ||
+             (!channel?.contentType || channel.contentType === 'live') && (
+              <Animated.View
+                style={[
+                  styles.dockerOverlay,
+                  dockerAnimatedStyle,
+                  {
+                    pointerEvents: dockerControls.isVisible ? 'box-none' : 'none',
+                  },
+                ]}>
+                <DockerBar
                 isVisible={dockerControls.isVisible}
                 channel={channel}
                 epgData={epgData}
@@ -2513,7 +2546,8 @@ const GlobalVideoPlayer: React.FC = () => {
                   }, 1000);
                 }}
               />
-            </Animated.View>
+              </Animated.View>
+            )}
 
             {/* 🎯 EFFET DE VAGUE (RIPPLE) POUR DOUBLE-CLICS */}
             {rippleVisible && (
@@ -2597,6 +2631,44 @@ const GlobalVideoPlayer: React.FC = () => {
               )}
           </TouchableOpacity>
         )}
+
+        {/* 🎯 MENU PARAMÈTRES - Intégré dans le lecteur vidéo */}
+        <SettingsMenu
+          showSettingsMenu={showSettingsMenu}
+          settingsMenuAnimatedStyle={{
+            opacity: showSettingsMenu ? 1 : 0,
+          }}
+          activeSubMenu={activeSubMenu}
+          subMenuAnimatedStyle={subMenuAnimatedStyle}
+          zoomMode={videoSettings.zoomMode}
+          bufferMode={videoSettings.bufferMode}
+          sleepTimer={sleepTimer}
+          availableVideoTracks={availableVideoTracks}
+          availableAudioTracks={availableAudioTracks}
+          availableSubtitleTracks={availableTextTracks}
+          selectedVideoQuality={selectedVideoQuality}
+          selectedAudioTrack={selectedAudioTrack}
+          selectedSubtitleTrack={selectedSubtitleTrack}
+          onClose={() => {
+            console.log('🔧 [GlobalVideoPlayer] onClose appelé - fermeture menu settings');
+            setShowSettingsMenu(false);
+            setActiveSubMenu(null);
+          }}
+          onOpenSubMenu={openSubMenu}
+          onCloseSubMenu={() => {
+            console.log('🔧 [GlobalVideoPlayer] onCloseSubMenu appelé - fermeture sous-menu');
+            closeSubMenu();
+          }}
+          onZoomModeChange={videoSettings.setZoomMode}
+          onBufferModeChange={videoSettings.setBufferMode}
+          onSleepTimerChange={setSleepTimer}
+          onVideoQualityChange={setSelectedVideoQuality}
+          onAudioTrackChange={(track: number) => setSelectedAudioTrack(track)}
+          onSubtitleTrackChange={(track: number) => setSelectedSubtitleTrack(track)}
+          audioDelay={audioDelay}
+          subtitleDelay={subtitleDelay}
+          subtitleSize={subtitleSize}
+        />
       </View>
     </RNAnimated.View>
   );
@@ -2697,46 +2769,7 @@ onChannelFullscreen={selectedChannel => {
         PlayerContent
       ) : null}
 
-      {/* 🎯 MENU PARAMÈTRES - Composant refactorisé */}
-      <SettingsMenu
-        showSettingsMenu={showSettingsMenu}
-        settingsMenuAnimatedStyle={settingsMenuAnimatedStyle}
-        activeSubMenu={activeSubMenu}
-        subMenuAnimatedStyle={subMenuAnimatedStyle}
-        zoomMode={videoSettings.zoomMode}
-        bufferMode={videoSettings.bufferMode}
-        sleepTimer={sleepTimer}
-        availableVideoTracks={availableVideoTracks}
-        availableAudioTracks={availableAudioTracks}
-        availableSubtitleTracks={availableTextTracks}
-        selectedVideoQuality={selectedVideoQuality}
-        selectedAudioTrack={selectedAudioTrack}
-        selectedSubtitleTrack={selectedSubtitleTrack}
-        onClose={() => {
-          console.log('🔧 [GlobalVideoPlayer] onClose appelé - fermeture menu settings');
-          setShowSettingsMenu(false);
-          setActiveSubMenu(null);
-        }}
-        onOpenSubMenu={openSubMenu}
-        onCloseSubMenu={() => {
-          console.log('🔧 [GlobalVideoPlayer] onCloseSubMenu appelé - fermeture sous-menu');
-          closeSubMenu();
-        }}
-        onZoomModeChange={videoSettings.setZoomMode}
-        onBufferModeChange={videoSettings.setBufferMode}
-        onSleepTimerChange={setSleepTimer}
-        onVideoQualityChange={setSelectedVideoQuality}
-        onAudioTrackChange={(track: number) => setSelectedAudioTrack(track)}
-        onSubtitleTrackChange={(track: number) => setSelectedSubtitleTrack(track)}
-        audioDelay={audioDelay}
-        subtitleDelay={subtitleDelay}
-        subtitleSize={subtitleSize}
-        onAudioDelayChange={setAudioDelay}
-        onSubtitleDelayChange={setSubtitleDelay}
-        onSubtitleSizeChange={setSubtitleSize}
-      />
-
-
+      
       {/* Modal de confirmation d'effacement moderne */}
       <Modal
         visible={showClearConfirmModal}

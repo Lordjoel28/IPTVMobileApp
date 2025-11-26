@@ -1,0 +1,16 @@
+{
+  "title": "Prueba de Velocidad",
+  "ping": "PING",
+  "download": "DESCARGA",
+  "upload": "SUBIDA",
+  "startTest": "Comenzar Prueba",
+  "stopTest": "Detener Prueba",
+  "restartTest": "Reiniciar Prueba",
+  "testing": "Probando...",
+  "testingPing": "Probando ping...",
+  "testingDownload": "Probando velocidad de descarga...",
+  "testingUpload": "Probando velocidad de subida...",
+  "completed": "Prueba completada",
+  "ms": "ms",
+  "mbps": "Mbps"
+}

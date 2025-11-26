@@ -3,7 +3,8 @@
  * Implémentation finale avec fond premium, couleurs riches, reflets et lueurs.
  */
 
-import React, {useRef, useEffect, useState} from 'react';
+import React from 'react';
+import {useRef, useEffect, useState} from 'react';
 import {
   View,
   Text,
@@ -22,6 +23,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import {useNavigation} from '@react-navigation/native';
 import type {StackNavigationProp} from '@react-navigation/stack';
+import {useUISettings} from './src/stores/UIStore';
 import VideoPlayer from './src/components/VideoPlayer';
 import ConnectionModal from './src/components/ConnectionModal';
 import XtreamCodeModal from './src/components/XtreamCodeModal';
@@ -41,6 +43,7 @@ import type {Channel, Profile} from './src/types';
 // 👤 Import ProfileService pour gestion des profils
 import ProfileService from './src/services/ProfileService';
 import SimplePinModal from './src/components/SimplePinModal';
+import SyncIndicator from './src/components/SyncIndicator';
 // import { APP_VERSION } from './src/version'; // Removed for production
 // AppContext removed - using UIStore instead
 import {useUIStore} from './src/stores/UIStore';
@@ -89,7 +92,9 @@ type NavigationProp = StackNavigationProp<RootStackParamList>;
 
 const App: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
+  const { getScaledTextSize } = useUISettings();
 
+  
   // Hook global pour immersion quand PiP présent
   useGlobalImmersion();
 
@@ -1069,7 +1074,6 @@ const App: React.FC = () => {
       hideLoading();
 
       // Ouvrir automatiquement le ProfilesModal pour sélection
-      console.log('📋 Ouverture automatique du ProfilesModal');
       setShowProfilesModal(true);
 
       console.log(
@@ -1191,7 +1195,6 @@ const App: React.FC = () => {
 
       // 📋 Ouvrir le ProfilesModal après import réussi
       setTimeout(() => {
-        console.log('📋 Ouverture automatique du ProfilesModal');
         setShowProfilesModal(true);
       }, 1000); // Petit délai pour laisser la notification s'afficher
     } catch (error) {
@@ -1740,8 +1743,8 @@ const App: React.FC = () => {
                       <View style={styles.premiumIconWrapper}>
                         <Image source={iconMap.tv} style={styles.iconImageLg} />
                       </View>
-                      <Text style={styles.modernTvTitle}>TV EN DIRECT</Text>
-                      <Text style={styles.modernSubtitle}>Streaming Live</Text>
+                      <Text style={[styles.modernTvTitle, { fontSize: getScaledTextSize(18) }]}>TV EN DIRECT</Text>
+                      <Text style={[styles.modernSubtitle, { fontSize: getScaledTextSize(12) }]}>Streaming Live</Text>
                     </View>
                   </>
                 )}
@@ -1757,8 +1760,51 @@ const App: React.FC = () => {
                     styles.cardFilms,
                     pressed && {transform: [{scale: 0.97}]},
                   ]}
-                  onPress={() => {
-                    console.log('🎬 Films CLICKED! - NAVIGATION FUTURE');
+                  onPress={async () => {
+                    console.log('🎬 Films CLICKED! - Navigation vers MoviesScreen');
+
+                    // Vérifier s'il y a une playlist sélectionnée
+                    if (!selectedPlaylistId) {
+                      console.log('❌ Aucune playlist sélectionnée');
+                      Alert.alert(
+                        '🎬 Aucune playlist',
+                        'Veuillez d\'abord importer et sélectionner une playlist Xtream Codes depuis le menu "Profils".',
+                        [{text: 'OK'}],
+                      );
+                      return;
+                    }
+
+                    try {
+                      // Vérifier si la playlist est de type Xtream Codes
+                      const database = await import('./src/database');
+                      const {Playlist} = await import('./src/database/models');
+
+                      const playlist = await database.default
+                        .get<typeof Playlist>('playlists')
+                        .find(selectedPlaylistId);
+
+                      if (!playlist || playlist.type !== 'XTREAM') {
+                        Alert.alert(
+                          '🎬 Playlist incompatible',
+                          'Les films ne sont disponibles que pour les playlists Xtream Codes.',
+                          [{text: 'OK'}],
+                        );
+                        return;
+                      }
+
+                      // Naviguer vers l'écran des films
+                      navigation.navigate('MoviesScreen', {
+                        playlistId: selectedPlaylistId,
+                      });
+
+                    } catch (error) {
+                      console.error('❌ Erreur accès playlist:', error);
+                      Alert.alert(
+                        '🎬 Erreur',
+                        'Impossible d\'accéder à la playlist. Veuillez la sélectionner à nouveau.',
+                        [{text: 'OK'}],
+                      );
+                    }
                   }}>
                   {({pressed}) => (
                     <>
@@ -1810,7 +1856,7 @@ const App: React.FC = () => {
                             style={styles.iconImageMd}
                           />
                         </View>
-                        <Text style={styles.modernCardTitle}>FILMS</Text>
+                        <Text style={[styles.modernCardTitle, { fontSize: getScaledTextSize(16) }]}>FILMS</Text>
                       </View>
                     </>
                   )}
@@ -1823,8 +1869,51 @@ const App: React.FC = () => {
                     styles.cardSeries,
                     pressed && {transform: [{scale: 0.97}]},
                   ]}
-                  onPress={() => {
-                    console.log('📺 Series CLICKED! - NAVIGATION FUTURE');
+                  onPress={async () => {
+                    console.log('📺 Series CLICKED! - Navigation vers SeriesScreen');
+
+                    // Vérifier s'il y a une playlist sélectionnée
+                    if (!selectedPlaylistId) {
+                      console.log('❌ Aucune playlist sélectionnée');
+                      Alert.alert(
+                        '📺 Aucune playlist',
+                        'Veuillez d\'abord importer et sélectionner une playlist Xtream Codes depuis le menu "Profils".',
+                        [{text: 'OK'}],
+                      );
+                      return;
+                    }
+
+                    try {
+                      // Vérifier si la playlist est de type Xtream Codes
+                      const database = await import('./src/database');
+                      const {Playlist} = await import('./src/database/models');
+
+                      const playlist = await database.default
+                        .get<typeof Playlist>('playlists')
+                        .find(selectedPlaylistId);
+
+                      if (!playlist || playlist.type !== 'XTREAM') {
+                        Alert.alert(
+                          '📺 Playlist incompatible',
+                          'Les séries ne sont disponibles que pour les playlists Xtream Codes.',
+                          [{text: 'OK'}],
+                        );
+                        return;
+                      }
+
+                      // Naviguer vers l'écran des séries
+                      navigation.navigate('SeriesScreen', {
+                        playlistId: selectedPlaylistId,
+                      });
+
+                    } catch (error) {
+                      console.error('❌ Erreur accès playlist:', error);
+                      Alert.alert(
+                        '📺 Erreur',
+                        'Impossible d\'accéder à la playlist. Veuillez la sélectionner à nouveau.',
+                        [{text: 'OK'}],
+                      );
+                    }
                   }}>
                   {({pressed}) => (
                     <>
@@ -1866,7 +1955,7 @@ const App: React.FC = () => {
                             style={styles.iconImageMd}
                           />
                         </View>
-                        <Text style={styles.modernCardTitle}>SERIES</Text>
+                        <Text style={[styles.modernCardTitle, { fontSize: getScaledTextSize(16) }]}>SERIES</Text>
                       </View>
                     </>
                   )}
@@ -1970,7 +2059,7 @@ const App: React.FC = () => {
             <View style={styles.footerLeft}>
               {playlistInfo && (
                 <>
-                  <Text style={styles.footerLabel}>Expiration: </Text>
+                  <Text style={[styles.footerLabel, { fontSize: getScaledTextSize(10) }]}>Expiration: </Text>
                   <Text style={styles.footerValue}>
                     {playlistInfo.expirationDate}
                   </Text>
@@ -2097,6 +2186,9 @@ const App: React.FC = () => {
           navigation.navigate('Settings');
         }}
       />
+
+      {/* 🔄 Sync Indicator - Non-blocking overlay */}
+      <SyncIndicator />
     </LinearGradient>
   );
 };

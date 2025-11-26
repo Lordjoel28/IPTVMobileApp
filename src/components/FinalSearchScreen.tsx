@@ -16,36 +16,47 @@ import {
   KeyboardAvoidingView,
   Platform,
   Animated,
+  BackHandler,
 } from 'react-native';
 import {GestureHandlerRootView} from 'react-native-gesture-handler';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
 import {testSearchService} from '../utils/TestSearchService';
 import {searchService} from '../services/SearchService';
+import {FastSQLiteService} from '../services/FastSQLiteService';
 import SimpleModernSearchCard from './SimpleModernSearchCard';
+import FastImage from 'react-native-fast-image';
 import {useThemeColors} from '../contexts/ThemeContext';
 import {useI18n} from '../hooks/useI18n';
 import {useVoiceSearch} from '../hooks/useVoiceSearch';
 import {cleanVoiceInput} from '../utils/textUtils';
 import {useStatusBar} from '../hooks/useStatusBar';
-import type {Channel} from '../types';
+import type {Channel, Movie, Series} from '../types';
 
 interface FinalSearchScreenProps {
   playlistId: string;
   categoryName?: string; // Pour affichage
   categoryGroupTitle?: string; // 🔑 Vrai group_title pour filtrage SQL
+  categoryId?: string; // 🔑 ID de catégorie pour filtrage films/séries
   blockedCategories?: string[]; // 🔒 Catégories bloquées à filtrer
+  searchType?: 'channels' | 'movies' | 'series' | 'all'; // Type de recherche
   onClose: () => void;
-  onChannelSelect: (channel: Channel) => void;
+  onChannelSelect?: (channel: Channel) => void;
+  onMovieSelect?: (movie: Movie) => void;
+  onSeriesSelect?: (series: Series) => void;
 }
 
 export default function FinalSearchScreen({
   playlistId,
   categoryName,
   categoryGroupTitle,
+  categoryId,
   blockedCategories = [],
+  searchType = 'channels',
   onClose,
   onChannelSelect,
+  onMovieSelect,
+  onSeriesSelect,
 }: FinalSearchScreenProps) {
   const colors = useThemeColors();
   const {t: tChannels} = useI18n('channels');
@@ -65,8 +76,26 @@ export default function FinalSearchScreen({
     };
   }, [setNormal]);
 
+  // 🔒 Gérer le bouton retour Android pour fermer proprement
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      onClose();
+      return true; // Empêcher le comportement par défaut
+    });
+
+    return () => backHandler.remove();
+  }, [onClose]);
+
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<Channel[]>([]);
+  const [searchResults, setSearchResults] = useState<{
+    channels: Channel[];
+    movies: Movie[];
+    series: Series[];
+  }>({
+    channels: [],
+    movies: [],
+    series: [],
+  });
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -165,139 +194,232 @@ export default function FinalSearchScreen({
 
   const generateSuggestions = async () => {
     try {
-      // Récupérer quelques chaînes depuis la playlist pour générer des suggestions dynamiques
-      const result = await testSearchService.searchChannels(playlistId, '', 50); // Prendre les 50 premières chaînes
-      const channels = result.channels;
+      const suggestionSet = new Set<string>();
+      const fastSQLiteService = FastSQLiteService.getInstance();
 
-      if (channels.length === 0) {
-        // Fallback si aucune chaîne
-        const fallbackSuggestions = ['France', 'Sport', 'News', 'HD', 'TV'];
-        setSuggestions(fallbackSuggestions);
-        return;
-      }
+      // Récupérer des suggestions RÉELLES depuis la base de données selon le contexte
+      if (searchType === 'channels' || searchType === 'all') {
+        // Pour les chaînes TV en direct : extraire les noms de catégories populaires
+        const result = await testSearchService.searchChannels(playlistId, '', 100);
+        const channels = result.channels;
 
-      const suggestions: string[] = [];
-      const categorySet = new Set<string>();
-      const channelWords = new Set<string>();
+        // Extraire les groupes/catégories les plus fréquents
+        const categoryCount = new Map<string, number>();
+        channels.forEach(channel => {
+          if (channel.groupTitle && channel.groupTitle.trim()) {
+            const category = channel.groupTitle.trim();
+            categoryCount.set(category, (categoryCount.get(category) || 0) + 1);
+          }
+        });
 
-      // Analyser les chaînes pour extraire des mots-clés pertinents
-      channels.forEach(channel => {
-        const channelName = channel.name.toLowerCase();
+        // Trier par fréquence et prendre les plus populaires
+        const sortedCategories = Array.from(categoryCount.entries())
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 6)
+          .map(([name]) => name);
 
-        // Catégories
-        if (channel.groupTitle && channel.groupTitle.trim()) {
-          const categoryWords = channel.groupTitle.toLowerCase().split(/\s+/);
-          categoryWords.forEach(word => {
-            if (word.length > 2 && !word.match(/^(d|de|la|le|et|ou|in|on|at|by)$/)) {
-              categorySet.add(word.charAt(0).toUpperCase() + word.slice(1));
+        sortedCategories.forEach(cat => suggestionSet.add(cat));
+
+        // Ajouter quelques noms de chaînes populaires
+        const popularChannelWords = new Set<string>();
+        channels.slice(0, 30).forEach(channel => {
+          const words = channel.name.split(/[^a-zA-Z0-9À-ÿ]+/);
+          words.forEach(word => {
+            if (word.length > 3 && word.length < 12 && !word.match(/^\d+$/) && !word.match(/^(d|de|la|le|et|ou|the|and)$/i)) {
+              popularChannelWords.add(word.charAt(0).toUpperCase() + word.slice(1).toLowerCase());
             }
           });
-        }
-
-        // Mots-clés des noms de chaînes
-        const commonKeywords = [
-          'france', 'sport', 'news', 'info', 'hd', 'uhd', '4k',
-          'canal', 'tf1', 'm6', 'arte', 'bfm', 'rmc', 'euronsport',
-          'live', 'direct', 'cinema', 'film', 'movie', 'series',
-          'music', 'musique', 'kids', 'enfant', 'documentaire',
-          'local', 'région', 'international', 'europe', 'monde'
-        ];
-
-        commonKeywords.forEach(keyword => {
-          if (channelName.includes(keyword)) {
-            channelWords.add(keyword.charAt(0).toUpperCase() + keyword.slice(1));
-          }
         });
-
-        // Extraire les mots significatifs du nom de la chaîne
-        const words = channelName.split(/[^a-zA-Z0-9]+/);
-        words.forEach(word => {
-          if (word.length > 3 && word.length < 15 && !word.match(/^\d+$/)) {
-            channelWords.add(word.charAt(0).toUpperCase() + word.slice(1));
-          }
-        });
-      });
-
-      // Construire la liste finale de suggestions
-      channelWords.forEach(word => suggestions.push(word));
-      categorySet.forEach(category => suggestions.push(category));
-
-      // Ajouter les suggestions génériques si pas assez
-      if (suggestions.length < 5) {
-        const genericSuggestions = ['France', 'Sport', 'News', 'HD', 'TV'];
-        genericSuggestions.forEach(suggestion => {
-          if (!suggestions.includes(suggestion)) {
-            suggestions.push(suggestion);
-          }
-        });
+        Array.from(popularChannelWords).slice(0, 4).forEach(w => suggestionSet.add(w));
       }
 
-      // Retourner les 8 premières suggestions uniques
-      const uniqueSuggestions = Array.from(new Set(suggestions)).slice(0, 8);
-      setSuggestions(uniqueSuggestions);
+      if (searchType === 'movies' || searchType === 'all') {
+        try {
+          // Pour les films : extraire des titres de films populaires/récents
+          const movies = await fastSQLiteService.searchMovies(playlistId, '', 100);
 
-      console.log('✨ [FinalSearchScreen] Suggestions dynamiques générées:', uniqueSuggestions);
+          // Extraire les mots-clés des titres de films
+          const movieWords = new Map<string, number>();
+          movies.forEach(movie => {
+            const words = movie.name.split(/[^a-zA-Z0-9À-ÿ]+/);
+            words.forEach(word => {
+              const cleanWord = word.trim().toLowerCase();
+              if (cleanWord.length > 3 && cleanWord.length < 15 && !cleanWord.match(/^\d+$/) &&
+                  !cleanWord.match(/^(d|de|la|le|et|ou|the|and|vf|vostfr|hd|uhd|4k|1080p|720p)$/i)) {
+                const formatted = cleanWord.charAt(0).toUpperCase() + cleanWord.slice(1);
+                movieWords.set(formatted, (movieWords.get(formatted) || 0) + 1);
+              }
+            });
+          });
+
+          // Prendre les mots les plus fréquents (probablement des genres ou franchises populaires)
+          const sortedMovieWords = Array.from(movieWords.entries())
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 8)
+            .map(([word]) => word);
+
+          sortedMovieWords.forEach(w => suggestionSet.add(w));
+
+          // Ajouter quelques titres de films complets populaires
+          movies.slice(0, 3).forEach(movie => {
+            const shortName = movie.name.split(/[:\-–]/)[0].trim();
+            if (shortName.length > 3 && shortName.length < 25) {
+              suggestionSet.add(shortName);
+            }
+          });
+        } catch (error) {
+          console.log('Erreur récupération films pour suggestions:', error);
+        }
+      }
+
+      if (searchType === 'series' || searchType === 'all') {
+        try {
+          // Pour les séries : extraire des noms de séries populaires
+          const series = await fastSQLiteService.searchSeries(playlistId, '', 100);
+
+          // Extraire les mots-clés des titres de séries
+          const seriesWords = new Map<string, number>();
+          series.forEach(serie => {
+            const words = serie.name.split(/[^a-zA-Z0-9À-ÿ]+/);
+            words.forEach(word => {
+              const cleanWord = word.trim().toLowerCase();
+              if (cleanWord.length > 3 && cleanWord.length < 15 && !cleanWord.match(/^\d+$/) &&
+                  !cleanWord.match(/^(d|de|la|le|et|ou|the|and|saison|season|s\d+|e\d+|vf|vostfr)$/i)) {
+                const formatted = cleanWord.charAt(0).toUpperCase() + cleanWord.slice(1);
+                seriesWords.set(formatted, (seriesWords.get(formatted) || 0) + 1);
+              }
+            });
+          });
+
+          // Prendre les mots les plus fréquents
+          const sortedSeriesWords = Array.from(seriesWords.entries())
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 8)
+            .map(([word]) => word);
+
+          sortedSeriesWords.forEach(w => suggestionSet.add(w));
+
+          // Ajouter quelques titres de séries complets populaires
+          series.slice(0, 4).forEach(serie => {
+            // Nettoyer le nom (enlever année, saison, etc.)
+            const shortName = serie.name
+              .replace(/\s*\(\d{4}\)\s*/g, '')
+              .replace(/\s*S\d+.*$/i, '')
+              .replace(/\s*Saison\s*\d+.*$/i, '')
+              .split(/[:\-–]/)[0]
+              .trim();
+            if (shortName.length > 3 && shortName.length < 30) {
+              suggestionSet.add(shortName);
+            }
+          });
+        } catch (error) {
+          console.log('Erreur récupération séries pour suggestions:', error);
+        }
+      }
+
+      const suggestions = Array.from(suggestionSet).slice(0, 10);
+      setSuggestions(suggestions);
+
+      console.log('✨ [FinalSearchScreen] Suggestions contextuelles pour', searchType, ':', suggestions);
 
     } catch (error) {
       console.error('Erreur génération suggestions:', error);
-      // Fallback en cas d'erreur
-      const fallbackSuggestions = ['France', 'Sport', 'News', 'HD', 'TV'];
+      // Fallback selon le type
+      let fallbackSuggestions = ['France', 'Sport', 'News', 'HD', 'TV'];
+      if (searchType === 'movies') {
+        fallbackSuggestions = ['Action', 'Comédie', 'Drame', 'Thriller', 'Aventure'];
+      } else if (searchType === 'series') {
+        fallbackSuggestions = ['Crime', 'Drame', 'Comédie', 'Thriller', 'Fantastique'];
+      }
       setSuggestions(fallbackSuggestions);
     }
   };
 
-  // Recherche en temps réel
-  useEffect(() => {
-    if (searchQuery.trim().length >= 2) {
-      // 🔥 Activer le loading immédiatement pour cacher les anciens résultats pendant le debounce
-      setIsLoading(true);
-      const timeoutId = setTimeout(() => {
-        performSearch(searchQuery);
-      }, 300); // Délai de 300ms pour éviter trop de requêtes
-      return () => clearTimeout(timeoutId);
-    } else if (searchQuery.trim().length === 0) {
-      setSearchResults([]);
-      setIsLoading(false);
-    }
-  }, [searchQuery, playlistId]);
-
   const performSearch = useCallback(async (query: string) => {
+    console.log(`🔍 [FinalSearchScreen] performSearch appelé avec: "${query}", type: ${searchType}, playlistId: ${playlistId}`);
+
     if (!query.trim() || query.length < 2) {
-      setSearchResults([]);
+      console.log('🔍 [FinalSearchScreen] Query trop courte, abandon');
+      setSearchResults({
+        channels: [],
+        movies: [],
+        series: [],
+      });
       return;
     }
 
     setIsLoading(true);
+    console.log('🔍 [FinalSearchScreen] Début recherche...');
+
     try {
-      const result = await testSearchService.searchChannels(
-        playlistId,
-        query,
-        150, // 🔥 Limite augmentée à 150 pour afficher tous les résultats (ex: france = 108 chaînes)
-        categoryName?.trim().replace(/\s+$/, '') // 🔑 Filtrer par vraie catégorie + retirer espaces de fin
-      );
+      const results = {
+        channels: [] as Channel[],
+        movies: [] as Movie[],
+        series: [] as Series[],
+      };
 
-      // 🔒 Filtrer les catégories bloquées (même normalization que ChannelsScreen)
-      let filteredChannels = result.channels;
-      if (blockedCategories.length > 0) {
-        const normalizeName = (name: string) =>
-          name.toLowerCase().trim()
-            .replace(/\s*\|\s*/g, '-')
-            .replace(/\s*-\s*/g, '-')
-            .replace(/\s+/g, '-');
+      const fastSQLiteService = FastSQLiteService.getInstance();
+      console.log('🔍 [FinalSearchScreen] FastSQLiteService instance obtenue');
 
-        const normalizedBlocked = blockedCategories.map(normalizeName);
+      // Rechercher selon le type
+      if (searchType === 'channels' || searchType === 'all') {
+        try {
+          const channelResult = await testSearchService.searchChannels(
+            playlistId,
+            query,
+            100,
+            categoryName?.trim().replace(/\s+$/, '')
+          );
 
-        filteredChannels = result.channels.filter((channel: any) => {
-          const channelCategory = channel.groupTitle || channel.group || channel.category || '';
-          const normalizedCategory = normalizeName(channelCategory);
-          return !normalizedBlocked.includes(normalizedCategory);
-        });
+          // Filtrer les catégories bloquées
+          let filteredChannels = channelResult.channels;
+          if (blockedCategories.length > 0) {
+            const normalizeName = (name: string) =>
+              name.toLowerCase().trim()
+                .replace(/\s*\|\s*/g, '-')
+                .replace(/\s*-\s*/g, '-')
+                .replace(/\s+/g, '-');
+
+            const normalizedBlocked = blockedCategories.map(normalizeName);
+            filteredChannels = channelResult.channels.filter((channel: any) => {
+              const channelCategory = channel.groupTitle || channel.group || channel.category || '';
+              const normalizedCategory = normalizeName(channelCategory);
+              return !normalizedBlocked.includes(normalizedCategory);
+            });
+          }
+
+          results.channels = filteredChannels;
+        } catch (error) {
+          console.error('❌ Erreur recherche chaînes:', error);
+        }
       }
 
-      setSearchResults(filteredChannels);
+      if (searchType === 'movies' || searchType === 'all') {
+        console.log('🔍 [FinalSearchScreen] Recherche films...');
+        try {
+          results.movies = await fastSQLiteService.searchMovies(playlistId, query, 50, categoryId);
+          console.log(`✅ [FinalSearchScreen] ${results.movies.length} films trouvés`);
+        } catch (error) {
+          console.error('❌ Erreur recherche films:', error);
+        }
+      }
 
-      // Ajouter à l'historique seulement si la recherche a réussi et donné des résultats
-      if (result.channels.length > 0) {
+      if (searchType === 'series' || searchType === 'all') {
+        console.log('🔍 [FinalSearchScreen] Recherche séries...');
+        try {
+          results.series = await fastSQLiteService.searchSeries(playlistId, query, 50, categoryId);
+          console.log(`✅ [FinalSearchScreen] ${results.series.length} séries trouvées`);
+        } catch (error) {
+          console.error('❌ Erreur recherche séries:', error);
+        }
+      }
+
+      console.log(`🔍 [FinalSearchScreen] Résultats totaux: ${results.channels.length} chaînes, ${results.movies.length} films, ${results.series.length} séries`);
+      setSearchResults(results);
+
+      // Ajouter à l'historique seulement si la recherche a donné des résultats
+      const totalResults = results.channels.length + results.movies.length + results.series.length;
+      if (totalResults > 0) {
         console.log('💾 Ajout à l\'historique:', query);
         // Ajouter à l'historique de manière asynchrone pour ne pas bloquer
         setTimeout(() => {
@@ -310,12 +432,38 @@ export default function FinalSearchScreen({
         }, 0);
       }
     } catch (error) {
-      console.error('❌ Erreur recherche:', error);
-      setSearchResults([]);
+      console.error('❌ Erreur recherche générale:', error);
+      setSearchResults({
+        channels: [],
+        movies: [],
+        series: [],
+      });
     } finally {
       setIsLoading(false);
     }
-  }, [playlistId, categoryGroupTitle]);
+  }, [playlistId, searchType, categoryName, categoryId, blockedCategories]);
+
+  // Recherche en temps réel - DOIT être après performSearch
+  useEffect(() => {
+    if (searchQuery.trim().length >= 2) {
+      // 🔥 Activer le loading immédiatement pour cacher les anciens résultats pendant le debounce
+      setIsLoading(true);
+      console.log(`🔍 [FinalSearchScreen] Démarrage recherche pour: "${searchQuery}"`);
+      const timeoutId = setTimeout(() => {
+        console.log('🔍 [FinalSearchScreen] Timer terminé, appel performSearch...');
+        performSearch(searchQuery);
+      }, 300); // Délai de 300ms pour éviter trop de requêtes
+      return () => clearTimeout(timeoutId);
+    } else if (searchQuery.trim().length === 0) {
+      setSearchResults({
+        channels: [],
+        movies: [],
+        series: [],
+      });
+      setIsLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery]);
 
   const handleSuggestionPress = (suggestion: string) => {
     setSearchQuery(suggestion);
@@ -361,7 +509,7 @@ export default function FinalSearchScreen({
         <View style={{width: cardWidth}}>
           <SimpleModernSearchCard
             channel={item}
-            onPress={() => onChannelSelect(item)}
+            onPress={() => onChannelSelect?.(item)}
             index={index}
           />
         </View>
@@ -369,17 +517,134 @@ export default function FinalSearchScreen({
     );
   };
 
+  const renderMovieCard = ({item, index}: {item: Movie; index: number}) => {
+    const screenWidth = 400;
+    const cardWidth = (screenWidth - 80) / 3;
+    const cardHeight = cardWidth * 1.5; // Ratio poster film
+
+    return (
+      <View style={{flexDirection: 'row'}}>
+        {index > 0 && <View style={{width: 16}} />}
+        <TouchableOpacity
+          style={{width: cardWidth}}
+          onPress={() => onMovieSelect?.(item)}>
+          <View style={[styles.movieCard, {width: cardWidth, height: cardHeight}]}>
+            {item.cover_url ? (
+              <FastImage
+                source={{uri: item.cover_url}}
+                style={[styles.movieImage, {width: cardWidth, height: cardHeight}]}
+                resizeMode={FastImage.resizeMode.cover}
+                cache={FastImage.cacheControl.immutable}
+                priority={FastImage.priority.normal}
+              />
+            ) : (
+              <View style={[styles.movieImagePlaceholder, {width: cardWidth, height: cardHeight}]}>
+                <Icon name="movie" size={24} color={colors.text.placeholder} />
+              </View>
+            )}
+
+            {/* Badge avec le nom du film */}
+            <View style={styles.movieTitleContainer}>
+              <Text style={[styles.movieTitle, {color: colors.text.primary}]} numberOfLines={2}>
+                {item.name}
+              </Text>
+            </View>
+
+            {/* Rating si disponible */}
+            {item.rating && (
+              <View style={styles.ratingOverlay}>
+                <Text style={styles.ratingText}>{item.rating}</Text>
+              </View>
+            )}
+          </View>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  const renderSeriesCard = ({item, index}: {item: Series; index: number}) => {
+    const screenWidth = 400;
+    const cardWidth = (screenWidth - 80) / 3;
+    const cardHeight = cardWidth * 1.5; // Ratio poster série
+
+    return (
+      <View style={{flexDirection: 'row'}}>
+        {index > 0 && <View style={{width: 16}} />}
+        <TouchableOpacity
+          style={{width: cardWidth}}
+          onPress={() => onSeriesSelect?.(item)}>
+          <View style={[styles.seriesCard, {width: cardWidth, height: cardHeight}]}>
+            {item.cover_url ? (
+              <FastImage
+                source={{uri: item.cover_url}}
+                style={[styles.seriesImage, {width: cardWidth, height: cardHeight}]}
+                resizeMode={FastImage.resizeMode.cover}
+                cache={FastImage.cacheControl.immutable}
+                priority={FastImage.priority.normal}
+              />
+            ) : (
+              <View style={[styles.seriesImagePlaceholder, {width: cardWidth, height: cardHeight}]}>
+                <Icon name="live-tv" size={24} color={colors.text.placeholder} />
+              </View>
+            )}
+
+            {/* Badge avec le nom de la série */}
+            <View style={styles.seriesTitleContainer}>
+              <Text style={[styles.seriesTitle, {color: colors.text.primary}]} numberOfLines={2}>
+                {item.name}
+              </Text>
+            </View>
+
+            {/* Info épisodes si disponible */}
+            {item.info?.episode_count && (
+              <View style={styles.episodeCountOverlay}>
+                <Text style={styles.episodeCountText}>{item.info.episode_count} ép</Text>
+              </View>
+            )}
+          </View>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  // Helper functions pour la gestion des résultats
+  const hasResults = () => {
+    return searchResults.channels.length > 0 || searchResults.movies.length > 0 || searchResults.series.length > 0;
+  };
+
+  const getResultsSummary = () => {
+    const parts = [];
+    if (searchResults.channels.length > 0 && (searchType === 'channels' || searchType === 'all')) {
+      parts.push(`${searchResults.channels.length} ${searchResults.channels.length > 1 ? tChannels('channels') : tChannels('channel')}`);
+    }
+    if (searchResults.movies.length > 0 && (searchType === 'movies' || searchType === 'all')) {
+      parts.push(`${searchResults.movies.length} Film${searchResults.movies.length > 1 ? 's' : ''}`);
+    }
+    if (searchResults.series.length > 0 && (searchType === 'series' || searchType === 'all')) {
+      parts.push(`${searchResults.series.length} Série${searchResults.series.length > 1 ? 's' : ''}`);
+    }
+    return parts.join(', ') || 'Aucun résultat';
+  };
+
+  // Couleurs sombres pour le header
+  const darkHeaderBg = '#0a0e1a';
+  const darkSurfaceSecondary = '#1e2940';
+  const darkBorder = 'rgba(255,255,255,0.1)';
+  const darkTextPrimary = '#FFFFFF';
+  const darkTextPlaceholder = 'rgba(255,255,255,0.5)';
+
   const renderHeader = () => (
     <View>
-      <View style={[styles.header, {backgroundColor: colors.background.primary}]}>
-        <TouchableOpacity onPress={onClose} style={[styles.closeButton, {backgroundColor: colors.surface.secondary}]}>
-          <Icon name="arrow-back" size={24} color={colors.text.primary} />
+      <View style={[styles.header, {backgroundColor: darkHeaderBg}]}>
+        <TouchableOpacity onPress={onClose} style={[styles.closeButton, {backgroundColor: darkSurfaceSecondary}]}>
+          <Icon name="arrow-back" size={24} color={darkTextPrimary} />
         </TouchableOpacity>
-        <View style={[styles.searchContainer, {backgroundColor: colors.surface.secondary, borderColor: colors.ui.border}]}>
-          <Icon name="search" size={20} color={colors.text.placeholder} style={styles.searchIcon} />
+        <View style={[styles.searchContainer, {backgroundColor: darkSurfaceSecondary, borderColor: darkBorder}]}>
+          <Icon name="search" size={20} color={darkTextPlaceholder} style={styles.searchIcon} />
           <TextInput
-            style={[styles.searchInput, {color: colors.text.primary}]}
+            style={[styles.searchInput, {color: darkTextPrimary}]}
             placeholder=""
+            placeholderTextColor={darkTextPlaceholder}
             value={searchQuery}
             onChangeText={setSearchQuery}
             returnKeyType="done"
@@ -472,14 +737,18 @@ export default function FinalSearchScreen({
     </TouchableOpacity>
   );
 
+  // Couleurs sombres forcées pour le confort visuel
+  const darkBackground = '#0a0e1a';
+  const darkSurface = '#1a1a2e';
+
   return (
     <GestureHandlerRootView style={{flex: 1}}>
       <KeyboardAvoidingView
-        style={{flex: 1, backgroundColor: colors.background.primary}}
+        style={{flex: 1, backgroundColor: darkBackground}}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         enabled={Platform.OS === 'ios'}>
         <SafeAreaView
-          style={[styles.container, {backgroundColor: colors.background.primary}]}>
+          style={[styles.container, {backgroundColor: darkBackground}]}>
 
         {renderHeader()}
 
@@ -542,58 +811,113 @@ export default function FinalSearchScreen({
           )}
 
           {/* Résultats de recherche - affichés en temps réel */}
-          {(searchQuery.length >= 2 || searchResults.length > 0) && (
+          {(searchQuery.length >= 2 || hasResults()) && (
             <View style={styles.section}>
-              {searchResults.length > 0 && (
-                <Text
-                  style={[styles.sectionTitle, {color: colors.text.primary, fontSize: 14, marginBottom: 12, textAlign: 'center'}]}>
-                  {searchResults.length} {searchResults.length > 1 ? tChannels('channels') : tChannels('channel')}
-                </Text>
+              {/* Compteurs de résultats */}
+              {hasResults() && (
+                <View style={styles.resultsSummary}>
+                  <Text style={[styles.sectionTitle, {color: colors.text.primary, fontSize: 14, marginBottom: 12, textAlign: 'center'}]}>
+                    {getResultsSummary()}
+                  </Text>
+                </View>
               )}
-              {searchQuery.length >= 2 &&
-                searchResults.length === 0 &&
-                !isLoading && (
-                  <View style={styles.emptyStateContainer}>
-                    <Icon
-                      name="sentiment-dissatisfied"
-                      size={64}
-                      color={colors.text.placeholder}
-                      style={{marginBottom: 16}}
-                    />
-                    <Text
-                      style={[
-                        styles.emptyStateTitle,
-                        {color: colors.text.primary},
-                      ]}>
-                      {tChannels('noResultsFound')}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.emptyStateSubtitle,
-                        {color: colors.text.secondary},
-                      ]}>
-                      {tChannels('tryOtherKeywords')}
-                    </Text>
-                  </View>
-                )}
-              {searchResults.length > 0 && !isLoading && (
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={{paddingLeft: 68, paddingRight: 16}}
-                  directionalLockEnabled={true}
-                  disableIntervalMomentum={true}
-                  automaticallyAdjustContentInsets={false}
-                  removeClippedSubviews={false}
-                  scrollEventThrottle={16}
-                  decelerationRate="fast"
-                  bounces={false}>
-                  {searchResults.map((item, index) => (
-                    <React.Fragment key={item.id}>
-                      {renderChannelCard({item, index})}
-                    </React.Fragment>
-                  ))}
-                </ScrollView>
+
+              {/* Aucun résultat */}
+              {searchQuery.length >= 2 && !hasResults() && !isLoading && (
+                <View style={styles.emptyStateContainer}>
+                  <Icon
+                    name="sentiment-dissatisfied"
+                    size={64}
+                    color={colors.text.placeholder}
+                    style={{marginBottom: 16}}
+                  />
+                  <Text
+                    style={[
+                      styles.emptyStateTitle,
+                      {color: colors.text.primary},
+                    ]}>
+                    {tChannels('noResultsFound')}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.emptyStateSubtitle,
+                      {color: colors.text.secondary},
+                    ]}>
+                    {tChannels('tryOtherKeywords')}
+                  </Text>
+                </View>
+              )}
+
+              {/* Chaînes trouvées */}
+              {searchResults.channels.length > 0 && !isLoading && (
+                <View style={styles.resultSection}>
+                  <Text style={[styles.resultSectionTitle, {color: colors.text.primary}]}>
+                    {searchResults.channels.length} {searchResults.channels.length > 1 ? tChannels('channels') : tChannels('channel')}
+                  </Text>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={{paddingLeft: 68, paddingRight: 16}}
+                    directionalLockEnabled={true}
+                    disableIntervalMomentum={true}
+                    automaticallyAdjustContentInsets={false}
+                    removeClippedSubviews={false}
+                    scrollEventThrottle={16}
+                    decelerationRate="fast"
+                    bounces={false}>
+                    {searchResults.channels.map((item, index) => (
+                      <React.Fragment key={`channel-${item.id}`}>
+                        {renderChannelCard({item, index})}
+                      </React.Fragment>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+
+              {/* Films trouvés */}
+              {searchResults.movies.length > 0 && !isLoading && (
+                <View style={styles.resultSection}>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={{paddingLeft: 68, paddingRight: 16}}
+                    directionalLockEnabled={true}
+                    disableIntervalMomentum={true}
+                    automaticallyAdjustContentInsets={false}
+                    removeClippedSubviews={false}
+                    scrollEventThrottle={16}
+                    decelerationRate="fast"
+                    bounces={false}>
+                    {searchResults.movies.map((item, index) => (
+                      <React.Fragment key={`movie-${item.id}`}>
+                        {renderMovieCard({item, index})}
+                      </React.Fragment>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+
+              {/* Séries trouvées */}
+              {searchResults.series.length > 0 && !isLoading && (
+                <View style={styles.resultSection}>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={{paddingLeft: 68, paddingRight: 16}}
+                    directionalLockEnabled={true}
+                    disableIntervalMomentum={true}
+                    automaticallyAdjustContentInsets={false}
+                    removeClippedSubviews={false}
+                    scrollEventThrottle={16}
+                    decelerationRate="fast"
+                    bounces={false}>
+                    {searchResults.series.map((item, index) => (
+                      <React.Fragment key={`series-${item.id}`}>
+                        {renderSeriesCard({item, index})}
+                      </React.Fragment>
+                    ))}
+                  </ScrollView>
+                </View>
               )}
             </View>
           )}
@@ -778,5 +1102,107 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     lineHeight: 20,
+  },
+  // Styles pour les films et séries
+  movieCard: {
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    position: 'relative',
+  },
+  movieImage: {
+    borderRadius: 8,
+  },
+  movieImagePlaceholder: {
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  movieTitleContainer: {
+    position: 'absolute',
+    bottom: 8,
+    left: 8,
+    right: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+  },
+  movieTitle: {
+    fontSize: 11,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  ratingOverlay: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(255, 193, 7, 0.9)',
+    borderRadius: 4,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+  },
+  ratingText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#000',
+  },
+  seriesCard: {
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    position: 'relative',
+  },
+  seriesImage: {
+    borderRadius: 8,
+  },
+  seriesImagePlaceholder: {
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  seriesTitleContainer: {
+    position: 'absolute',
+    bottom: 8,
+    left: 8,
+    right: 8,
+    backgroundColor: 'rgba(139, 92, 246, 0.7)', // Purple pour séries
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+  },
+  seriesTitle: {
+    fontSize: 11,
+    fontWeight: '600',
+    textAlign: 'center',
+    color: '#FFFFFF',
+  },
+  episodeCountOverlay: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(139, 92, 246, 0.9)',
+    borderRadius: 4,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+  },
+  episodeCountText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  resultsSummary: {
+    marginBottom: 12,
+  },
+  resultSection: {
+    marginBottom: 20,
+  },
+  resultSectionTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    marginHorizontal: 16,
+    marginBottom: 8,
   },
 });

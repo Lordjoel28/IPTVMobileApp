@@ -3,7 +3,8 @@
  * Structure: Sidebar catégories + Grille chaînes + Recherche
  */
 
-import React, {useState, useEffect, useRef, useCallback} from 'react';
+import React from 'react';
+import {useState, useEffect, useRef, useCallback} from 'react';
 import {useFocusEffect} from '@react-navigation/native';
 import {
   View,
@@ -30,6 +31,7 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import LinearGradient from 'react-native-linear-gradient';
 import {useI18n} from '../hooks/useI18n';
 import FastImage from 'react-native-fast-image'; // ✅ Import pour préchargement
+import {useUISettings} from '../stores/UIStore';
 import ChannelCard from '../components/ChannelCard';
 import type {Category, Channel, Profile} from '../types';
 import {usePlayerStore} from '../stores/PlayerStore';
@@ -577,6 +579,9 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({route, navigation}) => {
   const {t: tChannels} = useI18n('channels');
   const {t: tCommon} = useI18n('common');
   const {t: tProfiles} = useI18n('profiles');
+  const { getScaledTextSize } = useUISettings();
+
+  console.log(`🎨 [ChannelsScreen] Text scale: ${getScaledTextSize(18)}`);
 
   // StatusBar immersif automatique pour cet écran
   useImmersiveScreen('Channels', true);
@@ -618,7 +623,7 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({route, navigation}) => {
   const [sortOption, setSortOption] = useState<
     'default' | 'newest' | 'az' | 'za'
   >('default');
-  const CHANNELS_PER_PAGE = 800; // ✅ 800 chaînes = chargement plus rapide et plus fréquent
+  const CHANNELS_PER_PAGE = 800; // ✅ 800 chaînes - SQLite local est instantané
 
   // 🕰️ LISTENER RÉCENTS: Ecouter les changements dans RecentChannelsStore pour mettre à jour le compteur
   const recentChannels = useRecentChannelsStore(state => state.recentChannels);
@@ -2648,8 +2653,7 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({route, navigation}) => {
     console.log('🍉 WatermelonDB - Démarrage chargement page suivante (background)...');
 
     // ✅ InteractionManager = Chargement après toutes les interactions pour scroll ULTRA-fluide
-    InteractionManager.runAfterInteractions(() => {
-      setTimeout(async () => {
+    InteractionManager.runAfterInteractions(async () => {
       try {
       // 🚀 Utiliser le bon service WatermelonDB (M3U ou Xtream)
       const WatermelonService =
@@ -2767,7 +2771,6 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({route, navigation}) => {
         setIsLoadingMore(false);
         console.log('⚙️ loadMoreChannels terminé');
       }
-      }, 0); // setTimeout
     }); // InteractionManager
   };
 
@@ -3100,8 +3103,8 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({route, navigation}) => {
   const renderEmptyChannels = () => (
     <View style={styles.emptyChannels}>
       <Icon name="tv-off" size={48} color="rgba(255, 255, 255, 0.3)" />
-      <Text style={styles.emptyText}>Aucune chaîne dans cette catégorie</Text>
-      <Text style={styles.emptySubtext}>
+      <Text style={[styles.emptyText, { fontSize: getScaledTextSize(16) }]}>Aucune chaîne dans cette catégorie</Text>
+      <Text style={[styles.emptySubtext, { fontSize: getScaledTextSize(14) }]}>
         Sélectionnez une autre catégorie ou vérifiez votre playlist
       </Text>
     </View>
@@ -3112,7 +3115,7 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({route, navigation}) => {
     if (isLoadingMore) {
       return (
         <View style={styles.loadingFooter}>
-          <Text style={styles.loadingFooterText}>Chargement...</Text>
+          <Text style={[styles.loadingFooterText, { fontSize: getScaledTextSize(12) }]}>Chargement...</Text>
         </View>
       );
     }
@@ -3120,7 +3123,7 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({route, navigation}) => {
     if (!hasMoreChannels && displayedChannels.length > 0) {
       return (
         <View style={styles.endFooter}>
-          <Text style={styles.endFooterText}>
+          <Text style={[styles.endFooterText, { fontSize: getScaledTextSize(12) }]}>
             {displayedChannels.length} chaînes chargées
           </Text>
         </View>
@@ -3135,15 +3138,15 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({route, navigation}) => {
       <View style={styles.container}>
         {/* StatusBar gérée automatiquement par useImmersiveScreen */}
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Chargement des chaînes...</Text>
-          <Text style={styles.loadingSubtext}>
+          <Text style={[styles.loadingText, { fontSize: getScaledTextSize(16) }]}>Chargement des chaînes...</Text>
+          <Text style={[styles.loadingSubtext, { fontSize: getScaledTextSize(14) }]}>
             {channelsCount > 0
               ? `Reconstruction de ${Math.floor(
                   channelsCount / 1000,
                 )}K chaînes...`
               : 'Préparation de la playlist volumineuse...'}
           </Text>
-          <Text style={styles.loadingSubtext}>
+          <Text style={[styles.loadingSubtext, { fontSize: getScaledTextSize(14) }]}>
             Veuillez patienter quelques secondes
           </Text>
         </View>
@@ -3333,7 +3336,7 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({route, navigation}) => {
           <View style={styles.sidebar}>
             {/* Header simplifié - seulement bouton fermer */}
             <View style={styles.sidebarHeader}>
-              <Text style={styles.sidebarTitle}>{tChannels('categories')}</Text>
+              <Text style={[styles.sidebarTitle, { fontSize: getScaledTextSize(18) }]}>{tChannels('categories')}</Text>
               <TouchableOpacity
                 onPress={() => setSidebarVisible(false)}
                 style={styles.sidebarCloseButton}>
@@ -3378,8 +3381,9 @@ const ChannelsScreen: React.FC<ChannelsScreenProps> = ({route, navigation}) => {
             ListFooterComponent={renderFooter}
             estimatedItemSize={ITEM_HEIGHT}
             onEndReached={hasMoreChannels ? loadMoreChannels : undefined}
-            onEndReachedThreshold={5.0} // ✅ 5.0 = Chargement ULTRA-anticipé (500% avant la fin) = invisible!
-            extraData={`${selectedCategory?.id}-${displayedChannels.length}-${hasMoreChannels}-${favorites.length}-${hideChannelNames}-${lockedChannels.size}-${unlockedCategories.size}`}
+            onEndReachedThreshold={4}
+            drawDistance={ITEM_HEIGHT * 15}
+            extraData={{selectedCategoryId: selectedCategory?.id, favoritesLength: favorites.length, hideChannelNames, lockedChannelsSize: lockedChannels.size}}
           />
         </Animated.View>
       </View>

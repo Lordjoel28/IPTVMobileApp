@@ -530,6 +530,182 @@ class ParentalControlService {
       };
     }
   }
+
+  // ========================================
+  // 🔒 NOUVELLES FONCTIONNALITÉS DE SÉCURITÉ
+  // ========================================
+
+  /**
+   * 🔐 Vérifier si l'accès aux paramètres nécessite un PIN
+   * @param profile Profil actuel
+   * @returns true si un PIN est requis pour accéder aux paramètres
+   */
+  async requiresPinForSettings(profile?: Profile): Promise<boolean> {
+    try {
+      // Si aucun profil n'est fourni, vérifier les paramètres globaux
+      if (!profile) {
+        // TODO: Implémenter des paramètres globaux si nécessaire
+        return false;
+      }
+
+      // Vérifier les paramètres de sécurité du profil
+      return profile.securitySettings?.requirePinForSettings || false;
+    } catch (error) {
+      console.error('❌ Erreur vérification PIN paramètres:', error);
+      return false;
+    }
+  }
+
+  /**
+   * 👤 Vérifier si l'accès au gestionnaire de profils nécessite un PIN
+   * @param profile Profil actuel
+   * @returns true si un PIN est requis pour accéder aux profils
+   */
+  async requiresPinForProfile(profile?: Profile): Promise<boolean> {
+    try {
+      // Si aucun profil n'est fourni, vérifier les paramètres globaux
+      if (!profile) {
+        // TODO: Implémenter des paramètres globaux si nécessaire
+        return false;
+      }
+
+      // Vérifier les paramètres de sécurité du profil
+      return profile.securitySettings?.requireModalForProfile || false;
+    } catch (error) {
+      console.error('❌ Erreur vérification PIN profils:', error);
+      return false;
+    }
+  }
+
+  /**
+   * 📋 Vérifier si l'accès aux playlists nécessite une connexion modale
+   * @param profile Profil actuel
+   * @returns true si une connexion modale est requise pour les playlists
+   */
+  async requiresModalForPlaylist(profile?: Profile): Promise<boolean> {
+    try {
+      // Si aucun profil n'est fourni, vérifier les paramètres globaux
+      if (!profile) {
+        // TODO: Implémenter des paramètres globaux si nécessaire
+        return false;
+      }
+
+      // Vérifier les paramètres de sécurité du profil
+      return profile.securitySettings?.requireModalForPlaylist || false;
+    } catch (error) {
+      console.error('❌ Erreur vérification modale playlists:', error);
+      return false;
+    }
+  }
+
+  /**
+   * 🔐 Vérifier le PIN pour accéder aux paramètres
+   * @param pin PIN à vérifier
+   * @returns true si le PIN est correct
+   */
+  async verifyPinForSettings(pin: string): Promise<boolean> {
+    try {
+      return await this.verifyPin(pin);
+    } catch (error) {
+      console.error('❌ Erreur vérification PIN paramètres:', error);
+      return false;
+    }
+  }
+
+  /**
+   * 👤 Vérifier le PIN pour accéder au gestionnaire de profils
+   * @param pin PIN à vérifier
+   * @returns true si le PIN est correct
+   */
+  async verifyPinForProfile(pin: string): Promise<boolean> {
+    try {
+      return await this.verifyPin(pin);
+    } catch (error) {
+      console.error('❌ Erreur vérification PIN profils:', error);
+      return false;
+    }
+  }
+
+  /**
+   * 📋 Vérifier le PIN pour accéder aux playlists
+   * @param pin PIN à vérifier
+   * @returns true si le PIN est correct
+   */
+  async verifyPinForPlaylist(pin: string): Promise<boolean> {
+    try {
+      return await this.verifyPin(pin);
+    } catch (error) {
+      console.error('❌ Erreur vérification PIN playlists:', error);
+      return false;
+    }
+  }
+
+  /**
+   * 🔄 Mettre à jour les paramètres de sécurité d'un profil
+   * @param profileId ID du profil
+   * @param securitySettings Nouveaux paramètres de sécurité
+   * @returns true si la mise à jour a réussi
+   */
+  async updateSecuritySettings(
+    profileId: string,
+    securitySettings: {
+      requirePinForSettings?: boolean;
+      requireModalForPlaylist?: boolean;
+      requireModalForProfile?: boolean;
+    }
+  ): Promise<boolean> {
+    try {
+      const profile = await ProfileService.getProfileById(profileId);
+      if (!profile) {
+        console.error('❌ Profil non trouvé:', profileId);
+        return false;
+      }
+
+      // Fusionner les paramètres existants avec les nouveaux
+      const updatedSecuritySettings = {
+        ...profile.securitySettings,
+        ...securitySettings,
+      };
+
+      await ProfileService.updateProfile(profileId, {
+        securitySettings: updatedSecuritySettings,
+      });
+
+      console.log('✅ Paramètres de sécurité mis à jour pour le profil:', profileId);
+      return true;
+    } catch (error) {
+      console.error('❌ Erreur mise à jour paramètres de sécurité:', error);
+      return false;
+    }
+  }
+
+  /**
+   * 📊 Obtenir les paramètres de sécurité actuels d'un profil
+   * @param profileId ID du profil
+   * @returns Paramètres de sécurité ou null si non trouvé
+   */
+  async getSecuritySettings(profileId: string): Promise<{
+    requirePinForSettings?: boolean;
+    requireModalForPlaylist?: boolean;
+    requireModalForProfile?: boolean;
+  } | null> {
+    try {
+      const profile = await ProfileService.getProfileById(profileId);
+      if (!profile) {
+        console.error('❌ Profil non trouvé:', profileId);
+        return null;
+      }
+
+      return profile.securitySettings || {
+        requirePinForSettings: false,
+        requireModalForPlaylist: false,
+        requireModalForProfile: false,
+      };
+    } catch (error) {
+      console.error('❌ Erreur récupération paramètres de sécurité:', error);
+      return null;
+    }
+  }
 }
 
 // Export singleton

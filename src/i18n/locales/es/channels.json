@@ -38,5 +38,13 @@
   "all": "TODOS",
   "selectAll": "Todos",
   "deselectAll": "Ninguno",
-  "search": "Buscar"
+  "search": "Buscar",
+  "allCategories": "Todas las categorías",
+  "recentlyAdded": "Añadido recientemente",
+  "recentlyWatched": "Visto recientemente",
+  "loading": "Cargando...",
+  "noMoviesAvailable": "No hay películas disponibles",
+  "noSeriesAvailable": "No hay series disponibles",
+  "tryAnotherCategory": "Pruebe otra categoría",
+  "checkConnectionOrPlaylist": "Verifique su conexión o su lista de reproducción"
 }

@@ -8,7 +8,17 @@ import SQLiteAdapter from '@nozbe/watermelondb/adapters/sqlite';
 
 import schema from './schema';
 import migrations from './migrations';
-import {Playlist, Channel, Category, Program, Favorite, WatchHistory} from './models';
+import {
+  Playlist,
+  Channel,
+  Category,
+  Program,
+  Favorite,
+  WatchHistory,
+  VodCategory,
+  VodMovie,
+  VodSeries,
+} from './models';
 
 // Configuration de l'adaptateur SQLite optimisé avec PERSISTANCE
 const adapter = new SQLiteAdapter({
@@ -26,7 +36,17 @@ const adapter = new SQLiteAdapter({
 // Instance de la base de données
 export const database = new Database({
   adapter,
-  modelClasses: [Playlist, Channel, Category, Program, Favorite, WatchHistory],
+  modelClasses: [
+    Playlist,
+    Channel,
+    Category,
+    Program,
+    Favorite,
+    WatchHistory,
+    VodCategory,
+    VodMovie,
+    VodSeries,
+  ],
   actionsEnabled: true, // Activer les actions pour le debugging
 });
 

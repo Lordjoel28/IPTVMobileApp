@@ -1,4 +1,5 @@
-import React, {useEffect} from 'react';
+import React from 'react';
+import {useEffect} from 'react';
 import {
   View,
   Text,
@@ -17,6 +18,7 @@ import SystemNavigationBar from 'react-native-system-navigation-bar';
 import type {RootStackParamList} from '../../App';
 import { useThemeColors } from '../contexts/ThemeContext';
 import { useI18n } from '../hooks/useI18n';
+import { useUISettings } from '../stores/UIStore';
 
 // Types
 type NavigationProp = StackNavigationProp<RootStackParamList>;
@@ -44,6 +46,9 @@ const SettingsScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const { t: tCommon } = useI18n('common');
   const { t: tSettings } = useI18n('settings');
+  const { getScaledTextSize } = useUISettings();
+
+  console.log(`🎨 [SettingsScreen] Text scale: ${getScaledTextSize(22)}`);
 
   useEffect(() => {
     SystemNavigationBar.immersive();
@@ -60,12 +65,18 @@ const SettingsScreen: React.FC = () => {
       route: 'ThemeSettings',
     },
     {
+      id: 'interface',
+      title: tSettings('interface'),
+      icon: 'layers',
+      route: 'InterfaceSettings',
+    },
+    {
       id: 'video_player',
       title: tSettings('videoPlayer'),
       icon: 'video-settings',
       route: 'VideoPlayerSettings',
     },
-    {id: 'tv_guide', title: tSettings('tvGuide'), icon: 'event', route: 'TVGuideSettings'},
+    {id: 'tv_guide', title: tSettings('tvGuide'), icon: 'event-note', route: 'TVGuideSettings'},
     {id: 'performance', title: tCommon('performance'), icon: 'bolt', route: 'PerformanceSettings'},
     {id: 'account', title: tSettings('account'), icon: 'account-circle', route: 'Account'},
     {id: 'player_settings', title: tSettings('playerSettings'), icon: 'tune', route: '#'},
@@ -76,9 +87,9 @@ const SettingsScreen: React.FC = () => {
       icon: 'settings-ethernet',
       route: '#',
     },
-    {id: 'update_content', title: tSettings('updateContent'), icon: 'update', route: '#'},
+    {id: 'update_content', title: tSettings('updateContent'), icon: 'update', route: 'AutoSyncSettings'},
     {id: 'parental', title: tSettings('parental'), icon: 'lock', route: 'ParentalControl'},
-    {id: 'speed_test', title: tSettings('speedTest'), icon: 'speed', route: '#'},
+    {id: 'speed_test', title: tSettings('speedTest'), icon: 'network-check', route: 'SpeedTest'},
     {id: 'backup_restore', title: tSettings('backupRestore'), icon: 'cloud-upload', route: '#'},
     {
       id: 'remote_control',
@@ -120,7 +131,7 @@ const SettingsScreen: React.FC = () => {
           <View style={styles.iconContainer}>
             <Icon name={card.icon} size={36} color={colors.text.primary} />
           </View>
-          <Text style={styles.cardTitle}>{card.title}</Text>
+          <Text style={[styles.cardTitle, { fontSize: getScaledTextSize(9) }]}>{card.title}</Text>
         </View>
       </Pressable>
     );
@@ -141,7 +152,7 @@ const SettingsScreen: React.FC = () => {
           onPress={() => navigation.goBack()}>
           <Icon name="arrow-back" size={24} color={colors.text.primary} />
         </Pressable>
-        <Text style={styles.headerTitle}>{tCommon('settings')}</Text>
+        <Text style={[styles.headerTitle, { fontSize: getScaledTextSize(22) }]}>{tCommon('settings')}</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.gridContainer}>

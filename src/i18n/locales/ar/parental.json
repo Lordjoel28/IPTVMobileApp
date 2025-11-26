@@ -53,5 +53,18 @@
   "parentalPinRequired": "PIN الأبوي مطلوب لتغيير الملف الشخصي",
   "visibleGroups": "المجموعات المرئية",
   "selectVisibleCategories": "حدد الفئات المرئية لهذا الملف الشخصي.",
-  "selectVisibleCategoriesDesc": "إذا لم يتم تحديد أي فئة، ستكون كلها مرئية."
+  "selectVisibleCategoriesDesc": "إذا لم يتم تحديد أي فئة، ستكون كلها مرئية.",
+  "securitySettings": "إعدادات الأمان",
+  "securitySettingsDescription": "تكوين خيارات الأمان المتقدمة لهذا الملف الشخصي",
+  "requirePinForSettings": "تطلب PIN للإعدادات",
+  "requirePinForSettingsDesc": "طلب PIN الأبوي للوصول إلى إعدادات التطبيق",
+  "requirePinForProfile": "تطلب PIN للملفات الشخصية",
+  "requirePinForProfileDesc": "طلب PIN الأبوي للوصول إلى إدارة الملفات الشخصية",
+  "requirePinForPlaylist": "تطلب PIN لقوائم التشغيل",
+  "requirePinForPlaylistDesc": "طلب PIN الأبوي للوصول إلى قائمة التشغيل",
+  "confirmSecurityChange": "تأكيد تغيير الأمان",
+  "enableSecuritySetting": "تفعيل",
+  "disableSecuritySetting": "تعطيل",
+  "securitySettingUpdated": "تم تحديث إعداد الأمان",
+  "securitySettingUpdateFailed": "فشل في تحديث إعداد الأمان"
 }

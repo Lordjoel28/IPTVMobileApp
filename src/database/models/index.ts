@@ -9,5 +9,18 @@ import Category from './Category';
 import Program from './Program';
 import Favorite from './Favorite';
 import WatchHistory from './WatchHistory';
+import VodCategory from './VodCategory';
+import VodMovie from './VodMovie';
+import VodSeries from './VodSeries';
 
-export {Playlist, Channel, Category, Program, Favorite, WatchHistory};
+export {
+  Playlist,
+  Channel,
+  Category,
+  Program,
+  Favorite,
+  WatchHistory,
+  VodCategory,
+  VodMovie,
+  VodSeries,
+};

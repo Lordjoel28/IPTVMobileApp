@@ -11,6 +11,30 @@ import {UltraOptimizedM3UParser} from './parsers/UltraOptimizedM3UParser';
 import type {Channel as ParsedChannel} from './parsers/UltraOptimizedM3UParser';
 
 class WatermelonM3UService {
+  // Throttle pour éviter trop de callbacks de progression
+  private lastProgressUpdate = 0;
+  private readonly PROGRESS_THROTTLE_MS = 200; // Max 5 updates/seconde
+
+  /**
+   * Wrapper throttlé pour onProgress
+   */
+  private throttledProgress(
+    onProgress: ((progress: number, message: string) => void) | undefined,
+    progress: number,
+    message: string,
+    force: boolean = false
+  ): void {
+    if (!onProgress) return;
+
+    const now = Date.now();
+    if (!force && now - this.lastProgressUpdate < this.PROGRESS_THROTTLE_MS) {
+      return; // Ignorer (trop rapide)
+    }
+
+    this.lastProgressUpdate = now;
+    onProgress(progress, message);
+  }
+
   /**
    * 🚀 Import complet d'une playlist M3U dans WatermelonDB
    * Utilise UltraOptimizedM3UParser + batch operations
@@ -22,7 +46,7 @@ class WatermelonM3UService {
     onProgress?: (progress: number, message: string) => void,
   ): Promise<string> {
     try {
-      onProgress?.(10, '🔍 Parsing M3U avec UltraOptimizedParser...');
+      this.throttledProgress(onProgress, 10, '🔍 Parsing M3U avec UltraOptimizedParser...', true); // Force
 
       // 1. Parse M3U avec le parser ultra-optimisé existant
       const startParse = Date.now();
@@ -35,7 +59,8 @@ class WatermelonM3UService {
       );
       console.log('📊 Stats:', parseResult.stats);
 
-      onProgress?.(
+      this.throttledProgress(
+        onProgress,
         40,
         `📺 ${parseResult.channels.length} chaînes parsées en ${parseTime}ms...`,
       );
@@ -70,12 +95,232 @@ class WatermelonM3UService {
         onProgress,
       });
 
-      onProgress?.(100, '✅ Import M3U terminé avec succès !');
+      this.throttledProgress(onProgress, 100, '✅ Import M3U terminé avec succès !', true); // Force final
       return playlistId;
     } catch (error) {
       console.error('❌ Erreur import M3U WatermelonDB:', error);
       throw error;
     }
+  }
+
+  /**
+   * 🔄 Mise à jour EN PLACE d'une playlist M3U (garde le même ID)
+   * Pour synchronisation automatique sans perdre la session utilisateur
+   */
+  async updatePlaylistInPlace(
+    playlistId: string,
+    m3uContent: string,
+    playlistName: string,
+    playlistUrl?: string,
+    onProgress?: (progress: number, message: string) => void,
+  ): Promise<string> {
+    try {
+      // Message simple et unifié
+      this.throttledProgress(onProgress, 10, 'settings:updatingPlaylist', true);
+
+      // 1. Parse M3U avec le parser ultra-optimisé
+      const parser = new UltraOptimizedM3UParser();
+      const parseResult = await parser.parse(m3uContent);
+
+      this.throttledProgress(onProgress, 30, 'settings:updatingPlaylist');
+
+      // 2. Extraire catégories uniques
+      const categoriesMap = new Map<string, number>();
+      parseResult.channels.forEach(channel => {
+        const categoryName =
+          channel.category || channel.groupTitle || 'Non classé';
+        categoriesMap.set(
+          categoryName,
+          (categoriesMap.get(categoryName) || 0) + 1,
+        );
+      });
+
+      this.throttledProgress(onProgress, 40, 'settings:updatingPlaylist', true);
+
+      // 3. Supprimer les anciennes chaînes et catégories PAR BATCHS (évite blocage UI)
+      console.log('🗑️ [WatermelonM3U] Suppression anciennes données...');
+
+      // 3a. Récupérer les anciennes données
+      const channelsCollection = database.get<Channel>('channels');
+      const oldChannels = await channelsCollection
+        .query(Q.where('playlist_id', playlistId))
+        .fetch();
+
+      const categoriesCollection = database.get<Category>('categories');
+      const oldCategories = await categoriesCollection
+        .query(Q.where('playlist_id', playlistId))
+        .fetch();
+
+      console.log(`🗑️ [WatermelonM3U] ${oldChannels.length} chaînes + ${oldCategories.length} catégories à supprimer`);
+
+      // 3b. Supprimer les chaînes par batchs de 500 (évite blocage)
+      const DELETE_BATCH_SIZE = 500;
+      const channelBatches = this.chunkArray(oldChannels, DELETE_BATCH_SIZE);
+
+      for (let i = 0; i < channelBatches.length; i++) {
+        const batch = channelBatches[i];
+
+        // Progression de 40% à 48% pendant suppression chaînes
+        const progress = 40 + Math.floor((i / channelBatches.length) * 8);
+        this.throttledProgress(onProgress, progress, 'settings:updatingPlaylist', true);
+
+        await database.write(async () => {
+          await Promise.all(batch.map(ch => ch.markAsDeleted()));
+        });
+
+        // Pause de 10ms pour laisser l'UI respirer
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+
+      console.log(`✅ [WatermelonM3U] ${oldChannels.length} chaînes supprimées`);
+
+      // 3c. Supprimer les catégories (rapide, peu d'items)
+      this.throttledProgress(onProgress, 48, 'settings:updatingPlaylist', true);
+
+      await database.write(async () => {
+        await Promise.all(oldCategories.map(cat => cat.markAsDeleted()));
+      });
+
+      console.log(`✅ [WatermelonM3U] ${oldCategories.length} catégories supprimées`);
+      this.throttledProgress(onProgress, 50, 'settings:updatingPlaylist', true);
+
+      // 4. Réimporter les nouvelles données (réutilise la même playlist)
+      await this.batchUpdatePlaylist({
+        playlistId,
+        playlistName,
+        playlistUrl,
+        channels: parseResult.channels,
+        categories: Array.from(categoriesMap.entries()).map(
+          ([name, count]) => ({
+            name,
+            count,
+          }),
+        ),
+        onProgress,
+      });
+
+      this.throttledProgress(onProgress, 100, 'settings:updatingPlaylist', true);
+
+      return playlistId;
+    } catch (error) {
+      console.error('❌ Erreur mise à jour playlist:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 📦 Mise à jour des données d'une playlist existante
+   */
+  private async batchUpdatePlaylist({
+    playlistId,
+    playlistName,
+    playlistUrl,
+    channels,
+    categories,
+    onProgress,
+  }: {
+    playlistId: string;
+    playlistName: string;
+    playlistUrl?: string;
+    channels: ParsedChannel[];
+    categories: {name: string; count: number}[];
+    onProgress?: (progress: number, message: string) => void;
+  }): Promise<void> {
+    // 🚀 OPTIMISATION: Batch plus petit pour éviter de bloquer le thread UI
+    const BATCH_SIZE = 500; // Réduit de 1000 à 500
+
+    // 1. Mettre à jour les métadonnées de la playlist
+    await database.write(async () => {
+      const playlistsCollection = database.get<Playlist>('playlists');
+      const playlist = await playlistsCollection.find(playlistId);
+
+      await playlist.update(p => {
+        p.name = playlistName;
+        p.url = playlistUrl || p.url;
+        p.channelsCount = channels.length;
+        p.status = 'active';
+      });
+    });
+
+    this.throttledProgress(onProgress, 55, 'settings:updatingPlaylist');
+
+    // 2. Créer les nouvelles catégories (séparé pour éviter transaction longue)
+    let categoryRecords: any[] = [];
+    await database.write(async () => {
+      const categoriesCollection = database.get<Category>('categories');
+      categoryRecords = await Promise.all(
+        categories.map(cat =>
+          categoriesCollection.prepareCreate(c => {
+            c.playlistId = playlistId;
+            c.name = cat.name;
+            c.categoryId = cat.name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+            c.channelsCount = cat.count;
+          }),
+        ),
+      );
+
+      await database.batch(categoryRecords);
+    });
+
+    this.throttledProgress(onProgress, 60, 'settings:updatingPlaylist');
+
+    // 3. Créer les nouvelles chaînes par batch (SANS write global pour éviter blocage)
+    const channelBatches = this.chunkArray(channels, BATCH_SIZE);
+    const channelsCollection = database.get<Channel>('channels');
+
+    for (let i = 0; i < channelBatches.length; i++) {
+      const batch = channelBatches[i];
+
+      // 🔥 CRITIQUE: Mettre à jour la progression AVANT le batch (THROTTLÉ pour éviter 500+ callbacks)
+      const progress = 60 + Math.floor((i / channelBatches.length) * 35);
+      this.throttledProgress(onProgress, progress, 'settings:updatingPlaylist');
+
+      // 🚀 Transaction séparée pour chaque batch (évite blocage long)
+      await database.write(async () => {
+        const channelRecords = await Promise.all(
+          batch.map(channel =>
+            channelsCollection.prepareCreate(ch => {
+              ch.playlistId = playlistId;
+
+              const categoryName =
+                channel.category || channel.groupTitle || 'Non classé';
+              const catRecord = categoryRecords.find(
+                (c: any) => c.name === categoryName,
+              );
+              ch.categoryId =
+                catRecord?.categoryId ||
+                categoryName.toLowerCase().replace(/[^a-z0-9]/g, '_');
+
+              ch.name = channel.name;
+              ch.streamUrl = channel.url;
+              ch.logoUrl = channel.logo || '';
+              ch.groupTitle = channel.groupTitle || categoryName;
+
+              ch.tvgId = channel.tvgId || '';
+              ch.tvgName = channel.name;
+              ch.tvgLogo = channel.logo || '';
+
+              ch.language = channel.language || '';
+              ch.country = channel.country || '';
+              ch.quality = channel.quality || '';
+              ch.streamType = 'live';
+
+              ch.isFavorite = false;
+              ch.watchCount = 0;
+            }),
+          ),
+        );
+
+        await database.batch(channelRecords);
+      });
+
+      // 🚀 CRITIQUE: Pause plus longue entre batches pour laisser le thread UI respirer
+      if (i < channelBatches.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 50)); // 50ms au lieu de 10ms
+      }
+    }
+
+    this.throttledProgress(onProgress, 95, 'settings:updatingPlaylist');
   }
 
   /**
@@ -94,14 +339,17 @@ class WatermelonM3UService {
     categories: {name: string; count: number}[];
     onProgress?: (progress: number, message: string) => void;
   }): Promise<string> {
-    const BATCH_SIZE = 1000; // Traitement par batch de 1000 records
+    // 🚀 OPTIMISATION: Réduire la taille des batchs pour éviter de bloquer l'UI thread
+    const BATCH_SIZE = 500; // Réduit de 1000 à 500 pour fluidité animation
 
-    return await database.write(async () => {
-      onProgress?.(60, '💾 Création de la playlist...');
+    // 🚀 OPTIMISATION: Séparer les transactions pour permettre à l'UI de respirer
 
-      // 1. Créer la playlist
+    // 1. Créer la playlist (transaction séparée)
+    const playlist = await database.write(async () => {
+      this.throttledProgress(onProgress, 60, 'settings:updatingPlaylist');
+
       const playlistsCollection = database.get<Playlist>('playlists');
-      const playlist = await playlistsCollection.create(p => {
+      return await playlistsCollection.create(p => {
         p.name = playlistName;
         p.type = 'M3U';
         p.url = playlistUrl || '';
@@ -110,14 +358,16 @@ class WatermelonM3UService {
         p.status = 'active';
         p.isActive = false; // Sera activée à la fin
       });
+    });
 
-      console.log(`✅ Playlist créée: ${playlist.id}`);
+    console.log(`✅ Playlist créée: ${playlist.id}`);
 
-      onProgress?.(65, '📂 Import des catégories...');
+    // 2. Créer les catégories (transaction séparée)
+    const categoryRecords = await database.write(async () => {
+      this.throttledProgress(onProgress, 65, 'Veuillez patienter, contenu actualisé');
 
-      // 2. Créer les catégories
       const categoriesCollection = database.get<Category>('categories');
-      const categoryRecords = await Promise.all(
+      const records = await Promise.all(
         categories.map(cat =>
           categoriesCollection.prepareCreate(c => {
             c.playlistId = playlist.id;
@@ -128,31 +378,30 @@ class WatermelonM3UService {
         ),
       );
 
-      await database.batch(categoryRecords);
+      await database.batch(records);
       console.log(`✅ ${categories.length} catégories créées`);
+      return records;
+    });
 
-      // Créer un map categoryName -> categoryId pour référence
-      const categoryIdMap = new Map<string, string>();
-      categoryRecords.forEach((cat: any) => {
-        categoryIdMap.set(cat.name, cat.id);
-      });
+    // Créer un map categoryName -> categoryId pour référence
+    const categoryIdMap = new Map<string, string>();
+    categoryRecords.forEach((cat: any) => {
+      categoryIdMap.set(cat.name, cat.id);
+    });
 
-      onProgress?.(70, `📺 Import de ${channels.length} chaînes par batch...`);
+    // 3. Créer les chaînes par batch (transactions séparées par batch)
+    const channelBatches = this.chunkArray(channels, BATCH_SIZE);
+    const channelsCollection = database.get<Channel>('channels');
 
-      // 3. Créer les chaînes par batch
-      const channelBatches = this.chunkArray(channels, BATCH_SIZE);
-      const channelsCollection = database.get<Channel>('channels');
+    for (let i = 0; i < channelBatches.length; i++) {
+      const batch = channelBatches[i];
 
-      for (let i = 0; i < channelBatches.length; i++) {
-        const batch = channelBatches[i];
-        const progress = 70 + Math.floor((i / channelBatches.length) * 25);
-        onProgress?.(
-          progress,
-          `💾 Batch ${i + 1}/${channelBatches.length} (${
-            batch.length
-          } chaînes)...`,
-        );
+      // 🚀 OPTIMISATION: Mettre à jour la progression AVANT le batch (THROTTLÉ)
+      const progress = 70 + Math.floor((i / channelBatches.length) * 25);
+      this.throttledProgress(onProgress, progress, 'settings:updatingPlaylist');
 
+      // 🚀 OPTIMISATION: Transaction séparée par batch pour éviter blocage
+      await database.write(async () => {
         const channelRecords = await Promise.all(
           batch.map(channel =>
             channelsCollection.prepareCreate(ch => {
@@ -195,16 +444,18 @@ class WatermelonM3UService {
 
         // Batch insert optimisé
         await database.batch(channelRecords);
+      });
 
-        // Petite pause pour éviter de bloquer le thread UI
-        if (i < channelBatches.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 10));
-        }
+      // 🚀 OPTIMISATION: Pause plus longue pour laisser l'UI respirer
+      if (i < channelBatches.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 50)); // 50ms au lieu de 10ms
       }
+    }
 
-      onProgress?.(95, '✅ Finalisation...');
+    // 4. Activer la playlist après import complet (transaction séparée)
+    await database.write(async () => {
+      this.throttledProgress(onProgress, 95, 'settings:updatingPlaylist');
 
-      // 4. Activer la playlist après import complet
       await playlist.update(p => {
         p.isActive = true;
       });
@@ -212,8 +463,9 @@ class WatermelonM3UService {
       console.log(
         `✅ Import M3U WatermelonDB terminé: ${channels.length} chaînes, ${categories.length} catégories`,
       );
-      return playlist.id;
     });
+
+    return playlist.id;
   }
 
   /**

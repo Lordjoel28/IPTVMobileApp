@@ -23,11 +23,12 @@ import {Picker} from '@react-native-picker/picker';
 
 import {useThemeColors} from '../contexts/ThemeContext';
 import {useI18n} from '../hooks/useI18n';
+import {useUISettings} from '../stores/UIStore';
 import type {RootStackParamList} from '../types';
 import {CacheManager} from '../services/CacheManager';
 import { videoSettingsService } from '../services/VideoSettingsService';
 import type { VideoSettings } from '../services/VideoSettingsService';
-import CacheMetricsService, { CacheMetrics } from '../services/CacheMetricsService';
+import CacheMetricsService from '../services/CacheMetricsService';
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 
@@ -40,6 +41,7 @@ const PerformanceSettingsScreen: React.FC = () => {
   const colors = useThemeColors();
   const {t: tCommon} = useI18n('common');
   const {t: tSettings} = useI18n('settings');
+  const { getScaledTextSize } = useUISettings();
 
   // États des paramètres
   const [cacheLimit, setCacheLimit] = useState<CacheSize>(1000);
@@ -52,11 +54,13 @@ const PerformanceSettingsScreen: React.FC = () => {
   const [videoSettings, setVideoSettings] = useState<VideoSettings | null>(null);
   const [isLoadingVideoSettings, setIsLoadingVideoSettings] = useState(true);
 
-  // États pour le monitoring du cache
-  const [cacheMetrics, setCacheMetrics] = useState<CacheMetrics | null>(null);
+  // État pour le monitoring du cache
   const [isMonitoring, setIsMonitoring] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
 
+  // Chargement initial des paramètres
   useEffect(() => {
+    console.log(`🎨 [PerformanceSettings] Text scale: ${getScaledTextSize(20)}`);
     const loadSettings = async () => {
       try {
         // Charger les paramètres de cache
@@ -85,28 +89,11 @@ const PerformanceSettingsScreen: React.FC = () => {
     CacheMetricsService.startMonitoring();
     setIsMonitoring(true);
 
-    // Charger les métriques initiales
-    loadCacheMetrics();
-
-    // Rafraîchir les métriques uniquement quand nécessaire (optimisé)
-    let metricsInterval: NodeJS.Timeout | null = null;
-
     return () => {
       SystemNavigationBar.navigationShow();
       CacheMetricsService.stopMonitoring();
-      if (metricsInterval) clearInterval(metricsInterval);
     };
   }, []);
-
-  // Charger les métriques du cache
-  const loadCacheMetrics = async () => {
-    try {
-      const metrics = await CacheMetricsService.calculateMetrics();
-      setCacheMetrics(metrics);
-    } catch (error) {
-      console.error('❌ Erreur chargement métriques cache:', error);
-    }
-  };
 
   const handleCacheLimitChange = async (value: CacheSize) => {
     setCacheLimit(value);
@@ -114,9 +101,6 @@ const PerformanceSettingsScreen: React.FC = () => {
 
     // Vérifier immédiatement les limites après le changement
     await CacheMetricsService.forceCheckLimits();
-
-    // Recharger les métriques pour l'UI (une seule fois)
-    await loadCacheMetrics();
 
     console.log(`📊 Limite de cache changée: ${value}MB`);
   };
@@ -139,6 +123,52 @@ const PerformanceSettingsScreen: React.FC = () => {
   const handleDNSCacheToggle = async (value: boolean) => {
     setDnsCacheEnabled(value);
     await CacheManager.enableDNSCache(value);
+  };
+
+  const handleClearCache = async () => {
+    Alert.alert(
+      tSettings('clearCacheConfirm'),
+      tSettings('clearCacheConfirmDesc'),
+      [
+        {
+          text: tCommon('cancel'),
+          style: 'cancel',
+        },
+        {
+          text: tSettings('clearCache'),
+          style: 'destructive',
+          onPress: async () => {
+            setIsClearing(true);
+            try {
+              const result = await CacheMetricsService.clearAllCaches();
+
+              if (result.success) {
+                Alert.alert(
+                  tSettings('clearCacheSuccess'),
+                  `${result.clearedMB.toFixed(1)} ${tSettings('clearCacheSuccessDesc')}`,
+                  [{text: tCommon('ok')}]
+                );
+              } else {
+                Alert.alert(
+                  tSettings('clearCacheError'),
+                  result.error || tCommon('error'),
+                  [{text: tCommon('ok')}]
+                );
+              }
+            } catch (error) {
+              console.error('❌ Erreur vidage cache:', error);
+              Alert.alert(
+                tSettings('clearCacheError'),
+                tCommon('error'),
+                [{text: tCommon('ok')}]
+              );
+            } finally {
+              setIsClearing(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   // Gestionnaires pour les paramètres vidéo
@@ -173,7 +203,7 @@ const PerformanceSettingsScreen: React.FC = () => {
 
   const renderSection = (title: string, children: React.ReactNode) => (
     <View style={[styles.section, {backgroundColor: colors.surface.primary}]}>
-      <Text style={[styles.sectionTitle, {color: colors.accent.primary}]}>
+      <Text style={[styles.sectionTitle, {color: colors.accent.primary, fontSize: getScaledTextSize(16)}]}>
         {title}
       </Text>
       {children}
@@ -187,7 +217,7 @@ const PerformanceSettingsScreen: React.FC = () => {
     options: {label: string; value: CacheSize | AutoClearDays}[],
   ) => (
     <View style={styles.optionContainer}>
-      <Text style={[styles.optionLabel, {color: colors.text.primary}]}>
+      <Text style={[styles.optionLabel, {color: colors.text.primary, fontSize: getScaledTextSize(15)}]}>
         {label}
       </Text>
       <View
@@ -223,13 +253,13 @@ const PerformanceSettingsScreen: React.FC = () => {
       <View style={styles.switchOptionLeft}>
         <Icon name={icon} size={24} color={colors.accent.primary} />
         <View style={styles.switchOptionText}>
-          <Text style={[styles.switchOptionLabel, {color: colors.text.primary}]}>
+          <Text style={[styles.switchOptionLabel, {color: colors.text.primary, fontSize: getScaledTextSize(15)}]}>
             {label}
           </Text>
           <Text
             style={[
               styles.switchOptionDescription,
-              {color: colors.text.secondary},
+              {color: colors.text.secondary, fontSize: getScaledTextSize(12)},
             ]}>
             {description}
           </Text>
@@ -271,11 +301,11 @@ const PerformanceSettingsScreen: React.FC = () => {
       <Text
         style={[
           styles.decoderOptionTitle,
-          {color: videoSettings?.decoderType === type ? colors.accent.primary : colors.text.primary},
+          {color: videoSettings?.decoderType === type ? colors.accent.primary : colors.text.primary, fontSize: getScaledTextSize(14)},
         ]}>
         {title}
       </Text>
-      <Text style={[styles.decoderOptionDescription, {color: colors.text.secondary}]}>
+      <Text style={[styles.decoderOptionDescription, {color: colors.text.secondary, fontSize: getScaledTextSize(11)}]}>
         {description}
       </Text>
     </TouchableOpacity>
@@ -294,10 +324,10 @@ const PerformanceSettingsScreen: React.FC = () => {
         </TouchableOpacity>
 
         <View style={styles.headerContent}>
-          <Text style={[styles.headerTitle, {color: colors.text.primary}]}>
+          <Text style={[styles.headerTitle, {color: colors.text.primary, fontSize: getScaledTextSize(24)}]}>
             {tCommon('performance').toUpperCase()}
           </Text>
-          <Text style={[styles.headerSubtitle, {color: colors.text.secondary}]}>
+          <Text style={[styles.headerSubtitle, {color: colors.text.secondary, fontSize: getScaledTextSize(14)}]}>
             {tSettings('cacheAndOptimizations')}
           </Text>
         </View>
@@ -312,60 +342,6 @@ const PerformanceSettingsScreen: React.FC = () => {
         {renderSection(
           tSettings('videoCache'),
           <>
-            {/* Affichage de l'utilisation actuelle du cache */}
-            {cacheMetrics && (
-              <View style={[styles.cacheUsageContainer, {backgroundColor: colors.surface.secondary}]}>
-                <Text style={[styles.cacheUsageTitle, {color: colors.text.primary}]}>
-                  📊 {tSettings('currentUsage')}
-                </Text>
-                <View style={styles.cacheUsageBar}>
-                  <View style={styles.cacheUsageInfo}>
-                    <Text style={[styles.cacheUsageText, {color: colors.text.primary}]}>
-                      {cacheMetrics.totalSizeMB.toFixed(1)} MB / {cacheLimit} MB
-                    </Text>
-                    <Text style={[styles.cacheUsagePercentage, {
-                      color: cacheMetrics.totalSizeMB > cacheLimit * 0.9 ? colors.accent.error : colors.accent.primary
-                    }]}>
-                      {((cacheMetrics.totalSizeMB / cacheLimit) * 100).toFixed(1)}%
-                    </Text>
-                  </View>
-                  <View style={styles.cacheUsageProgressContainer}>
-                    <View
-                      style={[
-                        styles.cacheUsageProgress,
-                        {
-                          width: `${Math.min((cacheMetrics.totalSizeMB / cacheLimit) * 100, 100)}%`,
-                          backgroundColor: cacheMetrics.totalSizeMB > cacheLimit * 0.9
-                            ? colors.accent.error
-                            : cacheMetrics.totalSizeMB > cacheLimit * 0.7
-                              ? colors.accent.warning
-                              : colors.accent.primary
-                        }
-                      ]}
-                    />
-                  </View>
-                </View>
-
-                {/* Breakdown détaillé */}
-                <View style={styles.cacheBreakdown}>
-                  <Text style={[styles.cacheBreakdownTitle, {color: colors.text.secondary}]}>
-                    📈 {tSettings('breakdown')}
-                  </Text>
-                  <View style={styles.cacheBreakdownItems}>
-                    <Text style={[styles.cacheBreakdownItem, {color: colors.text.tertiary}]}>
-                      • {tSettings('images')}: {(cacheMetrics.breakdown.imageCache.memorySizeMB + cacheMetrics.breakdown.imageCache.diskSizeMB).toFixed(1)}MB
-                    </Text>
-                    <Text style={[styles.cacheBreakdownItem, {color: colors.text.tertiary}]}>
-                      • {tSettings('cacheService')}: {(cacheMetrics.breakdown.cacheService.l1SizeMB + cacheMetrics.breakdown.cacheService.l2SizeMB).toFixed(1)}MB
-                    </Text>
-                    <Text style={[styles.cacheBreakdownItem, {color: colors.text.tertiary}]}>
-                      • {tSettings('epg')}: {(cacheMetrics.breakdown.epgCache.dbSizeMB + cacheMetrics.breakdown.epgCache.memorySizeMB).toFixed(1)}MB
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            )}
-
             {renderPickerOption(
               tSettings('cacheLimit'),
               cacheLimit,
@@ -396,6 +372,28 @@ const PerformanceSettingsScreen: React.FC = () => {
               handleCompressionToggle,
               'compress',
             )}
+
+            {/* Bouton Vider le cache */}
+            <TouchableOpacity
+              style={[
+                styles.clearCacheButton,
+                {
+                  backgroundColor: colors.accent.error,
+                  opacity: isClearing ? 0.5 : 1,
+                },
+              ]}
+              onPress={handleClearCache}
+              disabled={isClearing}>
+              <Icon name="delete-sweep" size={24} color="#FFFFFF" />
+              <View style={styles.clearCacheButtonText}>
+                <Text style={[styles.clearCacheButtonLabel, {color: '#FFFFFF', fontSize: getScaledTextSize(16)}]}>
+                  {tSettings('clearCache')}
+                </Text>
+                <Text style={[styles.clearCacheButtonDesc, {color: 'rgba(255, 255, 255, 0.9)', fontSize: getScaledTextSize(12)}]}>
+                  {tSettings('clearCacheDesc')}
+                </Text>
+              </View>
+            </TouchableOpacity>
           </>,
         )}
 
@@ -436,13 +434,13 @@ const PerformanceSettingsScreen: React.FC = () => {
                 )}
 
                 <View style={styles.decoderContainer}>
-                  <Text style={[styles.switchOptionLabel, {color: colors.text.primary}]}>
+                  <Text style={[styles.switchOptionLabel, {color: colors.text.primary, fontSize: getScaledTextSize(15)}]}>
                     {tSettings('decoderTypeLabel')}
                   </Text>
                   <Text
                     style={[
                       styles.switchOptionDescription,
-                      {color: colors.text.secondary, marginBottom: 16},
+                      {color: colors.text.secondary, marginBottom: 16, fontSize: getScaledTextSize(12)},
                     ]}>
                     {tSettings('decoderTypeDesc')}
                   </Text>
@@ -477,10 +475,10 @@ const PerformanceSettingsScreen: React.FC = () => {
         <View style={[styles.infoCard, {backgroundColor: colors.surface.primary}]}>
           <Icon name="info-outline" size={24} color={colors.accent.primary} />
           <View style={styles.infoTextContainer}>
-            <Text style={[styles.infoTitle, {color: colors.text.primary}]}>
+            <Text style={[styles.infoTitle, {color: colors.text.primary, fontSize: getScaledTextSize(15)}]}>
               {tSettings('bufferSettings')}
             </Text>
-            <Text style={[styles.infoText, {color: colors.text.secondary}]}>
+            <Text style={[styles.infoText, {color: colors.text.secondary, fontSize: getScaledTextSize(13)}]}>
               {tSettings('bufferSettingsDesc')}
             </Text>
           </View>
@@ -629,61 +627,26 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 14,
   },
-  cacheUsageContainer: {
-    padding: 16,
+  clearCacheButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
     borderRadius: 12,
-    marginBottom: 16,
+    marginTop: 16,
   },
-  cacheUsageTitle: {
+  clearCacheButtonText: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  clearCacheButtonLabel: {
     fontSize: 16,
     fontWeight: '600',
-    marginBottom: 12,
+    marginBottom: 4,
   },
-  cacheUsageBar: {
-    marginBottom: 12,
-  },
-  cacheUsageInfo: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  cacheUsageText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  cacheUsagePercentage: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  cacheUsageProgressContainer: {
-    height: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  cacheUsageProgress: {
-    height: '100%',
-    borderRadius: 4,
-    transition: 'width 0.3s ease-in-out',
-  },
-  cacheBreakdown: {
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.05)',
-  },
-  cacheBreakdownTitle: {
-    fontSize: 13,
-    fontWeight: '500',
-    marginBottom: 6,
-  },
-  cacheBreakdownItems: {
-    paddingLeft: 4,
-  },
-  cacheBreakdownItem: {
+  clearCacheButtonDesc: {
     fontSize: 12,
     lineHeight: 16,
-    marginBottom: 2,
   },
   });
 

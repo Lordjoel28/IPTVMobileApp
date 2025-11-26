@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import {useUISettings} from '../stores/UIStore';
 
 const {width: SCREEN_WIDTH, height: SCREEN_HEIGHT} = Dimensions.get('screen');
 
@@ -45,6 +46,10 @@ export const ModernDialog: React.FC<ModernDialogProps> = ({
   stats,
   onClose,
 }) => {
+  const { getMenuAlpha, getScaledTextSize } = useUISettings();
+
+  console.log(`🎨 [ModernDialog] Menu alpha: ${getMenuAlpha()}, Text scale: ${getScaledTextSize(18)}`);
+
   const getButtonStyle = (style?: string) => {
     switch (style) {
       case 'cancel':
@@ -71,8 +76,8 @@ export const ModernDialog: React.FC<ModernDialogProps> = ({
         backgroundColor="rgba(0, 0, 0, 0.75)"
         barStyle="light-content"
       />
-      <View style={styles.overlay}>
-        <View style={styles.dialogContainer}>
+      <View style={[styles.overlay, { backgroundColor: getMenuAlpha() }]}>
+        <View style={[styles.dialogContainer, { backgroundColor: getMenuAlpha() }]}>
           <LinearGradient
             colors={['#4A4F6C', '#3A3F5C', '#2E3348', '#222734']}
             style={styles.dialog}
@@ -90,11 +95,11 @@ export const ModernDialog: React.FC<ModernDialogProps> = ({
                   </LinearGradient>
                 </View>
               )}
-              <Text style={styles.title}>{title}</Text>
+              <Text style={[styles.title, { fontSize: getScaledTextSize(20) }]}>{title}</Text>
             </View>
 
             {/* Message */}
-            <Text style={styles.message}>{message}</Text>
+            <Text style={[styles.message, { fontSize: getScaledTextSize(16) }]}>{message}</Text>
 
             {/* Stats pour les téléchargements EPG */}
             {stats && (
@@ -103,19 +108,19 @@ export const ModernDialog: React.FC<ModernDialogProps> = ({
                   <View style={styles.statIconContainer}>
                     <Icon name="tv" size={16} color="#4A90E2" />
                   </View>
-                  <Text style={styles.statNumber}>
+                  <Text style={[styles.statNumber, { fontSize: getScaledTextSize(18) }]}>
                     {stats.channels.toLocaleString()}
                   </Text>
-                  <Text style={styles.statLabel}>chaînes</Text>
+                  <Text style={[styles.statLabel, { fontSize: getScaledTextSize(12) }]}>chaînes</Text>
                 </View>
                 <View style={styles.statItem}>
                   <View style={styles.statIconContainer}>
                     <Icon name="event" size={16} color="#FF9800" />
                   </View>
-                  <Text style={styles.statNumber}>
+                  <Text style={[styles.statNumber, { fontSize: getScaledTextSize(18) }]}>
                     {stats.programmes.toLocaleString()}
                   </Text>
-                  <Text style={styles.statLabel}>programmes</Text>
+                  <Text style={[styles.statLabel, { fontSize: getScaledTextSize(12) }]}>programmes</Text>
                 </View>
               </View>
             )}
@@ -141,7 +146,7 @@ export const ModernDialog: React.FC<ModernDialogProps> = ({
                     end={{x: 1, y: 1}}>
                     <Text
                       style={[
-                        styles.buttonText,
+                        [styles.buttonText, { fontSize: getScaledTextSize(16) }],
                         {color: getButtonTextColor(button.style)},
                       ]}>
                       {button.text}

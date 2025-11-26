@@ -29,6 +29,7 @@ import {
 import {Text, Button} from 'react-native-paper';
 import {useTheme, useThemeColors} from '../contexts/ThemeContext';
 import {useI18n} from '../hooks/useI18n';
+import {useUISettings} from '../stores/UIStore';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import {useNavigation} from '@react-navigation/native';
@@ -52,6 +53,7 @@ const ParentalControlScreen: React.FC = () => {
   const {t: tProfiles} = useI18n('profiles');
   const {t: tParental} = useI18n('parental');
   const {t: tChannels} = useI18n('channels');
+  const { getScaledTextSize } = useUISettings();
   const navigation = useNavigation<ParentalControlScreenNavigationProp>();
 
   // Styles pour les modaux avec effet flou parfait
@@ -273,6 +275,7 @@ const ParentalControlScreen: React.FC = () => {
   };
 
   useEffect(() => {
+    console.log(`🎨 [ParentalControl] Text scale: ${getScaledTextSize(20)}`);
     loadData();
   }, []);
 
@@ -448,6 +451,59 @@ const ParentalControlScreen: React.FC = () => {
     } else {
       Alert.alert(tCommon('error'), tParental('incorrectPin'));
     }
+  };
+
+  // ====================
+  // 🔒 GESTION PARAMÈTRES DE SÉCURITÉ
+  // ====================
+
+  const handleSecuritySettingChange = async (
+    setting: 'requirePinForSettings' | 'requireModalForProfile' | 'requireModalForPlaylist',
+    value: boolean
+  ) => {
+    if (!activeProfile) {
+      Alert.alert(tCommon('error'), tParental('noActiveProfile'));
+      return;
+    }
+
+    // Demander une confirmation
+    Alert.alert(
+      tParental('confirmSecurityChange'),
+      `${value ? tParental('enableSecuritySetting') : tParental('disableSecuritySetting')} "${tParental(setting)}"`,
+      [
+        {text: tCommon('cancel'), style: 'cancel'},
+        {
+          text: tCommon('ok'),
+          onPress: async () => {
+            try {
+              const success = await ParentalControlService.updateSecuritySettings(
+                activeProfile.id,
+                { [setting]: value }
+              );
+
+              if (success) {
+                loadData(); // Recharger les données
+                Alert.alert(
+                  tCommon('success'),
+                  `${tParental('securitySettingUpdated')}: ${tParental(setting)}`
+                );
+              } else {
+                Alert.alert(
+                  tCommon('error'),
+                  tParental('securitySettingUpdateFailed')
+                );
+              }
+            } catch (error) {
+              console.error('❌ Erreur mise à jour paramètre sécurité:', error);
+              Alert.alert(
+                tCommon('error'),
+                tParental('securitySettingUpdateFailed')
+              );
+            }
+          }
+        }
+      ]
+    );
   };
 
   // ====================
@@ -700,10 +756,10 @@ const ParentalControlScreen: React.FC = () => {
           <View style={{padding: 16}}>
             <View style={{alignItems: 'center', padding: 16}}>
               <Icon name="lock-open" size={48} color={colors.ui.border} />
-              <Text variant="titleLarge" style={{color: colors.text.primary, marginTop: 16}}>
+              <Text variant="titleLarge" style={{color: colors.text.primary, marginTop: 16, fontSize: getScaledTextSize(20)}}>
                 {tCommon('disabled')}
               </Text>
-              <Text style={{color: colors.text.secondary, textAlign: 'center', marginTop: 8}}>
+              <Text style={{color: colors.text.secondary, textAlign: 'center', marginTop: 8, fontSize: getScaledTextSize(14)}}>
                 {tParental('parentalPinDescription')}
               </Text>
               <Button
@@ -724,10 +780,10 @@ const ParentalControlScreen: React.FC = () => {
         {/* Gestion PIN */}
         <View style={[themedStyles.card, {backgroundColor: colors.surface.primary}]}>
           <View style={{padding: 16}}>
-            <Text variant="titleMedium" style={[themedStyles.sectionTitle, {color: colors.text.primary}]}>
+            <Text variant="titleMedium" style={[themedStyles.sectionTitle, {color: colors.text.primary, fontSize: getScaledTextSize(20)}]}>
               {tParental('parentalPin')}
             </Text>
-            <Text style={{color: colors.text.secondary, marginBottom: 16}}>
+            <Text style={{color: colors.text.secondary, marginBottom: 16, fontSize: getScaledTextSize(14)}}>
               {tParental('parentalPinDescription')}
             </Text>
 
@@ -747,6 +803,63 @@ const ParentalControlScreen: React.FC = () => {
             >
               {tParental('disableParentalControl')}
             </Button>
+          </View>
+        </View>
+
+        {/* 🔒 Options de sécurité avancées */}
+        <View style={[themedStyles.card, {backgroundColor: colors.surface.primary}]}>
+          <View style={{padding: 16}}>
+            <Text variant="titleMedium" style={[themedStyles.sectionTitle, {color: colors.text.primary, fontSize: getScaledTextSize(20)}]}>
+              {tParental('securitySettings')}
+            </Text>
+            <Text style={{color: colors.text.secondary, marginBottom: 16, fontSize: getScaledTextSize(14)}}>
+              {tParental('securitySettingsDescription')}
+            </Text>
+
+            {/* Option: Exiger PIN pour les paramètres */}
+            <View style={[themedStyles.switchContainer, {borderTopColor: colors.ui.border, marginTop: 16, paddingTop: 16}]}>
+              <View style={{flex: 1}}>
+                <Text style={{color: colors.text.primary, fontSize: getScaledTextSize(16)}}>{tParental('requirePinForSettings')}</Text>
+                <Text style={{color: colors.text.secondary, fontSize: getScaledTextSize(12)}}>
+                  {tParental('requirePinForSettingsDesc')}
+                </Text>
+              </View>
+              <Switch
+                value={activeProfile?.securitySettings?.requirePinForSettings || false}
+                onValueChange={(value) => handleSecuritySettingChange('requirePinForSettings', value)}
+                trackColor={{false: colors.surface.primaryVariant, true: colors.accent.primary}}
+              />
+            </View>
+
+            {/* Option: Exiger PIN pour les profils */}
+            <View style={[themedStyles.switchContainer, {borderTopColor: colors.ui.border}]}>
+              <View style={{flex: 1}}>
+                <Text style={{color: colors.text.primary, fontSize: getScaledTextSize(16)}}>{tParental('requirePinForProfile')}</Text>
+                <Text style={{color: colors.text.secondary, fontSize: getScaledTextSize(12)}}>
+                  {tParental('requirePinForProfileDesc')}
+                </Text>
+              </View>
+              <Switch
+                value={activeProfile?.securitySettings?.requireModalForProfile || false}
+                onValueChange={(value) => handleSecuritySettingChange('requireModalForProfile', value)}
+                trackColor={{false: colors.surface.primaryVariant, true: colors.accent.primary}}
+              />
+            </View>
+
+            {/* Option: Exiger PIN pour les playlists */}
+            <View style={[themedStyles.switchContainer, {borderTopColor: colors.ui.border}]}>
+              <View style={{flex: 1}}>
+                <Text style={{color: colors.text.primary, fontSize: getScaledTextSize(16)}}>{tParental('requirePinForPlaylist')}</Text>
+                <Text style={{color: colors.text.secondary, fontSize: getScaledTextSize(12)}}>
+                  {tParental('requirePinForPlaylistDesc')}
+                </Text>
+              </View>
+              <Switch
+                value={activeProfile?.securitySettings?.requireModalForPlaylist || false}
+                onValueChange={(value) => handleSecuritySettingChange('requireModalForPlaylist', value)}
+                trackColor={{false: colors.surface.primaryVariant, true: colors.accent.primary}}
+              />
+            </View>
           </View>
         </View>
 

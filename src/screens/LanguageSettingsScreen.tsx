@@ -16,6 +16,7 @@ import SystemNavigationBar from 'react-native-system-navigation-bar';
 import type {RootStackParamList} from '../../App';
 import {useThemeColors} from '../contexts/ThemeContext';
 import {useI18n} from '../hooks/useI18n';
+import {useUISettings} from '../stores/UIStore';
 import {videoSettingsService} from '../services/VideoSettingsService';
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
@@ -35,6 +36,7 @@ const LanguageSettingsScreen: React.FC = () => {
   const {currentLanguage, changeLanguage} = useI18n('common');
   const {t: tCommon} = useI18n('common');
   const {t: tSettings} = useI18n('settings');
+  const { getScaledTextSize } = useUISettings();
   const [isLoading, setIsLoading] = useState(true);
 
   const languageOptions: LanguageOption[] = [
@@ -70,6 +72,7 @@ const LanguageSettingsScreen: React.FC = () => {
 
   useEffect(() => {
     SystemNavigationBar.immersive();
+    console.log(`🎨 [LanguageSettings] Text scale: ${getScaledTextSize(20)}`);
     return () => {
       SystemNavigationBar.navigationShow();
     };
@@ -106,17 +109,18 @@ const LanguageSettingsScreen: React.FC = () => {
                 styles.iconContainer,
                 isSelected && styles.iconContainerSelected,
               ]}>
-              <Text style={styles.flagEmoji}>{option.flag}</Text>
+              <Text style={[styles.flagEmoji, {fontSize: getScaledTextSize(32)}]}>{option.flag}</Text>
             </View>
             <View style={styles.optionInfo}>
               <Text
                 style={[
                   styles.optionTitle,
                   isSelected && styles.optionTitleSelected,
+                  {fontSize: getScaledTextSize(16)},
                 ]}>
                 {option.nativeName}
               </Text>
-              <Text style={styles.optionDescription}>{option.name}</Text>
+              <Text style={[styles.optionDescription, {fontSize: getScaledTextSize(13)}]}>{option.name}</Text>
             </View>
           </View>
           <View style={styles.radioContainer}>
@@ -136,7 +140,7 @@ const LanguageSettingsScreen: React.FC = () => {
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>🔄 {tCommon('loading')}</Text>
+        <Text style={[styles.loadingText, {fontSize: getScaledTextSize(16)}]}>🔄 {tCommon('loading')}</Text>
       </View>
     );
   }
@@ -156,7 +160,7 @@ const LanguageSettingsScreen: React.FC = () => {
           onPress={() => navigation.goBack()}>
           <Icon name="arrow-back" size={24} color={colors.text.primary} />
         </Pressable>
-        <Text style={styles.headerTitle}>{tCommon('language').toUpperCase()}</Text>
+        <Text style={[styles.headerTitle, {fontSize: getScaledTextSize(22)}]}>{tCommon('language').toUpperCase()}</Text>
       </View>
 
       <ScrollView
@@ -164,10 +168,10 @@ const LanguageSettingsScreen: React.FC = () => {
         contentContainerStyle={styles.scrollContent}>
         <View style={styles.sectionHeader}>
           <Icon name="language" size={24} color={colors.accent.primary} />
-          <Text style={styles.sectionTitle}>{tSettings('chooseLanguage')}</Text>
+          <Text style={[styles.sectionTitle, {fontSize: getScaledTextSize(18)}]}>{tSettings('chooseLanguage')}</Text>
         </View>
 
-        <Text style={styles.sectionDescription}>
+        <Text style={[styles.sectionDescription, {fontSize: getScaledTextSize(14)}]}>
           {tSettings('selectAppLanguage')}
         </Text>
 
@@ -177,7 +181,7 @@ const LanguageSettingsScreen: React.FC = () => {
 
         <View style={styles.infoBox}>
           <Icon name="info-outline" size={20} color={colors.accent.info} />
-          <Text style={styles.infoText}>
+          <Text style={[styles.infoText, {fontSize: getScaledTextSize(13)}]}>
             {tSettings('languageChangeInfo')}
           </Text>
         </View>

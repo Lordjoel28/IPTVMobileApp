@@ -7,6 +7,7 @@ import {Q} from '@nozbe/watermelondb';
 import database from '../database';
 import {Playlist, Channel, Category} from '../database/models';
 import {networkService, NetworkError} from './NetworkService';
+import type {VodMovie, VodSeries, VodSeason, VodEpisode, VodCategory} from '../types';
 
 export interface XtreamCredentials {
   url: string;
@@ -31,6 +32,104 @@ export interface XtreamCategory {
   category_id: string;
   category_name: string;
   parent_id: number;
+}
+
+// 🎬 Interfaces Xtream Codes pour VOD Films
+export interface XtreamMovie {
+  num: number;
+  name: string;
+  stream_type: 'movie';
+  stream_id: string;
+  stream_icon: string;
+  added: string;
+  category_id: string;
+  container_extension: string;
+  custom_sid: string;
+  direct_source: string;
+  rating: string;
+  plot: string;
+  duration: string;
+  director: string;
+  cast: string;
+  release_date: string;
+  last_modified: string;
+  genre: string;
+  backdrop: string;
+  // Champs optionnels supplémentaires
+  cover?: string;
+  movie_image?: string;
+  cover_big?: string;
+  tmdb_cover?: string;
+  backdrop_path?: string;
+  tmdb_backdrop?: string;
+}
+
+// 📺 Interfaces Xtream Codes pour Séries
+export interface XtreamSeries {
+  num: number;
+  name: string;
+  stream_type: 'series';
+  stream_id: string;
+  stream_icon: string;
+  added: string;
+  category_id: string;
+  cover: string;
+  plot: string;
+  cast: string;
+  director: string;
+  genre: string;
+  release_date: string;
+  last_modified: string;
+  rating: string;
+  backdrop: string;
+  youtube_trailer: string;
+  episode_run_time: string;
+  episodes: number;
+}
+
+export interface XtreamSeriesInfo {
+  series_id: string;
+  name: string;
+  plot: string;
+  cast: string;
+  director: string;
+  genre: string;
+  release_date: string;
+  rating: string;
+  backdrop: string;
+  youtube_trailer: string;
+  categories: {category_id: string; category_name: string}[];
+  seasons: XtreamSeason[];
+}
+
+export interface XtreamSeason {
+  season_id: string;
+  season_number: number;
+  name: string;
+  overview: string;
+  episodes_count: number;
+  episodes: XtreamEpisode[];
+}
+
+export interface XtreamEpisode {
+  episode_id: string;
+  episode_num: number;
+  title: string;
+  container_extension: string;
+  custom_sid: string;
+  direct_source: string;
+  info: {
+    movie_image: string;
+    plot: string;
+    duration: string;
+    rating: string;
+    genre: string;
+    cast: string;
+    director: string;
+    release_date: string;
+    last_modified: string;
+  };
+  seasons: {season_id: string; season_number: number}[];
 }
 
 class WatermelonXtreamService {
@@ -67,6 +166,17 @@ class WatermelonXtreamService {
         channels,
         onProgress,
       });
+
+      // 5. 🚀 IMPORTER SEULEMENT LES CATÉGORIES VOD (SOLUTION HYBRIDE)
+      onProgress?.(96, '📁 Import des catégories films et séries...');
+      try {
+        await this.importXtreamCategoriesOnly(playlistId, credentials);
+        console.log(`📁 Catégories VOD importées avec succès`);
+        onProgress?.(99, '✅ Catégories films et séries importées');
+      } catch (vodError) {
+        console.warn('⚠️ Erreur import catégories VOD (non bloquant):', vodError);
+        // Ne pas bloquer l'import si les catégories échouent
+      }
 
       onProgress?.(100, '✅ Import terminé avec succès !');
       return playlistId;
@@ -683,6 +793,501 @@ class WatermelonXtreamService {
     }
   }
 
+  // ================================
+  // 🎬 API VOD - FILMS ET SÉRIES
+  // ================================
+
+  /**
+   * 🎬 Récupérer les catégories de films VOD
+   */
+  async getVodCategories(
+    credentials: XtreamCredentials,
+  ): Promise<VodCategory[]> {
+    const url = `${credentials.url}/player_api.php?username=${credentials.username}&password=${credentials.password}&action=get_vod_categories`;
+    try {
+      const categories = await networkService.fetchJSON<XtreamCategory[]>(url, {
+        timeout: 15000,
+      });
+
+      return categories.map(cat => ({
+        id: `vod_cat_${cat.category_id}`,
+        category_id: cat.category_id,
+        category_name: cat.category_name,
+        parent_id: cat.parent_id,
+        type: 'movie' as const,
+        count: 0, // À récupérer avec getVodStreams
+      }));
+    } catch (error) {
+      if (error instanceof NetworkError) {
+        throw new Error(
+          `Erreur chargement catégories VOD: ${error.getUserMessage()}`,
+        );
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * 🎬 Récupérer les films VOD par catégorie
+   * Optimisé pour 129K+ films - évite appels de fonctions répétitifs
+   */
+  async getVodStreams(
+    credentials: XtreamCredentials,
+    categoryId?: string,
+  ): Promise<VodMovie[]> {
+    const baseUrl = `${credentials.url}/player_api.php?username=${credentials.username}&password=${credentials.password}&action=get_vod_streams`;
+    const url = categoryId ? `${baseUrl}&category_id=${categoryId}` : baseUrl;
+
+    try {
+      const movies = await networkService.fetchJSON<XtreamMovie[]>(url, {
+        timeout: 30000,
+      });
+
+      // 🚀 Précalculer les bases URL une seule fois (évite 387K appels de fonction)
+      const serverUrl = credentials.url;
+      const streamUrlBase = `${serverUrl}/movie/${credentials.username}/${credentials.password}/`;
+
+      // Extraire le hostname pour normalizeLogoUrl inline
+      let serverHost = '';
+      try {
+        const urlObj = new URL(serverUrl);
+        serverHost = `${urlObj.protocol}//${urlObj.host}`;
+      } catch {
+        serverHost = serverUrl;
+      }
+
+      return movies.map(movie => {
+        // Inline normalizeLogoUrl pour cover_url - essayer plusieurs sources
+        let cover_url = '';
+        const coverSource = movie.stream_icon || movie.cover || movie.movie_image || movie.cover_big || movie.tmdb_cover || '';
+        if (coverSource) {
+          if (coverSource.startsWith('http')) {
+            cover_url = coverSource;
+          } else if (coverSource.startsWith('/')) {
+            cover_url = serverHost + coverSource;
+          } else {
+            cover_url = serverHost + '/' + coverSource;
+          }
+        }
+
+        // Inline normalizeLogoUrl pour backdrop_url - essayer plusieurs sources
+        let backdrop_url = '';
+        const backdropSource = movie.backdrop || movie.backdrop_path || movie.tmdb_backdrop || '';
+        if (backdropSource) {
+          if (backdropSource.startsWith('http')) {
+            backdrop_url = backdropSource;
+          } else if (backdropSource.startsWith('/')) {
+            backdrop_url = serverHost + backdropSource;
+          } else {
+            backdrop_url = serverHost + '/' + backdropSource;
+          }
+        }
+
+        return {
+          id: `vod_movie_${movie.stream_id}`,
+          movie_id: movie.stream_id,
+          name: movie.name,
+          plot: movie.plot || '',
+          genre: movie.genre || '',
+          director: movie.director || '',
+          cast: movie.cast || '',
+          release_date: movie.release_date || '',
+          rating: movie.rating || '',
+          duration: movie.duration || '',
+          imdb_id: '',
+          cover_url,
+          backdrop_url,
+          stream_url: streamUrlBase + movie.stream_id + '.' + (movie.container_extension || 'mp4'),
+          container_extension: movie.container_extension || '',
+          added: movie.added || '',
+          category_id: movie.category_id,
+          category_name: '',
+        };
+      });
+    } catch (error) {
+      if (error instanceof NetworkError) {
+        throw new Error(
+          `Erreur chargement films VOD: ${error.getUserMessage()}`,
+        );
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * 🎬 Récupérer les informations détaillées d'un film (métadonnées complètes)
+   * Endpoint: get_vod_info - Retourne genre, casting, durée, note, etc.
+   */
+  async getVodInfo(
+    credentials: XtreamCredentials,
+    vodId: string,
+  ): Promise<VodMovie | null> {
+    const url = `${credentials.url}/player_api.php?username=${credentials.username}&password=${credentials.password}&action=get_vod_info&vod_id=${vodId}`;
+
+    try {
+      const response = await networkService.fetchJSON<{
+        info: {
+          tmdb_id?: string;
+          name: string;
+          cover?: string;
+          cover_big?: string;
+          movie_image?: string;
+          tmdb_cover?: string;        // 🎨 TMDB cover (haute qualité)
+          backdrop_path?: string;
+          tmdb_backdrop?: string;     // 🎨 TMDB backdrop (haute qualité)
+          youtube_trailer?: string;
+          director?: string;
+          actors?: string;
+          cast?: string;
+          description?: string;
+          plot?: string;
+          age?: string;
+          rating?: string;
+          rating_5based?: string;
+          duration_secs?: string;
+          duration?: string;
+          video?: {
+            duration_secs?: number;
+            duration?: string;
+          };
+          releasedate?: string;
+          release_date?: string;
+          genre?: string;
+          category_id?: string;
+          container_extension?: string;
+        };
+        movie_data: {
+          stream_id: string;
+          name: string;
+          added: string;
+          category_id: string;
+          container_extension: string;
+          custom_sid: string;
+          direct_source: string;
+        };
+      }>(url, {
+        timeout: 15000,
+      });
+
+      if (!response || !response.info || !response.movie_data) {
+        console.warn(`⚠️ Données VOD incomplètes pour ${vodId}`);
+        return null;
+      }
+
+      const info = response.info;
+      const movieData = response.movie_data;
+
+      // 🔍 Debug: Afficher la structure de la réponse
+      console.log('🔍 Structure API response.info:', {
+        has_name: !!info.name,
+        has_plot: !!info.plot,
+        has_genre: !!info.genre,
+        has_cast: !!info.cast,
+        has_director: !!info.director,
+        has_rating: !!info.rating,
+        has_backdrop_path: !!info.backdrop_path,
+        has_cover: !!info.cover,
+        has_movie_image: !!info.movie_image,
+      });
+
+      // 🚀 Précalculer les bases URL
+      const serverUrl = credentials.url;
+      let serverHost = '';
+      try {
+        const urlObj = new URL(serverUrl);
+        serverHost = `${urlObj.protocol}//${urlObj.host}`;
+      } catch {
+        serverHost = serverUrl;
+      }
+
+      // 🎨 Normaliser cover_url avec priorisation TMDB (meilleure qualité)
+      let cover_url = '';
+      // Ordre de priorité : TMDB → movie_image → cover_big → cover
+      const coverSources = [
+        info.tmdb_cover,        // 1️⃣ TMDB (haute qualité)
+        info.movie_image,       // 2️⃣ Image du serveur
+        info.cover_big,         // 3️⃣ Grande couverture
+        info.cover              // 4️⃣ Couverture standard
+      ];
+
+      for (const source of coverSources) {
+        if (source && typeof source === 'string') {
+          if (source.startsWith('http')) {
+            cover_url = source;
+            break;
+          } else if (source.startsWith('/')) {
+            cover_url = serverHost + source;
+            break;
+          } else if (source) {
+            cover_url = serverHost + '/' + source;
+            break;
+          }
+        }
+      }
+
+      // 🎨 Normaliser backdrop_url avec priorisation TMDB
+      let backdrop_url = '';
+      // Ordre de priorité : TMDB → backdrop_path standard
+      const backdropSources = [
+        info.tmdb_backdrop,     // 1️⃣ TMDB backdrop (haute qualité)
+        info.backdrop_path      // 2️⃣ Backdrop standard
+      ];
+
+      for (const source of backdropSources) {
+        if (source && typeof source === 'string') {
+          if (source.startsWith('http')) {
+            backdrop_url = source;
+            break;
+          } else if (source.startsWith('/')) {
+            backdrop_url = serverHost + source;
+            break;
+          } else if (source) {
+            backdrop_url = serverHost + '/' + source;
+            break;
+          }
+        }
+      }
+
+      // Calculer la durée (peut être dans info.duration, info.duration_secs ou info.video.duration_secs)
+      let duration = '';
+      if (info.duration && typeof info.duration === 'string') {
+        duration = info.duration;
+      } else if (info.duration_secs) {
+        const secs = typeof info.duration_secs === 'string'
+          ? parseInt(info.duration_secs, 10)
+          : info.duration_secs;
+        if (!isNaN(secs)) {
+          const hours = Math.floor(secs / 3600);
+          const minutes = Math.floor((secs % 3600) / 60);
+          duration = hours > 0 ? `${hours}h ${minutes}min` : `${minutes}min`;
+        }
+      } else if (info.video?.duration_secs) {
+        const secs = info.video.duration_secs;
+        const hours = Math.floor(secs / 3600);
+        const minutes = Math.floor((secs % 3600) / 60);
+        duration = hours > 0 ? `${hours}h ${minutes}min` : `${minutes}min`;
+      }
+
+      // Construire l'objet VodMovie avec toutes les métadonnées
+      const vodMovie = {
+        id: `vod_movie_${vodId}`,
+        movie_id: vodId,
+        name: info.name || movieData.name,
+        plot: info.plot || info.description || '',
+        genre: info.genre || '',
+        director: info.director || '',
+        cast: info.cast || info.actors || '',
+        release_date: info.release_date || info.releasedate || '',
+        rating: info.rating || info.rating_5based || '',
+        duration,
+        imdb_id: info.tmdb_id || '',
+        cover_url,
+        backdrop_url,
+        stream_url: `${serverUrl}/movie/${credentials.username}/${credentials.password}/${vodId}.${movieData.container_extension || 'mp4'}`,
+        container_extension: movieData.container_extension || '',
+        added: movieData.added || '',
+        category_id: movieData.category_id || info.category_id || '',
+        category_name: '',
+      };
+
+      console.log('✅ VodMovie construit:', {
+        name: vodMovie.name,
+        genre: vodMovie.genre,
+        cast: vodMovie.cast?.substring(0, 50),
+        director: vodMovie.director,
+        rating: vodMovie.rating,
+        duration: vodMovie.duration,
+        release_date: vodMovie.release_date,
+      });
+
+      return vodMovie;
+    } catch (error) {
+      console.error(`❌ Erreur récupération info VOD ${vodId}:`, error);
+      if (error instanceof NetworkError) {
+        throw new Error(
+          `Erreur chargement info film: ${error.getUserMessage()}`,
+        );
+      }
+      return null;
+    }
+  }
+
+  /**
+   * 📺 Récupérer les catégories de séries VOD
+   */
+  async getSeriesCategories(
+    credentials: XtreamCredentials,
+  ): Promise<VodCategory[]> {
+    const url = `${credentials.url}/player_api.php?username=${credentials.username}&password=${credentials.password}&action=get_series_categories`;
+    try {
+      const categories = await networkService.fetchJSON<XtreamCategory[]>(url, {
+        timeout: 15000,
+      });
+
+      return categories.map(cat => ({
+        id: `series_cat_${cat.category_id}`,
+        category_id: cat.category_id,
+        category_name: cat.category_name,
+        parent_id: cat.parent_id,
+        type: 'series' as const,
+        count: 0, // À récupérer avec getSeriesStreams
+      }));
+    } catch (error) {
+      if (error instanceof NetworkError) {
+        throw new Error(
+          `Erreur chargement catégories séries: ${error.getUserMessage()}`,
+        );
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * 📺 Récupérer les séries VOD par catégorie
+   */
+  async getSeriesStreams(
+    credentials: XtreamCredentials,
+    categoryId?: string,
+  ): Promise<VodSeries[]> {
+    const baseUrl = `${credentials.url}/player_api.php?username=${credentials.username}&password=${credentials.password}&action=get_series`;
+    const url = categoryId ? `${baseUrl}&category_id=${categoryId}` : baseUrl;
+
+    try {
+      const series = await networkService.fetchJSON<XtreamSeries[]>(url, {
+        timeout: 30000,
+      });
+
+      return series.map((s, index) => {
+        // Protection contre les IDs undefined - utiliser plusieurs fallbacks
+        const seriesId = s.stream_id || s.num?.toString() || `idx_${index}`;
+        return {
+          id: `vod_series_${seriesId}`,
+          series_id: seriesId,
+          stream_id: s.stream_id, // Garder l'original pour référence
+          name: s.name || `Series ${index + 1}`,
+          plot: s.plot || '',
+          genre: s.genre || '',
+          director: s.director || '',
+          cast: s.cast || '',
+          release_date: s.release_date || '',
+          rating: s.rating || '',
+          imdb_id: '', // Pas disponible dans l'API Xtream
+          cover_url: this.normalizeLogoUrl(s.cover || s.stream_icon, credentials.url),
+          backdrop_url: this.normalizeLogoUrl(s.backdrop, credentials.url),
+          youtube_trailer: s.youtube_trailer || '',
+          episodes_count: s.episodes || 0,
+          seasons_count: 0, // À récupérer avec getSeriesInfo
+          last_updated: s.last_modified || '',
+          category_id: s.category_id || '',
+          category_name: '', // À remplir avec le mapping
+          added: s.added || '', // Pour le tri par date d'ajout
+        };
+      });
+    } catch (error) {
+      if (error instanceof NetworkError) {
+        throw new Error(
+          `Erreur chargement séries VOD: ${error.getUserMessage()}`,
+        );
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * 📺 Récupérer les détails complets d'une série (saisons et épisodes)
+   */
+  async getSeriesInfo(
+    credentials: XtreamCredentials,
+    seriesId: string,
+  ): Promise<{
+    series: VodSeries;
+    seasons: VodSeason[];
+  }> {
+    const url = `${credentials.url}/player_api.php?username=${credentials.username}&password=${credentials.password}&action=get_series_info&series_id=${seriesId}`;
+
+    try {
+      const seriesInfo = await networkService.fetchJSON<XtreamSeriesInfo>(url, {
+        timeout: 30000,
+      });
+
+      // Vérifier que la réponse est valide
+      if (!seriesInfo || !seriesInfo.info) {
+        throw new Error('Réponse API invalide pour les détails de la série');
+      }
+
+      // Extraire les données de info (structure API Xtream)
+      const info = seriesInfo.info;
+      const seasonsData = seriesInfo.seasons || [];
+      const episodesData = seriesInfo.episodes || {};
+      const categoriesData = Array.isArray(seriesInfo.categories) ? seriesInfo.categories : [];
+
+      // Mapper la série principale
+      const series: VodSeries = {
+        id: `vod_series_${info.series_id || seriesId}`,
+        series_id: info.series_id || seriesId,
+        name: info.name || 'Sans nom',
+        plot: info.plot || '',
+        genre: info.genre || '',
+        director: info.director || '',
+        cast: info.cast || '',
+        release_date: info.releaseDate || info.release_date || '',
+        rating: info.rating || '',
+        imdb_id: '',
+        cover_url: this.normalizeLogoUrl(info.cover || info.backdrop_path?.[0], credentials.url),
+        backdrop_url: this.normalizeLogoUrl(info.backdrop_path?.[0] || info.cover, credentials.url),
+        youtube_trailer: info.youtube_trailer || '',
+        episodes_count: 0, // Calculé après
+        seasons_count: seasonsData.length,
+        last_updated: info.last_modified || '',
+        category_id: categoriesData[0]?.category_id || '',
+        category_name: categoriesData[0]?.category_name || '',
+      };
+
+      // Mapper les saisons et épisodes (structure API Xtream: episodes est un objet {1: [...], 2: [...], ...})
+      const seasons: VodSeason[] = (seasonsData || []).map(season => {
+        const seasonNumber = String(season.season_number);
+        const seasonEpisodes = episodesData[seasonNumber] || [];
+
+        return {
+          id: `vod_season_${season.id || seasonNumber}`,
+          season_id: String(season.id || seasonNumber),
+          series_id: info.series_id || seriesId,
+          season_number: season.season_number,
+          name: season.name || `Saison ${season.season_number}`,
+          overview: season.overview || '',
+          cover_url: season.cover || season.cover_big || '',
+          episodes_count: seasonEpisodes.length,
+          episodes: seasonEpisodes.map((episode: any) => ({
+            id: `vod_episode_${episode.id}`,
+            episode_id: String(episode.id),
+            season_id: String(season.id || seasonNumber),
+            series_id: info.series_id || seriesId,
+            episode_number: episode.episode_num,
+            name: episode.title || `Épisode ${episode.episode_num}`,
+            plot: episode.info?.plot || '',
+            duration: episode.info?.duration || '',
+            stream_url: this.buildXtreamStreamUrl(credentials, String(episode.id)),
+            container_extension: episode.container_extension || 'mkv',
+            added: episode.added || '',
+            air_date: episode.info?.release_date || '',
+          })),
+        };
+      });
+
+      // Calculer le total d'épisodes
+      series.episodes_count = seasons.reduce((total, season) => total + season.episodes_count, 0);
+
+      return { series, seasons };
+    } catch (error) {
+      if (error instanceof NetworkError) {
+        throw new Error(
+          `Erreur chargement détails série: ${error.getUserMessage()}`,
+        );
+      }
+      throw error;
+    }
+  }
+
   /**
    * 🔍 Trouver l'index d'une chaîne dans la playlist (pour window loading)
    * Version OPTIMISÉE : Utilise uniquement la récupération de l'ID pour trouver la position
@@ -728,6 +1333,145 @@ class WatermelonXtreamService {
       console.error('❌ [findChannelIndex] Erreur:', error);
       return 0; // Fallback vers le début
     }
+  }
+
+  // ==========================================
+  // 📁 SOLUTION HYBRIDE - IMPORT CATÉGORIES SEULEMENT
+  // ==========================================
+
+  /**
+   * 📁 Importer SEULEMENT les catégories VOD (ultra-rapide)
+   * Solution hybride pour éviter le téléchargement massif
+   */
+  async importXtreamCategoriesOnly(
+    playlistId: string,
+    credentials: XtreamCredentials,
+  ): Promise<void> {
+    try {
+      console.log('📁 Import léger des catégories VOD...');
+      const startTime = Date.now();
+
+      // Télécharger uniquement les catégories (rapide)
+      const [movieCategories, seriesCategories] = await Promise.all([
+        this.getVodCategories(credentials),
+        this.getSeriesCategories(credentials),
+      ]);
+
+      console.log(`📁 Téléchargé: ${movieCategories.length} catégories films, ${seriesCategories.length} catégories séries`);
+
+      // Sauvegarder dans WatermelonDB via VODCacheService
+      const VODCacheService = (await import('./VODCacheService')).default;
+
+      await VODCacheService.saveCategoriesToDB(playlistId, movieCategories, 'movie');
+      await VODCacheService.saveCategoriesToDB(playlistId, seriesCategories, 'series');
+
+      const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+      console.log(`✅ Catégories VOD importées en ${duration}s: ${movieCategories.length + seriesCategories.length} catégories`);
+
+    } catch (error) {
+      console.error('❌ Erreur import catégories VOD:', error);
+      throw error;
+    }
+  }
+
+  // ==========================================
+  // 🚀 MÉTHODES PUBLIQUES POUR CONNEXION XTREAM
+  // ==========================================
+
+  /**
+   * 🔍 Récupérer les informations du compte Xtream (PUBLIC)
+   */
+  async getAccountInfo(credentials: XtreamCredentials): Promise<{
+    username: string;
+    password: string;
+    message: string;
+    auth: number;
+    status: string;
+    exp_date: string;
+    is_trial: string;
+    active_cons: string;
+    created_at: string;
+    max_connections: string;
+    allowed_output_formats: string[];
+  }> {
+    const accountData = await this.getXtreamAccountInfo(credentials);
+    return accountData.user_info || accountData;
+  }
+
+  /**
+   * 📺 Récupérer toutes les chaînes live depuis Xtream (PUBLIC)
+   */
+  async getChannelsFromXtream(credentials: XtreamCredentials): Promise<any[]> {
+    const [categories, channels] = await Promise.all([
+      this.getXtreamCategories(credentials),
+      this.getXtreamLiveChannels(credentials),
+    ]);
+
+    // Créer un map des catégories pour lookup rapide
+    const categoryMap = new Map<string, string>();
+    categories.forEach(cat => {
+      categoryMap.set(cat.category_id, cat.category_name);
+    });
+
+    // Mapper les chaînes avec les infos de catégorie
+    return channels.map((ch, index) => ({
+      id: `xtream_${ch.stream_id || index}`,
+      name: ch.name,
+      streamUrl: this.buildXtreamStreamUrl(
+        credentials.url,
+        credentials.username,
+        credentials.password,
+        ch.stream_id,
+        'ts',
+      ),
+      logoUrl: this.normalizeLogoUrl(ch.stream_icon, credentials.url),
+      groupTitle: categoryMap.get(ch.category_id) || ch.category_name || 'Non classé',
+      tvgId: ch.epg_channel_id || '',
+      streamType: 'live',
+      streamId: ch.stream_id,
+      isAdult: ch.is_adult === '1' || ch.is_adult === 1,
+      categoryId: ch.category_id,
+    }));
+  }
+
+  /**
+   * 💾 Sauvegarder les chaînes dans WatermelonDB (PUBLIC)
+   */
+  async saveChannelsToDatabase(playlistId: string, channels: any[]): Promise<void> {
+    console.log(`💾 Sauvegarde de ${channels.length} chaînes dans WatermelonDB...`);
+
+    const CHUNK_SIZE = 500;
+    const chunks = this.chunkArray(channels, CHUNK_SIZE);
+
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      console.log(`📦 Chunk ${i + 1}/${chunks.length}: ${chunk.length} chaînes`);
+
+      await database.write(async () => {
+        const channelCollection = database.get<any>('channels');
+
+        for (const ch of chunk) {
+          await channelCollection.create((record: any) => {
+            record.playlistId = playlistId;
+            record.categoryId = ch.categoryId || '';
+            record.name = ch.name;
+            record.streamUrl = ch.streamUrl;
+            record.logoUrl = ch.logoUrl || '';
+            record.groupTitle = ch.groupTitle || '';
+            record.tvgId = ch.tvgId || '';
+            record.streamType = ch.streamType || 'live';
+            record.streamId = ch.streamId || '';
+            record.isAdult = ch.isAdult || false;
+            record.isFavorite = false;
+            record.watchCount = 0;
+            record.createdAt = Date.now();
+            record.updatedAt = Date.now();
+          });
+        }
+      });
+    }
+
+    console.log(`✅ ${channels.length} chaînes sauvegardées avec succès`);
   }
 }
 

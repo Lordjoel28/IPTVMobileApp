@@ -48,6 +48,10 @@ const DEFAULT_CONFIG: VoiceSearchConfig = {
   timeout: 10000, // 10 secondes
 };
 
+// Singleton pour éviter les multiples initialisations de Voice
+let voiceInstanceCount = 0;
+let isVoiceInitializing = false;
+
 export const useVoiceSearch = (
   config: VoiceSearchConfig = {},
   callbacks: VoiceSearchCallbacks = {},
@@ -118,10 +122,25 @@ export const useVoiceSearch = (
   // 🔧 Initialisation du service Voice
   const initializeVoice = async () => {
     try {
-      console.log('🎤 [VoiceSearch] Initialisation...');
+      console.log('🎤 [VoiceSearch] Initialisation...', voiceInstanceCount);
 
-      // Détruire toute session existante
-      await Voice.destroy();
+      // Éviter les initialisations simultanées
+      if (isVoiceInitializing) {
+        console.log('🎤 [VoiceSearch] Initialisation déjà en cours, attente...');
+        return;
+      }
+
+      isVoiceInitializing = true;
+      voiceInstanceCount++;
+
+      // Détruire toute session existante seulement si c'est la première instance
+      if (voiceInstanceCount === 1) {
+        try {
+          await Voice.destroy();
+        } catch (e) {
+          // Ignorer si déjà détruit
+        }
+      }
 
       // Event listeners
       Voice.onSpeechStart = (event: SpeechStartEvent) => {
@@ -237,6 +256,8 @@ export const useVoiceSearch = (
         error: error.message || 'Erreur initialisation',
         isInitialized: true,
       });
+    } finally {
+      isVoiceInitializing = false;
     }
   };
 
@@ -343,14 +364,31 @@ export const useVoiceSearch = (
   // 🧹 Nettoyer les ressources
   const cleanup = async () => {
     try {
-      console.log('🎤 [VoiceSearch] Nettoyage...');
+      console.log('🎤 [VoiceSearch] Nettoyage...', voiceInstanceCount);
 
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
       }
 
-      await Voice.destroy();
+      // Arrêter l'écoute d'abord
+      try {
+        await Voice.stop();
+      } catch (e) {
+        // Ignorer l'erreur si déjà arrêté
+      }
+
+      voiceInstanceCount = Math.max(0, voiceInstanceCount - 1);
+
+      // Détruire seulement si c'est la dernière instance
+      if (voiceInstanceCount === 0) {
+        try {
+          await Voice.destroy();
+        } catch (e) {
+          // Ignorer si déjà détruit
+        }
+      }
+
       safeSetState({
         isListening: false,
         results: [],

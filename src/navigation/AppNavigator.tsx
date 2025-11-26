@@ -32,6 +32,10 @@ import AccountScreen from '../screens/AccountScreen';
 import AccountInfoScreen from '../screens/AccountInfoScreen';
 import ParentalControlScreen from '../screens/ParentalControlScreen';
 import CategoriesSelectionScreen from '../screens/CategoriesSelectionScreen';
+import MoviesScreen from '../screens/vod/MoviesScreen';
+import MovieDetailScreen from '../screens/vod/MovieDetailScreen';
+import SeriesScreen from '../screens/vod/SeriesScreen';
+import SeriesDetailScreen from '../screens/vod/SeriesDetailScreen';
 
 // Tab Screens
 import PlaylistsScreen from '../screens/PlaylistsScreen';
@@ -396,6 +400,46 @@ const AppNavigator: React.FC = () => {
       <Stack.Screen
         name="CategoriesSelection"
         component={CategoriesSelectionScreen}
+        options={{
+          headerShown: false,
+          gestureEnabled: true,
+        }}
+      />
+
+      {/* Écran Films VOD */}
+      <Stack.Screen
+        name="MoviesScreen"
+        component={MoviesScreen}
+        options={{
+          headerShown: false,
+          gestureEnabled: true,
+        }}
+      />
+
+      {/* Détail d'un film */}
+      <Stack.Screen
+        name="MovieDetailScreen"
+        component={MovieDetailScreen}
+        options={{
+          headerShown: false,
+          gestureEnabled: true,
+        }}
+      />
+
+      {/* Écran Séries VOD */}
+      <Stack.Screen
+        name="SeriesScreen"
+        component={SeriesScreen}
+        options={{
+          headerShown: false,
+          gestureEnabled: true,
+        }}
+      />
+
+      {/* Détail d'une série */}
+      <Stack.Screen
+        name="SeriesDetailScreen"
+        component={SeriesDetailScreen}
         options={{
           headerShown: false,
           gestureEnabled: true,
