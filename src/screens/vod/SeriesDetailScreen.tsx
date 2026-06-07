@@ -23,6 +23,8 @@ import LinearGradient from 'react-native-linear-gradient';
 import {useI18n} from '../../hooks/useI18n';
 import {useUIStore} from '../../stores/UIStore';
 import WatermelonXtreamService from '../../services/WatermelonXtreamService';
+import ProfileService from '../../services/ProfileService';
+import VODHistoryService from '../../services/VODHistoryService';
 import type {VodSeries, VodSeason, VodEpisode, RootStackParamList} from '../../types';
 
 type SeriesDetailScreenNavigationProp = StackNavigationProp<RootStackParamList, 'SeriesDetailScreen'>;
@@ -58,6 +60,7 @@ const SeriesDetailScreen: React.FC<Props> = ({navigation, route}) => {
     seasons: VodSeason[];
   } | null>(null);
   const [expandedSeasons, setExpandedSeasons] = useState<Set<string>>(new Set());
+  const [activeProfileId, setActiveProfileId] = useState<string | null>(null);
 
   useEffect(() => {
     navigation.setOptions({
@@ -70,6 +73,11 @@ const SeriesDetailScreen: React.FC<Props> = ({navigation, route}) => {
     });
 
     loadSeriesDetails();
+
+    // Charger le profil actif pour l'historique
+    ProfileService.getActiveProfile().then(profile => {
+      if (profile) setActiveProfileId(profile.id);
+    });
   }, [navigation, series.name]);
 
   const loadSeriesDetails = async (forceRefresh: boolean = false) => {
@@ -169,6 +177,17 @@ const SeriesDetailScreen: React.FC<Props> = ({navigation, route}) => {
 
       // Lancer le lecteur avec l'épisode
       navigation.navigate('Player', {channel: episodeChannel});
+
+      // Enregistrer la série dans l'historique VOD (fire & forget)
+      if (activeProfileId) {
+        VODHistoryService.addSeriesToHistory(
+          series,
+          playlistId,
+          activeProfileId,
+        ).catch(err =>
+          console.error('❌ Erreur ajout historique série:', err),
+        );
+      }
 
       showNotification(`Lecture de "S${season.season_number}E${episode.episode_number}"`, 'success', 3000);
     } catch (error) {

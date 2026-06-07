@@ -3,7 +3,7 @@
  * Design moderne avec header compact, grille d'avatars et aperçus de thèmes
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -75,6 +75,10 @@ const AccountInfoScreen: React.FC = () => {
   const [showThemePicker, setShowThemePicker] = useState(false);
   const [showProfileSwitcher, setShowProfileSwitcher] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
+  // Ref pour éviter le double rechargement quand isLoaded passe à true
+  const initialLoadDoneRef = useRef(false);
+  // Ref pour bloquer le rechargement lors de mises à jour internes (avatar, thème)
+  const skipNextFocusReloadRef = useRef(false);
 
   // États pour les informations de la playlist active
   const [activePlaylist, setActivePlaylist] = useState<any>(null);
@@ -91,13 +95,21 @@ const AccountInfoScreen: React.FC = () => {
     loadProfileData();
   }, []);
 
-  // Rafraîchir quand l'écran est en focus avec useIsFocused
+  // Rafraîchir quand l'écran revient en focus (navigation retour, etc.)
+  // On utilise initialLoadDoneRef pour ne pas déclencher au premier chargement
   useEffect(() => {
-    if (isFocused && isLoaded) {
-      console.log('🔄 [AccountInfoScreen] Écran en focus, rechargement complet...');
-      loadProfileData(true); // Forcer le rechargement
+    if (!isFocused) return;
+    if (!initialLoadDoneRef.current) return;
+
+    if (skipNextFocusReloadRef.current) {
+      skipNextFocusReloadRef.current = false;
+      return;
     }
-  }, [isFocused, isLoaded]);
+
+    console.log('🔄 [AccountInfoScreen] Écran en focus, rechargement complet...');
+    loadProfileData(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFocused]);
 
   const loadProfileData = async (forceReload = false) => {
     try {
@@ -119,6 +131,7 @@ const AccountInfoScreen: React.FC = () => {
       console.error('❌ Erreur chargement profil:', error);
     } finally {
       setIsLoaded(true);
+      initialLoadDoneRef.current = true;
     }
   };
 
@@ -224,11 +237,15 @@ const AccountInfoScreen: React.FC = () => {
     if (!currentProfile) return;
 
     try {
+      // Bloquer le rechargement focus déclenché par l'Alert
+      skipNextFocusReloadRef.current = true;
       await ProfileService.updateProfile(currentProfile.id, { avatar });
-      setCurrentProfile({ ...currentProfile, avatar });
+      // Mise à jour optimiste de l'état local uniquement (pas de rechargement réseau)
+      setCurrentProfile(prev => prev ? { ...prev, avatar } : prev);
       setShowAvatarPicker(false);
       Alert.alert(tCommon('success'), tProfiles('avatarChanged'));
     } catch (error) {
+      skipNextFocusReloadRef.current = false;
       Alert.alert(tCommon('error'), tProfiles('avatarChangeError'));
     }
   };
@@ -237,12 +254,14 @@ const AccountInfoScreen: React.FC = () => {
     if (!currentProfile) return;
 
     try {
+      skipNextFocusReloadRef.current = true;
       await ProfileService.updateProfile(currentProfile.id, { theme: themeId as any });
       await setTheme(themeId);
-      setCurrentProfile({ ...currentProfile, theme: themeId as any });
+      setCurrentProfile(prev => prev ? { ...prev, theme: themeId as any } : prev);
       setShowThemePicker(false);
       Alert.alert(tCommon('success'), tThemes('themeChanged'));
     } catch (error) {
+      skipNextFocusReloadRef.current = false;
       Alert.alert(tCommon('error'), tThemes('themeChangeError'));
     }
   };

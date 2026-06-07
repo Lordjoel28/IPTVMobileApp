@@ -32,6 +32,7 @@ import FavoritesService from '../../services/FavoritesService';
 import ProfileService from '../../services/ProfileService';
 import WatermelonXtreamService from '../../services/WatermelonXtreamService';
 import VODHybridService from '../../services/VODHybridService';
+import VODHistoryService from '../../services/VODHistoryService';
 import {database} from '../../database';
 import {Q} from '@nozbe/watermelondb';
 import type {RootStackParamList, Channel, VodMovie} from '../../types';
@@ -341,12 +342,23 @@ const MovieDetailScreen: React.FC<Props> = ({route}) => {
       // Lancer la lecture avec le GlobalVideoPlayer
       playerActions.playChannel(movieChannel, true); // true pour démarrer en fullscreen
 
+      // Enregistrer dans l'historique VOD (fire & forget)
+      if (activeProfileId) {
+        VODHistoryService.addMovieToHistory(
+          enrichedMovie,
+          playlistId,
+          activeProfileId,
+        ).catch(err =>
+          console.error('❌ Erreur ajout historique film:', err),
+        );
+      }
+
       showNotification(tCommon('playing') + ' ' + movie.name, 'success', 2000);
     } catch (error) {
       console.error('❌ Erreur lors du lancement du film:', error);
       showNotification(tCommon('errorPlayingVideo'), 'error', 3000);
     }
-  }, [movie, playlistId, isFavorite, tCommon, showNotification, playerActions]);
+  }, [movie, enrichedMovie, playlistId, activeProfileId, isFavorite, tCommon, showNotification, playerActions]);
 
   const handleTrailer = useCallback(() => {
     showNotification(tCommon('noTrailerAvailable'), 'info', 2000);

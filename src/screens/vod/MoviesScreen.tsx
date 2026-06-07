@@ -31,6 +31,7 @@ import FastSQLiteService from '../../services/FastSQLiteService';
 import WatermelonXtreamService from '../../services/WatermelonXtreamService';
 import ProfileService from '../../services/ProfileService';
 import FavoritesService from '../../services/FavoritesService';
+import VODHistoryService from '../../services/VODHistoryService';
 import FinalSearchScreen from '../../components/FinalSearchScreen';
 import type {VodMovie, VodCategory, RootStackParamList, XtreamCredentials, Profile, Channel} from '../../types';
 
@@ -375,18 +376,19 @@ const MoviesScreen: React.FC<Props> = ({navigation, route}) => {
 
       setTotalMoviesCount(totalCount);
 
-      // Récupérer le nombre de favoris pour ce profil
+      // Récupérer le nombre de favoris et l'historique pour ce profil
       let favoritesCount = 0;
+      let recentlyWatchedCount = 0;
       if (profile) {
         try {
-          const favorites = await FavoritesService.getFavoriteChannelsByProfile(
-            profile.id,
-            playlistId
-          );
-          // Filtrer pour ne compter que les films (streamType === 'movie' ou non défini pour compatibilité)
+          const [favorites, watchedCount] = await Promise.all([
+            FavoritesService.getFavoriteChannelsByProfile(profile.id, playlistId),
+            VODHistoryService.getWatchedMoviesCount(profile.id, playlistId),
+          ]);
           favoritesCount = favorites.filter(f => f.streamType === 'movie' || !f.streamType).length;
+          recentlyWatchedCount = watchedCount;
         } catch (error) {
-          console.log('Erreur comptage favoris:', error);
+          console.log('Erreur comptage favoris/historique:', error);
         }
       }
 
@@ -413,7 +415,7 @@ const MoviesScreen: React.FC<Props> = ({navigation, route}) => {
           category_id: SPECIAL_CATEGORIES.RECENTLY_WATCHED,
           category_name: 'Récemment regardé',
           type: 'movie',
-          count: 0, // TODO: Compter l'historique VOD du profil
+          count: recentlyWatchedCount,
           isSpecial: true,
         },
         {
@@ -569,8 +571,19 @@ const MoviesScreen: React.FC<Props> = ({navigation, route}) => {
           break;
 
         case SPECIAL_CATEGORIES.RECENTLY_WATCHED:
-          // TODO: Implémenter avec le service d'historique VOD
-          result = { movies: [], hasMore: false, totalCount: 0 };
+          if (activeProfile) {
+            const watchedMovies = await VODHistoryService.getWatchedMovies(
+              activeProfile.id,
+              playlistId,
+            );
+            result = {
+              movies: watchedMovies,
+              hasMore: false,
+              totalCount: watchedMovies.length,
+            };
+          } else {
+            result = {movies: [], hasMore: false, totalCount: 0};
+          }
           break;
 
         default:
